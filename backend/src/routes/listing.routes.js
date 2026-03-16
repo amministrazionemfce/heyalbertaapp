@@ -7,17 +7,22 @@ const router = express.Router();
 
 
 
-// Public: directory listings (published only; filter by categoryId = query category)
+// Public: directory listings from LISTINGS collection
+// Query params: page, limit, city (vendor.city), vendorId (listings.vendorId), categoryId (listings.categoryId), category (vendor.category), search
+// Response: { listings, total, pages, page } — each listing has id, title, description, categoryId, status, vendorId, createdAt, vendor: { id, name, city, neighborhood, images, description }
 router.get("/", async (req, res) => {
   try {
     const categoryId = (req.query.categoryId || req.query.category || "").trim();
+    const vendorId = (req.query.vendorId || "").trim();
     const city = (req.query.city || "").trim();
     const search = (req.query.search || "").trim();
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(24, Math.max(1, parseInt(req.query.limit, 10) || 12));
     const skip = (page - 1) * limit;
 
+    // Match on listings collection: published, optional vendorId (= listings.vendorId), optional categoryId (= listings.categoryId)
     const matchListing = { status: "published" };
+    if (vendorId) matchListing.vendorId = vendorId;
     if (categoryId) matchListing.categoryId = categoryId;
 
     const pipeline = [
@@ -25,8 +30,10 @@ router.get("/", async (req, res) => {
       {
         $lookup: {
           from: "vendors",
-          let: { vid: { $toObjectId: "$vendorId" } },
-          pipeline: [{ $match: { $expr: { $eq: ["$_id", "$$vid"] } } }],
+          let: { vid: "$vendorId" },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
+          ],
           as: "vendorDoc",
         },
       },
@@ -34,6 +41,8 @@ router.get("/", async (req, res) => {
       { $match: { "vendorDoc.status": "approved" } },
     ];
 
+    // Optional: category param = vendor.category (filter by the vendor's category)
+    if (categoryId) pipeline.push({ $match: { "vendorDoc.category": categoryId } });
     if (city) pipeline.push({ $match: { "vendorDoc.city": new RegExp(city, "i") } });
     if (search) {
       const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -87,7 +96,7 @@ router.get("/", async (req, res) => {
 
     res.json({ listings, total, pages, page });
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch directory listings" });
+    res.status(500).json({ message: "Failed to fetch listings" });
   }
 });
 

@@ -1,13 +1,30 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { TIERS } from '../data/categories';
+import { useAuth } from '../lib/auth';
 import {
   Mountain, Users, BadgeCheck, BookOpen, ArrowRight,
   CheckCircle2, Star, Shield
 } from 'lucide-react';
-import { TIERS } from '../data/categories';
 
 export default function AboutPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleAddListingsClick = () => {
+    console.log('handleAddListingsClick', user);
+    if (!user) {
+      navigate('/register');
+      return;
+    }
+    if (user.role === 'vendor' || user.role === 'admin') {
+      navigate('/dashboard?tab=add-listing');
+      return;
+    }
+    setShowUpgradeModal(true);
+  };
+
   return (
     <div className="min-h-screen" data-testid="about-page">
       {/* Hero */}
@@ -19,8 +36,8 @@ export default function AboutPage() {
               Making Alberta Feel Like Home
             </h1>
             <p className="text-lg text-spruce-100 leading-relaxed">
-              Hey Alberta is the go-to platform for individuals and families relocating to Alberta. 
-              We connect newcomers with verified, trusted local service providers across 16 essential categories, 
+              Hey Alberta is the go-to platform for individuals and families relocating to Alberta.
+              We connect newcomers with verified, trusted local service providers across 16 essential categories,
               making the transition as smooth and stress-free as possible.
             </p>
           </div>
@@ -62,9 +79,7 @@ export default function AboutPage() {
             {[
               { tier: "Free", price: "Free", features: ["75-word description", "1 image", "Non-verified label", "Basic listing"] },
               { tier: "Standard", price: "$29/mo", features: ["Unlimited description", "Multiple images", "Video introduction", "Direct contact info", "Reply to reviews", "Verified badge"], popular: true },
-              { tier: "Gold", price: "$79/mo", features: ["All Standard features", "Priority placement", "On-site dynamic ads", "Post promotions/coupons", "Email campaign inclusion"] },
-              { tier: "Platinum", price: "$149/mo", features: ["All Gold features", "Category dominance", "City/neighborhood sponsorship", "Featured landing pages", "Dedicated email campaigns"] },
-              { tier: "Enterprise", price: "Custom", features: ["Multi-location listings", "API/bulk management", "Co-branded content", "Welcome box inclusion", "Dedicated account manager"] },
+              { tier: "Premium", price: "$39/mo", features: ["All Standard features", "Priority placement", "On-site dynamic ads", "Post promotions/coupons", "Email campaign inclusion"] },
             ].map((plan, i) => (
               <div
                 key={i}
@@ -106,11 +121,12 @@ export default function AboutPage() {
                 Browse Directory
               </Button>
             </Link>
-            <Link to="/register">
-              <Button variant="outline" className="border-white/30 text-white hover:bg-white/10 h-12 px-8" data-testid="about-register-btn">
-                List Your Business <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            <Button
+              onClick={handleAddListingsClick}
+              className="bg-white/10 border-white/30 text-white hover:bg-white/10 h-12 px-8"
+              data-testid="about-register-btn">
+              List Your Business <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
           </div>
         </div>
       </section>

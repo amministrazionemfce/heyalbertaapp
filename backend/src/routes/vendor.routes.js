@@ -1,7 +1,14 @@
 import express from "express";
+import mongoose from "mongoose";
 import { requireAuth } from "../middleware/auth.js";
 import Vendor from "../models/Vendor.js";
+import Review from "../models/Review.js";
+
 const router = express.Router();
+
+function isValidObjectId(id) {
+  return id && typeof id === "string" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id);
+}
 
 router.get("/", async (req, res) => {
   const { featured, limit } = req.query;
@@ -14,6 +21,38 @@ router.get("/", async (req, res) => {
   }
   const vendors = await q;
   res.json(vendors);
+});
+
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+  if (!isValidObjectId(id)) {
+    return res.status(404).json({ message: "Vendor not found" });
+  }
+  const vendor = await Vendor.findById(id);
+  if (!vendor) {
+    return res.status(404).json({ message: "Vendor not found" });
+  }
+  const reviews = await Review.find({ vendorId: id }).sort({ createdAt: -1 });
+  const vendorObj = vendor.toJSON ? vendor.toJSON() : vendor;
+  const avgRating =
+    reviews.length > 0
+      ? reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length
+      : 0;
+  const payload = {
+    ...vendorObj,
+    user_id: vendor.userId,
+    avg_rating: Math.round(avgRating * 10) / 10,
+    review_count: reviews.length,
+    reviews: reviews.map((r) => {
+      const j = r.toJSON ? r.toJSON() : r;
+      return {
+        ...j,
+        user_name: r.userName,
+        created_at: r.createdAt
+      };
+    })
+  };
+  res.json(payload);
 });
 
 function normalizeName(name) {

@@ -5,7 +5,7 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import ListingCard from '../components/ListingCard';
-import { listingAPI } from '../lib/api';
+import { listingAPI, vendorAPI } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { CATEGORIES, CITIES } from '../data/categories';
 import { toast } from 'sonner';
@@ -24,6 +24,9 @@ export default function DirectoryPage() {
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [category, setCategory] = useState(searchParams.get('category') || '');
   const [city, setCity] = useState(searchParams.get('city') || '');
+  const [vendorId, setVendorId] = useState(searchParams.get('vendorId') || '');
+  const [vendorName, setVendorName] = useState(searchParams.get('vendorName') || '');
+  const [vendors, setVendors] = useState([]);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
 
@@ -60,6 +63,7 @@ export default function DirectoryPage() {
       if (search) params.search = search;
       if (category) params.categoryId = category;
       if (city) params.city = city;
+      if (vendorId) params.vendorId = vendorId;
      
       const res = await listingAPI.directory(params);
       setListings(res.data.listings || []);
@@ -77,11 +81,34 @@ export default function DirectoryPage() {
     setSearch(searchParams.get('search') || '');
     setCategory(searchParams.get('category') || '');
     setCity(searchParams.get('city') || '');
+     setVendorId(searchParams.get('vendorId') || '');
+     setVendorName(searchParams.get('vendorName') || '');
   }, [searchParams]);
 
   useEffect(() => {
     fetchListings(1);
-  }, [category, city]);
+  }, [category, city, vendorId]);
+
+  useEffect(() => {
+    const loadVendors = async () => {
+      try {
+        const res = await vendorAPI.list({ limit: 100 });
+        const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
+        setVendors(list);
+      } catch {
+        setVendors([]);
+      }
+    };
+    loadVendors();
+  }, []);
+
+  // When vendors load and we have vendorId in URL but no vendorName, set name from list so dropdown shows name
+  useEffect(() => {
+    if (vendorId && !vendorName && vendors.length > 0) {
+      const v = vendors.find((x) => String(x.id || x._id) === String(vendorId));
+      if (v?.name) setVendorName(v.name);
+    }
+  }, [vendorId, vendorName, vendors]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -89,6 +116,10 @@ export default function DirectoryPage() {
     if (search) params.set('search', search);
     if (category) params.set('category', category);
     if (city) params.set('city', city);
+    if (vendorId) {
+      params.set('vendorId', vendorId);
+      if (vendorName) params.set('vendorName', vendorName);
+    }
     setSearchParams(params);
     fetchListings(1);
   };
@@ -97,12 +128,23 @@ export default function DirectoryPage() {
     setSearch('');
     setCategory('');
     setCity('');
+    setVendorId('');
+    setVendorName('');
     setSearchParams({});
     fetchListings(1);
   };
 
-  const activeFilters = [search, category, city].filter(Boolean).length;
+  const activeFilters = [search, category, city, vendorName || vendorId].filter(Boolean).length;
   const categoryName = CATEGORIES.find(c => c.id === category)?.name;
+  // When a category is selected, only show vendors in that category in the vendor dropdown
+  const vendorsInCategory = category
+    ? vendors.filter((v) => String(v.category) === String(category))
+    : vendors;
+  const selectedVendorName =
+    vendorId && (vendorName || vendors.find((v) => String(v.id || v._id) === String(vendorId))?.name);
+  const displayVendorLabel = selectedVendorName || 'All Vendors';
+  const displayCategoryLabel = categoryName || 'All Categories';
+  const displayCityLabel = city || 'All Cities';
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="directory-page">
@@ -165,23 +207,85 @@ export default function DirectoryPage() {
             </div>
 
             <Select
+              value={vendorId || 'all'}
+              onValueChange={(val) => {
+                const newVendorId = val === 'all' ? '' : val;
+                const selectedVendor = vendorsInCategory.find(
+                  (v) => String(v.id || v._id) === newVendorId
+                );
+                setVendorId(newVendorId);
+                setVendorName(selectedVendor?.name || '');
+                const p = new URLSearchParams(searchParams);
+                if (newVendorId) {
+                  p.set('vendorId', newVendorId);
+                  if (selectedVendor?.name) p.set('vendorName', selectedVendor.name);
+                } else {
+                  p.delete('vendorId');
+                  p.delete('vendorName');
+                }
+                setSearchParams(p);
+                // Let useEffect run after state update so fetchListings uses new vendorId
+              }}
+            >
+              <SelectTrigger className="w-full md:w-52 h-11" data-testid="vendor-filter">
+                <SelectValue>{displayVendorLabel}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Vendors</SelectItem>
+                {vendorsInCategory.map((v) => {
+                  const id = String(v.id ?? v._id);
+                  return (
+                    <SelectItem key={id} value={id}>
+                      {v.name || id}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            <Select
               value={category || 'all'}
               onValueChange={(val) => {
                 const newCat = val === 'all' ? '' : val;
+                let newVendorId = vendorId;
+                let newVendorName = vendorName;
+                if (newCat && vendorId) {
+                  const stillInCategory = vendors.some(
+                    (v) =>
+                      String(v.id || v._id) === String(vendorId) &&
+                      String(v.category) === String(newCat)
+                  );
+                  if (!stillInCategory) {
+                    newVendorId = '';
+                    newVendorName = '';
+                    setVendorId('');
+                    setVendorName('');
+                  }
+                }
                 setCategory(newCat);
                 const p = new URLSearchParams(searchParams);
                 if (newCat) p.set('category', newCat);
                 else p.delete('category');
+                if (newVendorId) {
+                  p.set('vendorId', newVendorId);
+                  if (newVendorName) p.set('vendorName', newVendorName);
+                } else {
+                  p.delete('vendorId');
+                  p.delete('vendorName');
+                }
                 setSearchParams(p);
+                // Let useEffect run after state update so fetchListings uses correct filters
               }}
             >
               <SelectTrigger className="w-full md:w-52 h-11" data-testid="category-filter">
-                <SelectValue placeholder="All Categories" />
+                <SelectValue>{displayCategoryLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Categories</SelectItem>
-                {CATEGORIES.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                {CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.id} className="text-left" value={cat.id}>
+                    {cat.name}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -198,12 +302,14 @@ export default function DirectoryPage() {
               }}
             >
               <SelectTrigger className="w-full md:w-44 h-11" data-testid="city-filter">
-                <SelectValue placeholder="All Cities" />
+                <SelectValue>{displayCityLabel}</SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Cities</SelectItem>
-                {CITIES.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                {CITIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -219,6 +325,11 @@ export default function DirectoryPage() {
               {search && <span className="text-xs bg-slate-100 px-2 py-1 rounded">{search}</span>}
               {categoryName && <span className="text-xs bg-spruce-50 text-spruce-700 px-2 py-1 rounded">{categoryName}</span>}
               {city && <span className="text-xs bg-secondary-50 text-secondary-700 px-2 py-1 rounded">{city}</span>}
+              {(vendorName || vendorId) && (
+                <span className="text-xs bg-amber-50 text-amber-800 px-2 py-1 rounded">
+                  Vendor: {vendorName || `#${vendorId}`}
+                </span>
+              )}
               <button onClick={clearFilters} className="text-xs text-destructive flex items-center gap-1 ml-2" data-testid="clear-filters-btn">
                 <X className="w-3 h-3" /> Clear all
               </button>

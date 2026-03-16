@@ -29,7 +29,13 @@ const userSchema = new mongoose.Schema({
 userSchema.virtual("id").get(function () {
   return this._id.toString();
 });
-userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toJSON", {
+  virtuals: true,
+  transform: (doc, ret) => {
+    delete ret.passwordHash;
+    return ret;
+  },
+});
 userSchema.set("toObject", { virtuals: true });
 
 export default mongoose.model("User", userSchema);

@@ -4,10 +4,13 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
-import {Link} from 'react-router-dom';
+import {Link, useNavigate} from 'react-router-dom';
+import { useAuth } from '../lib/auth';
 import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
 
 export default function ContactPage() {
+  const { user } = useAuth();
+  const navigate = useNavigate(); 
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [sending, setSending] = useState(false);
 
@@ -21,6 +24,17 @@ export default function ContactPage() {
       setSending(false);
     }, 1000);
   };
+
+  const handleAddListingsClick = () => {
+    if (!user) {
+      navigate('/register');
+      return;
+    }
+    if (user.role === 'vendor' || user.role === 'admin') {
+      navigate('/dashboard?tab=add-listing');
+      return;
+    }
+  };  
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="contact-page">
@@ -103,8 +117,8 @@ export default function ContactPage() {
               <p className="text-sm text-spruce-100 leading-relaxed mb-4">
                 Interested in listing your business? We offer free and premium plans to connect you with newcomers to Alberta.
               </p>
-              <Button variant="secondary" className="text-spruce-700 hover:text-spruce-500 w-full" asChild>
-                <Link to="/">Get Listed</Link>
+              <Button onClick={handleAddListingsClick} variant="secondary" className="text-spruce-700 hover:text-spruce-500 w-full" asChild>
+                Get Listed
               </Button>
             </div>
           </div>

@@ -10,7 +10,10 @@ import Resource from "../models/Resource.js";
 const router = express.Router();
 
 function isValidObjectId(id) {
-  return id && typeof id === "string" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id);
+  return id &&
+    typeof id === "string"
+    && id !== "undefined"
+    && mongoose.Types.ObjectId.isValid(id);
 }
 
 
@@ -78,7 +81,7 @@ router.put("/vendors/:vendorId/approve", requireAdmin, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
-}); 
+});
 
 /*
 ------------------------------------------------

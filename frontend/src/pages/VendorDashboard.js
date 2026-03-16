@@ -23,7 +23,7 @@ const defaultFormData = {
 };
 
 export default function VendorDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
@@ -44,9 +44,13 @@ export default function VendorDashboard() {
   const [addListingBlockedDismissed, setAddListingBlockedDismissed] = useState(false);
 
   useEffect(() => {
-    if (!user) { navigate('/login'); return; }
+    if (authLoading) return;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
     fetchVendors();
-  }, [user]);
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (hasVendor) fetchListings();

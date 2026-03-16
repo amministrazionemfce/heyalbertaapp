@@ -18,6 +18,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [featuredVendors, setFeaturedVendors] = useState([]);
+  const [showAllVendors, setShowAllVendors] = useState(false);
   const [loading, setLoading] = useState(true);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [listingCounts, setListingCounts] = useState({});
@@ -222,22 +223,49 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Vendors */}
+      {/* Vendors section: featured by default, expandable to all */}
       <section className="py-24 md:py-24 bg-slate-50" data-testid="featured-vendors-section">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl">
           <div className="mb-12">
             <div>
               <h2 className="font-heading text-3xl md:text-4xl font-bold text-center text-slate-900 mb-3">
-                Featured Vendors
+                {showAllVendors ? 'All Vendors' : 'Featured Vendors'}
               </h2>
               <p className="text-base text-center md:text-lg text-slate-500">
-                Trusted service providers ready to help with your relocation.
+                {showAllVendors
+                  ? 'Browse all approved vendors.'
+                  : 'Trusted service providers ready to help with your relocation.'}
               </p>
             </div>
 
-            <Link to="/directory" className="hidden mt-10 justify-center md:flex items-center gap-1 text-spruce-700 font-medium hover:underline" data-testid="view-all-vendors">
-              View All <ChevronRight className="w-4 h-4" />
-            </Link>
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  if (showAllVendors) {
+                    const res = await vendorAPI.list({ featured: true, limit: 6 });
+                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
+                    setFeaturedVendors(list);
+                    setShowAllVendors(false);
+                  } else {
+                    const res = await vendorAPI.list({});
+                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
+                    setFeaturedVendors(list);
+                    setShowAllVendors(true);
+                  }
+                } catch {
+                  // ignore errors, keep current list
+                }
+              }}
+              className="hidden mt-10 justify-center md:inline-flex items-center gap-1 text-spruce-700 font-medium hover:bg-slate-100 rounded-lg px-4 py-2"
+              data-testid="view-all-vendors"
+            >
+              {showAllVendors ? (
+                <>Featured Vendors <ChevronUp className="w-4 h-4" /></>
+              ) : (
+                <>Show All Vendors <ChevronRight className="w-4 h-4" /></>
+              )}
+            </button>
           </div>
 
           {loading ? (
@@ -247,7 +275,11 @@ export default function HomePage() {
               ))}
             </div>
           ) : featuredVendors.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">No featured vendors yet. Admins can feature approved vendors from the dashboard.</p>
+            <p className="text-center text-slate-500 py-8">
+              {showAllVendors
+                ? 'No vendors yet.'
+                : 'No featured vendors yet. Admins can feature approved vendors from the dashboard.'}
+            </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {featuredVendors.map(vendor => (
@@ -257,9 +289,29 @@ export default function HomePage() {
           )}
 
           <div className="mt-10 text-center md:hidden">
-            <Link to="/directory">
-              <Button variant="outline" data-testid="view-all-vendors-mobile">View All Vendors</Button>
-            </Link>
+            <Button
+              variant="outline"
+              data-testid="view-all-vendors-mobile"
+              onClick={async () => {
+                try {
+                  if (showAllVendors) {
+                    const res = await vendorAPI.list({ featured: true, limit: 6 });
+                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
+                    setFeaturedVendors(list);
+                    setShowAllVendors(false);
+                  } else {
+                    const res = await vendorAPI.list({});
+                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
+                    setFeaturedVendors(list);
+                    setShowAllVendors(true);
+                  }
+                } catch {
+                  // ignore errors
+                }
+              }}
+            >
+              {showAllVendors ? 'Only Featured' : 'Show All Vendors'}
+            </Button>
           </div>
         </div>
       </section>

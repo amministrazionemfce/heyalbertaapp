@@ -40,9 +40,10 @@ export function SelectTrigger({ className = '', children, ...props }) {
   );
 }
 
-export function SelectValue({ placeholder = 'Select...' }) {
+export function SelectValue({ placeholder = 'Select...', children }) {
   const { value } = React.useContext(SelectContext);
-  return <span>{value || placeholder}</span>;
+  const display = children != null && children !== '' ? children : (value || placeholder);
+  return <span>{display}</span>;
 }
 
 export function SelectContent({ className = '', children, ...props }) {

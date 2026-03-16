@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Sheet, SheetContent, SheetTrigger } from '../components/ui/sheet';
-import { Menu, User, LogOut, LayoutDashboard, ChevronDown, Mountain } from 'lucide-react';
+import { Menu, User, LogOut, LayoutDashboard, ChevronDown, KeyRound, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { Button } from '../components/ui/button';
 import {
@@ -18,8 +18,7 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-  const { pathname } = useLocation(); 
-
+  const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -45,13 +44,16 @@ export default function Navbar() {
           {/* Desktop Nav */}
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map(link => {
-              const isActive = pathname === link.to;
+              const isActive =
+                link.to === '/'
+                  ? pathname === '/'
+                  : pathname === link.to || pathname.startsWith(`${link.to}/`);
               return (
                 <Link
                   key={link.to}
                   to={link.to}
                   className={`text-sm font-medium transition-colors border-b-2 border-transparent -mb-px pb-px
-                    ${isActive ? 'text-spruce-700 border-spruce-700' : 'text-slate-600 hover:text-spruce-600 border-transparent'}`}
+                    ${isActive ? 'text-red-900 font-bold' : 'text-slate-600 hover:text-spruce-600 border-transparent'}`}
                   data-testid={`nav-${link.label.toLowerCase()}`}
                 >
                   {link.label}
@@ -61,13 +63,13 @@ export default function Navbar() {
           </div>
 
           {/* Auth */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-3 bg-white-900">
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2" data-testid="user-menu-trigger">
-                    <div className="w-8 h-8 bg-spruce-50 rounded-full flex items-center justify-center">
-                      <User className="w-4 h-4 text-spruce-700" />
+                    <div className="w-8 h-8 bg-spruce-50 rounded-full text-black-900 bg-white flex items-center justify-center">
+                      <User className="w-4 h-4" />
                     </div>
                     <span className="text-sm font-medium">{user.name}</span>
                     <ChevronDown className="w-4 h-4" />
@@ -82,7 +84,7 @@ export default function Navbar() {
                   {user.role === 'admin' && (
                     <>
                       <DropdownMenuItem onClick={() => navigate('/admin')} data-testid="nav-admin">
-                        <LayoutDashboard className="w-4 h-4 mr-2" /> Admin Panel
+                        <KeyRound className="w-4 h-4 mr-2" /> Admin Panel
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                     </>
@@ -123,7 +125,7 @@ export default function Navbar() {
                     <Link
                       key={link.to}
                       to={link.to}
-                      className={`text-lg font-medium ${isActive ? 'text-spruce-700 font-semibold' : 'text-slate-700 hover:text-spruce-700'}`}
+                      className={`text-lg font-medium hover:text-red-900 ${isActive ? 'text-red-900 font-bold' : 'text-slate-700 hover:text-red-800'}`}
                       onClick={() => setOpen(false)}
                     >
                       {link.label}
