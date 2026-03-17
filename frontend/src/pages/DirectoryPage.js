@@ -39,6 +39,10 @@ export default function DirectoryPage() {
       navigate('/dashboard?tab=add-listing');
       return;
     }
+    if (user.role === 'user') {
+      setShowUpgradeModal(true);
+      return;
+    }
     setShowUpgradeModal(true);
   };
 
@@ -389,6 +393,39 @@ export default function DirectoryPage() {
           </>
         )}
       </div>
+
+      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upgrade to Vendor</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            You need to upgrade to a vendor account to add listings. Do you want to upgrade to a vendor account?
+          </p>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setShowUpgradeModal(false)}
+              disabled={upgrading}
+            >
+              No
+            </Button>
+            <Button
+              onClick={handleUpgradeConfirm}
+              disabled={upgrading}
+            >
+              {upgrading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Upgrading…
+                </>
+              ) : (
+                'Yes'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -81,6 +81,8 @@ export const adminAPI = {
   approveVendor: (id) => API.put(`/admin/vendors/${id}/approve`),
   rejectVendor: (id) => API.put(`/admin/vendors/${id}/reject`),
   featureVendor: (id, featured) => API.put(`/admin/vendors/${id}/feature`, { featured }),
+  listings: (params) => API.get('/admin/listings', { params }),
+  featureListing: (id, featured) => API.put(`/admin/listings/${id}/feature`, { featured }),
   stats: () => API.get('/admin/stats'),
   users: () => API.get('/admin/users'),
 };

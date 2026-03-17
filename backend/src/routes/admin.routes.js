@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { requireAdmin } from "../middleware/admin.js";
 
 import Vendor from "../models/Vendor.js";
+import Listing from "../models/Listing.js";
 import Review from "../models/Review.js";
 import User from "../models/User.js";
 import Resource from "../models/Resource.js";
@@ -137,6 +138,64 @@ router.put("/vendors/:vendorId/feature", requireAdmin, async (req, res) => {
   }
 });
 
+
+/*
+------------------------------------------------
+GET ALL LISTINGS (Admin panel) — with vendor info
+------------------------------------------------
+*/
+router.get("/listings", requireAdmin, async (req, res) => {
+  try {
+    const { status } = req.query;
+    const query = {};
+    if (status) query.status = status;
+
+    const listings = await Listing.find(query).sort({ createdAt: -1 });
+    const result = [];
+
+    for (const list of listings) {
+      const vendor = await Vendor.findById(list.vendorId);
+      result.push({
+        ...list.toObject(),
+        id: list._id.toString(),
+        vendorName: vendor?.name ?? null,
+        vendorCity: vendor?.city ?? null,
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/*
+------------------------------------------------
+FEATURE / UNFEATURE LISTING
+------------------------------------------------
+*/
+router.put("/listings/:listingId/feature", requireAdmin, async (req, res) => {
+  try {
+    const { listingId } = req.params;
+    const { featured } = req.body;
+    if (!isValidObjectId(listingId))
+      return res.status(400).json({ message: "Invalid listing id" });
+
+    const value = featured === true || featured === "true";
+    const listing = await Listing.findByIdAndUpdate(
+      listingId,
+      { featured: value },
+      { new: true }
+    );
+
+    if (!listing)
+      return res.status(404).json({ message: "Listing not found" });
+
+    res.json({ message: value ? "Listing featured" : "Listing unfeatured", listing });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 /*
 ------------------------------------------------

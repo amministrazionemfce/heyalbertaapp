@@ -14,7 +14,7 @@ export default function ListingCard({ listing }) {
     >
       <div className="relative h-40 overflow-hidden bg-slate-100">
         <img
-          src={vendor.images?.[0] || 'services/1.jpeg'}
+          src={vendor.images?.[0] || 'services/1.jpg'}
           alt="Image of the listing is unavailable"
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"

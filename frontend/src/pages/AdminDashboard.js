@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI } from '../lib/api';
-import { Loader2, List, Megaphone, CreditCard, Settings } from 'lucide-react';
+import { Loader2, Megaphone, CreditCard, Settings } from 'lucide-react';
 import { ADMIN_SECTIONS } from './admin/adminConfig';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminStatsSection } from './admin/AdminStatsSection';
 import { AdminPlaceholder } from './admin/AdminPlaceholder';
 import { AdminVendorsSection } from './admin/AdminVendorsSection';
+import { AdminListingsSection } from './admin/AdminListingsSection';
 import { AdminUsersSection } from './admin/AdminUsersSection';
 import { AdminResourcesSection } from './admin/AdminResourcesSection';
 
@@ -66,9 +67,7 @@ export default function AdminDashboard() {
           {validSection === 'statistics' && <AdminStatsSection stats={stats} />}
           {validSection === 'users' && <AdminUsersSection />}
           {validSection === 'vendors' && <AdminVendorsSection onUpdate={refreshStats} />}
-          {validSection === 'listings' && (
-            <AdminPlaceholder icon={List} title="Listings" description="Manage all listings across vendors. Coming soon." />
-          )}
+          {validSection === 'listings' && <AdminListingsSection onUpdate={refreshStats} />}
           {validSection === 'resources' && <AdminResourcesSection onUpdate={refreshStats} />}
           {validSection === 'marketings' && (
             <AdminPlaceholder icon={Megaphone} title="Marketings" description="Campaigns and promotions. Coming soon." />
