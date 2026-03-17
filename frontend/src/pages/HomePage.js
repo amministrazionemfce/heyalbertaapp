@@ -134,8 +134,8 @@ export default function HomePage() {
               Browse by Category
             </h2>
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-2xl mx-auto">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <div className="relative flex-1 h-10 flex items-center">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 <Input
                   placeholder="Search categories..."
                   value={categorySearch}

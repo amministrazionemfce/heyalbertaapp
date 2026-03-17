@@ -102,10 +102,23 @@ router.get("/", async (req, res) => {
 
 
 // Public: get published listing counts by category (for homepage)
+// Only count listings whose vendor is approved, to match directory results
 router.get("/counts-by-category", async (req, res) => {
   try {
     const counts = await Listing.aggregate([
       { $match: { status: "published" } },
+      {
+        $lookup: {
+          from: "vendors",
+          let: { vid: "$vendorId" },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
+          ],
+          as: "vendorDoc",
+        },
+      },
+      { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
+      { $match: { "vendorDoc.status": "approved" } },
       { $group: { _id: "$categoryId", count: { $sum: 1 } } },
     ]);
     const byCategory = {};
