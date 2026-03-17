@@ -4,6 +4,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import VendorCard from '../components/VendorCard';
+import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
+import { useAddListingClick } from '../hooks/useAddListingClick';
 import { StarRating } from '../components/StarRating';
 import { vendorAPI, listingAPI } from '../lib/api';
 import { CATEGORIES, getCategoryIcon, CITIES } from '../data/categories';
@@ -16,6 +18,7 @@ const INITIAL_CATEGORIES = 8;
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [searchQuery, setSearchQuery] = useState('');
   const [featuredVendors, setFeaturedVendors] = useState([]);
   const [showAllVendors, setShowAllVendors] = useState(false);
@@ -352,11 +355,13 @@ export default function HomePage() {
             Join Hey Alberta and connect with thousands of newcomers looking for trusted services. Start with a free listing today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/register">
-              <Button className="bg-white/10 text-white h-12 px-8 text-base rounded-xl" data-testid="cta-register-btn">
-                List Your Business <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </Link>
+            <Button
+              onClick={handleAddListingClick}
+              className="bg-white/10 text-white h-12 px-8 text-base rounded-xl"
+              data-testid="cta-register-btn"
+            >
+              List Your Business <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
             <Link to="/about">
               <Button className="bg-secondary-600 border-white/30 text-white hover:bg-white/10 h-12 px-8 text-base rounded-xl" data-testid="cta-learn-more-btn">
                 Learn More
@@ -365,6 +370,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );
 }

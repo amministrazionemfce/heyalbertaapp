@@ -3,17 +3,16 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import ListingCard from '../components/ListingCard';
+import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
+import { useAddListingClick } from '../hooks/useAddListingClick';
 import { listingAPI, vendorAPI } from '../lib/api';
-import { useAuth } from '../lib/auth';
 import { CATEGORIES, CITIES } from '../data/categories';
-import { toast } from 'sonner';
-import { Search, X, Loader2, Plus, MapPin, BadgeCheck, Heart } from 'lucide-react';
+import { Search, X, Plus, MapPin, BadgeCheck, Heart, Loader2 } from 'lucide-react';
 
 export default function DirectoryPage() {
-  const { user, upgradeToVendor } = useAuth();
   const navigate = useNavigate();
+  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [searchParams, setSearchParams] = useSearchParams();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,38 +26,6 @@ export default function DirectoryPage() {
   const [vendorId, setVendorId] = useState(searchParams.get('vendorId') || '');
   const [vendorName, setVendorName] = useState(searchParams.get('vendorName') || '');
   const [vendors, setVendors] = useState([]);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
-
-  const handleAddListingsClick = () => {
-    if (!user) {
-      navigate('/register');
-      return;
-    }
-    if (user.role === 'vendor' || user.role === 'admin') {
-      navigate('/dashboard?tab=add-listing');
-      return;
-    }
-    if (user.role === 'user') {
-      setShowUpgradeModal(true);
-      return;
-    }
-    setShowUpgradeModal(true);
-  };
-
-  const handleUpgradeConfirm = async () => {
-    setUpgrading(true);
-    try {
-      await upgradeToVendor();
-      toast.success('Account upgraded to Vendor. You can now add listings.');
-      setShowUpgradeModal(false);
-      navigate('/dashboard?tab=add-listing');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Upgrade failed');
-    } finally {
-      setUpgrading(false);
-    }
-  };
 
   const fetchListings = async (p = 1) => {
     setLoading(true);
@@ -181,7 +148,7 @@ export default function DirectoryPage() {
             <div className="w-full sm:w-auto flex flex-shrink-0 justify-end sm:justify-end">
               <Button
                 type="button"
-                onClick={handleAddListingsClick}
+                onClick={handleAddListingClick}
                 className="w-full sm:w-auto bg-spruce-700 hover:bg-spruce-800 text-white h-11 px-5 gap-2 shadow-lg min-w-[140px]"
                 data-testid="add-listings-btn"
               >
@@ -394,38 +361,7 @@ export default function DirectoryPage() {
         )}
       </div>
 
-      <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Upgrade to Vendor</DialogTitle>
-          </DialogHeader>
-          <p className="text-muted-foreground">
-            You need to upgrade to a vendor account to add listings. Do you want to upgrade to a vendor account?
-          </p>
-          <div className="flex justify-end gap-2 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setShowUpgradeModal(false)}
-              disabled={upgrading}
-            >
-              No
-            </Button>
-            <Button
-              onClick={handleUpgradeConfirm}
-              disabled={upgrading}
-            >
-              {upgrading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Upgrading…
-                </>
-              ) : (
-                'Yes'
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );
 }

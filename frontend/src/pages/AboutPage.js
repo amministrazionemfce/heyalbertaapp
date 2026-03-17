@@ -1,29 +1,15 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { TIERS } from '../data/categories';
-import { useAuth } from '../lib/auth';
+import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
+import { useAddListingClick } from '../hooks/useAddListingClick';
 import {
-  Mountain, Users, BadgeCheck, BookOpen, ArrowRight,
-  CheckCircle2, Star, Shield
+  Users, BadgeCheck, BookOpen, ArrowRight,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function AboutPage() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  const handleAddListingsClick = () => {
-    console.log('handleAddListingsClick', user);
-    if (!user) {
-      navigate('/register');
-      return;
-    }
-    if (user.role === 'vendor' || user.role === 'admin') {
-      navigate('/dashboard?tab=add-listing');
-      return;
-    }
-    setShowUpgradeModal(true);
-  };
+  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
 
   return (
     <div className="min-h-screen" data-testid="about-page">
@@ -122,7 +108,7 @@ export default function AboutPage() {
               </Button>
             </Link>
             <Button
-              onClick={handleAddListingsClick}
+              onClick={handleAddListingClick}
               className="bg-white/10 border-white/30 text-white hover:bg-white/10 h-12 px-8"
               data-testid="about-register-btn">
               List Your Business <ArrowRight className="w-4 h-4 ml-2" />
@@ -130,6 +116,7 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+      <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );
 }

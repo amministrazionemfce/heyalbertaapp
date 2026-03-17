@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
+import { useAddListingClick } from '../hooks/useAddListingClick';
 import { resourceAPI } from '../lib/api';
-import { ClipboardList, BookOpen, HelpCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ClipboardList, BookOpen, HelpCircle, Loader2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
 
 export default function ResourceLibrary() {
+  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
@@ -72,12 +76,23 @@ export default function ResourceLibrary() {
       {/* Header */}
       <div className="bg-white border-b">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl py-12">
-          <h1 className="font-heading text-3xl md:text-4xl font-bold text-slate-900 mb-3">
-            Resource Library
-          </h1>
-          <p className="text-base md:text-lg text-slate-500 max-w-2xl">
-            Essential guides, checklists, and FAQs to help make your move to Alberta as smooth as possible.
-          </p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="font-heading text-3xl md:text-4xl font-bold text-slate-900 mb-3">
+                Resource Library
+              </h1>
+              <p className="text-base md:text-lg text-slate-500 max-w-2xl">
+                Essential guides, checklists, and FAQs to help make your move to Alberta as smooth as possible.
+              </p>
+            </div>
+            <Button
+              onClick={handleAddListingClick}
+              className="bg-spruce-700 hover:bg-spruce-800 text-white shrink-0"
+              data-testid="resource-list-business-btn"
+            >
+              List Your Business <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -104,6 +119,7 @@ export default function ResourceLibrary() {
           </TabsContent>
         </Tabs>
       </div>
+      <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );
 }
