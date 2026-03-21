@@ -12,6 +12,7 @@ import {
   ArrowLeft, MapPin, Phone, Mail, Globe, BadgeCheck,
   ExternalLink, MessageSquare, Send, Loader2, Clock
 } from 'lucide-react';
+import { ROUTES, vendorPath } from '../constants';
 
 export default function ListingDetailPage() {
   const { id } = useParams();
@@ -30,7 +31,7 @@ export default function ListingDetailPage() {
       setListing(res.data);
     } catch {
       toast.error('Listing not found');
-      navigate('/directory');
+      navigate(ROUTES.DIRECTORY);
     } finally {
       setLoading(false);
     }
@@ -57,7 +58,7 @@ export default function ListingDetailPage() {
   const handleSubmitReview = async (e) => {
     e.preventDefault();
     if (!user) {
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
       return;
     }
     if (!listing?.vendor?.id) return;
@@ -125,7 +126,7 @@ export default function ListingDetailPage() {
               </h1>
               {vendor.name && (
                 <Link
-                  to={`/vendors/${vendor.id}`}
+                  to={vendorPath(vendor.id)}
                   className="text-spruce-700 hover:underline font-medium mb-4 inline-block"
                 >
                   {vendor.name}
@@ -183,7 +184,7 @@ export default function ListingDetailPage() {
                 </form>
               ) : (
                 <p className="text-sm text-muted-foreground mb-6">
-                  <Link to="/login" className="text-spruce-700 hover:underline font-medium">Log in</Link> to leave feedback.
+                  <Link to={ROUTES.LOGIN} className="text-spruce-700 hover:underline font-medium">Log in</Link> to leave feedback.
                 </p>
               )}
 
@@ -230,7 +231,7 @@ export default function ListingDetailPage() {
               {vendor.tier === 'free' ? (
                 <p className="text-sm text-muted-foreground mb-4">
                   Contact info available for upgraded listings.
-                  <Link to="/about" className="text-spruce-700 hover:underline ml-1">Learn more</Link>
+                  <Link to={ROUTES.ABOUT} className="text-spruce-700 hover:underline ml-1">Learn more</Link>
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -277,7 +278,7 @@ export default function ListingDetailPage() {
               </div>
 
               <Button variant="outline" className="w-full mt-4" asChild>
-                <Link to={`/vendors/${vendor.id}`}>
+                <Link to={vendorPath(vendor.id)}>
                   View full vendor profile <ExternalLink className="w-3.5 h-3.5 ml-2" />
                 </Link>
               </Button>

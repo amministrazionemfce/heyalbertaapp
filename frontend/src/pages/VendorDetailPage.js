@@ -12,6 +12,7 @@ import {
   ArrowLeft, MapPin, Phone, Mail, Globe, BadgeCheck,
   ExternalLink, MessageSquare, Send, Loader2, Clock
 } from 'lucide-react';
+import { ROUTES, directoryCategoryQuery } from '../constants';
 
 export default function VendorDetailPage() {
   const { id } = useParams();
@@ -31,7 +32,7 @@ export default function VendorDetailPage() {
       setVendor(res.data);
     } catch {
       toast.error('Vendor not found');
-      navigate('/directory');
+      navigate(ROUTES.DIRECTORY);
     } finally {
       setLoading(false);
     }
@@ -119,7 +120,7 @@ export default function VendorDetailPage() {
                     {vendor.name}
                   </h1>
                   {categoryInfo && (
-                    <Link to={`/directory?category=${categoryInfo.id}`} className="text-sm text-spruce-700 hover:underline font-medium">
+                    <Link to={directoryCategoryQuery(categoryInfo.id)} className="text-sm text-spruce-700 hover:underline font-medium">
                       {categoryInfo.name}
                     </Link>
                   )}
@@ -179,7 +180,7 @@ export default function VendorDetailPage() {
 
               {!user && (
                 <p className="text-sm text-muted-foreground mb-6">
-                  <Link to="/login" className="text-spruce-700 hover:underline font-medium">Log in</Link> to leave a review.
+                  <Link to={ROUTES.LOGIN} className="text-spruce-700 hover:underline font-medium">Log in</Link> to leave a review.
                 </p>
               )}
 
@@ -256,7 +257,7 @@ export default function VendorDetailPage() {
               {vendor.tier === 'free' ? (
                 <p className="text-sm text-muted-foreground">
                   Contact info available for verified vendors. 
-                  <Link to="/about" className="text-spruce-700 hover:underline ml-1">Learn more</Link>
+                  <Link to={ROUTES.ABOUT} className="text-spruce-700 hover:underline ml-1">Learn more</Link>
                 </p>
               ) : (
                 <div className="space-y-4">

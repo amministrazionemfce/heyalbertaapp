@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import { registerValidation } from '../validations/registerValidation';
+import { ROUTES } from '../constants';
 
 const initialValdationError = {
   name: '',
@@ -28,7 +29,7 @@ export default function RegisterPage() {
   const [validationError, setValidationError] = useState(initialValdationError);
 
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
+    if (user) navigate(ROUTES.HOME, { replace: true });
   }, [user, navigate]);
  
 
@@ -45,8 +46,8 @@ export default function RegisterPage() {
     try {
       await register(name, email, password, role);
       
-      if (role === 'vendor') navigate('/dashboard');
-      else navigate('/');
+      if (role === 'vendor') navigate(ROUTES.DASHBOARD);
+      else navigate(ROUTES.HOME);
     } catch (err) {
       toast.error(err.response?.data?.detail || 'Registration failed');
     } finally {
@@ -58,19 +59,19 @@ export default function RegisterPage() {
     <div className="min-h-screen flex" data-testid="register-page">
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <Link to="/" className="flex items-center gap-2 mb-6">
+          <Link to={ROUTES.HOME} className="flex items-center gap-2 mb-6">
             <div className="w-25 h-16 flex items-center justify-center">
               <img src="logo.png" alt="Hey Alberta Logo" className="w-full h-full object-cover" />
             </div>
           </Link>
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700 mb-8" data-testid="register-back-home">
+          <Link to={ROUTES.HOME} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700 mb-8" data-testid="register-back-home">
             <ArrowLeft className="w-4 h-4" /> Return to main page
           </Link>
 
           <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">Create your account</h1>
           <p className="text-sm text-muted-foreground mb-8">
             Already have an account? {' '}
-            <Link to="/login" className="text-spruce-700 hover:underline font-medium">Log in</Link>
+            <Link to={ROUTES.LOGIN} className="text-spruce-700 hover:underline font-medium">Log in</Link>
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">

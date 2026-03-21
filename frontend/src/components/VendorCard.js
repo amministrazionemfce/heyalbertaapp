@@ -3,6 +3,7 @@ import { Badge } from '../components/ui/badge';
 import { StarRating } from '../components/StarRating';
 import { MapPin, BadgeCheck, Phone } from 'lucide-react';
 import { getCategoryIcon, getTierInfo } from '../data/categories';
+import { vendorPath } from '../constants';
 
 export default function VendorCard({ vendor }) {
   const tierInfo = getTierInfo(vendor.tier);
@@ -10,7 +11,7 @@ export default function VendorCard({ vendor }) {
 
   return (
     <Link
-      to={`/vendors/${vendor.id}`}
+      to={vendorPath(vendor.id)}
       className="group relative overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-lg hover:-translate-y-1"
       data-testid={`vendor-card-${vendor.id}`}
     >

@@ -11,6 +11,7 @@ import { AdminVendorsSection } from './admin/AdminVendorsSection';
 import { AdminListingsSection } from './admin/AdminListingsSection';
 import { AdminUsersSection } from './admin/AdminUsersSection';
 import { AdminResourcesSection } from './admin/AdminResourcesSection';
+import { ROUTES } from '../constants';
 
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -26,7 +27,7 @@ export default function AdminDashboard() {
       return;
     }
     if (!user || user.role !== 'admin') {
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
       return;
     }
     adminAPI

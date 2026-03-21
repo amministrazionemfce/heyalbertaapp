@@ -16,6 +16,7 @@ router.get("/", async (req, res) => {
     const vendorId = (req.query.vendorId || "").trim();
     const city = (req.query.city || "").trim();
     const search = (req.query.search || "").trim();
+    const featuredOnly = req.query.featured === "true" || req.query.featured === true;
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(24, Math.max(1, parseInt(req.query.limit, 10) || 12));
     const skip = (page - 1) * limit;
@@ -24,6 +25,7 @@ router.get("/", async (req, res) => {
     const matchListing = { status: "published" };
     if (vendorId) matchListing.vendorId = vendorId;
     if (categoryId) matchListing.categoryId = categoryId;
+    if (featuredOnly) matchListing.featured = true;
 
     const pipeline = [
       { $match: matchListing },
@@ -39,6 +41,16 @@ router.get("/", async (req, res) => {
       },
       { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
       { $match: { "vendorDoc.status": "approved" } },
+      {
+        $lookup: {
+          from: "reviews",
+          localField: "vendorId",
+          foreignField: "vendorId",
+          as: "_reviewDocs",
+        },
+      },
+      { $addFields: { reviewCount: { $size: { $ifNull: ["$_reviewDocs", []] } } } },
+      { $project: { _reviewDocs: 0 } },
     ];
 
     // Optional: category param = vendor.category (filter by the vendor's category)
@@ -73,6 +85,9 @@ router.get("/", async (req, res) => {
                 categoryId: 1,
                 status: 1,
                 vendorId: 1,
+                featured: 1,
+                features: { $ifNull: ["$features", []] },
+                reviewCount: 1,
                 createdAt: 1,
                 vendor: {
                   id: { $toString: "$vendorDoc._id" },
@@ -128,6 +143,41 @@ router.get("/counts-by-category", async (req, res) => {
     res.json(byCategory);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch counts" });
+  }
+});
+
+// Public: published listing counts by vendor city (lowercase keys, for homepage city cards)
+router.get("/counts-by-city", async (req, res) => {
+  try {
+    const counts = await Listing.aggregate([
+      { $match: { status: "published" } },
+      {
+        $lookup: {
+          from: "vendors",
+          let: { vid: "$vendorId" },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
+          ],
+          as: "vendorDoc",
+        },
+      },
+      { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
+      { $match: { "vendorDoc.status": "approved" } },
+      { $match: { "vendorDoc.city": { $exists: true, $nin: [null, ""] } } },
+      {
+        $group: {
+          _id: { $toLower: "$vendorDoc.city" },
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+    const byCity = {};
+    counts.forEach(({ _id, count }) => {
+      if (_id) byCity[_id] = count;
+    });
+    res.json(byCity);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch city counts" });
   }
 });
 

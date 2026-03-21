@@ -7,6 +7,7 @@ const listingSchema = new mongoose.Schema({
   description: { type: String, required: true },
   status: { type: String, required: true, default: "draft" },
   featured: { type: Boolean, required: true, default: false },
+  features: { type: [String], default: [] },
   createdAt: { type: Date, default: Date.now }
 });
 

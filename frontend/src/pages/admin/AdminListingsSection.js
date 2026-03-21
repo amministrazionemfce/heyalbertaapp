@@ -7,6 +7,7 @@ import { AdminListingsFiltersBar } from './AdminListingsFiltersBar';
 import { AdminListingsTable } from './AdminListingsTable';
 import { AdminListingsGrid } from './AdminListingsGrid';
 import { AdminListingDetailDialog } from './AdminListingDetailDialog';
+import { listingPath } from '../../constants';
 
 export function AdminListingsSection({ onUpdate }) {
   const navigate = useNavigate();
@@ -77,7 +78,7 @@ export function AdminListingsSection({ onUpdate }) {
         getCategoryName={getCategoryName}
         onToggleFeature={featureListing}
         actionLoading={actionLoading}
-        onViewPublic={(id) => navigate(`/listings/${id}`)}
+        onViewPublic={(id) => navigate(listingPath(id))}
       />
     </div>
   );

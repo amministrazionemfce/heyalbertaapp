@@ -15,6 +15,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import ResourceLibrary from './pages/ResourceLibrary';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
+import { ROUTES, ROUTE_PATTERNS } from './constants';
 
 function Layout({ children, hideNav }) {
   return (
@@ -51,19 +52,19 @@ function App() {
         />
         <Routes>
           {/* Auth pages without nav */}
-          <Route path="/login" element={<Layout hideNav><LoginPage /></Layout>} />
-          <Route path="/register" element={<Layout hideNav><RegisterPage /></Layout>} />
+          <Route path={ROUTES.LOGIN} element={<Layout hideNav><LoginPage /></Layout>} />
+          <Route path={ROUTES.REGISTER} element={<Layout hideNav><RegisterPage /></Layout>} />
 
           {/* Pages with nav */}
-          <Route path="/" element={<Layout><HomePage /></Layout>} />
-          <Route path="/directory" element={<Layout><DirectoryPage /></Layout>} />
-          <Route path="/vendors/:id" element={<Layout><VendorDetailPage /></Layout>} />
-          <Route path="/listings/:id" element={<Layout><ListingDetailPage /></Layout>} />
-          <Route path="/dashboard" element={<Layout><VendorDashboard /></Layout>} />
-          <Route path="/admin" element={<Layout><AdminDashboard /></Layout>} />
-          <Route path="/resources" element={<Layout><ResourceLibrary /></Layout>} />
-          <Route path="/about" element={<Layout><AboutPage /></Layout>} />
-          <Route path="/contact" element={<Layout><ContactPage /></Layout>} />
+          <Route path={ROUTES.HOME} element={<Layout><HomePage /></Layout>} />
+          <Route path={ROUTES.DIRECTORY} element={<Layout><DirectoryPage /></Layout>} />
+          <Route path={ROUTE_PATTERNS.VENDOR_DETAIL} element={<Layout><VendorDetailPage /></Layout>} />
+          <Route path={ROUTE_PATTERNS.LISTING_DETAIL} element={<Layout><ListingDetailPage /></Layout>} />
+          <Route path={ROUTES.DASHBOARD} element={<Layout><VendorDashboard /></Layout>} />
+          <Route path={ROUTES.ADMIN} element={<Layout><AdminDashboard /></Layout>} />
+          <Route path={ROUTES.RESOURCES} element={<Layout><ResourceLibrary /></Layout>} />
+          <Route path={ROUTES.ABOUT} element={<Layout><AboutPage /></Layout>} />
+          <Route path={ROUTES.CONTACT} element={<Layout><ContactPage /></Layout>} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>

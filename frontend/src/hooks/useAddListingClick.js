@@ -2,8 +2,7 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '../lib/auth';
-
-const DASHBOARD_ADD_LISTING = '/dashboard?tab=add-listing';
+import { ROUTES, DASHBOARD_ADD_LISTING } from '../constants';
 
 /**
  * Reusable hook for "Add Listings" / "List your business" actions.
@@ -22,7 +21,7 @@ export function useAddListingClick() {
 
   const handleAddListingClick = useCallback(() => {
     if (!user) {
-      navigate('/register');
+      navigate(ROUTES.REGISTER);
       return;
     }
     if (user.role === 'vendor' || user.role === 'admin') {

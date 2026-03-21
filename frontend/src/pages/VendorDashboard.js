@@ -16,6 +16,7 @@ import {
   Pencil, Trash2, Loader2, Store, MessageSquare,
   Eye, BadgeCheck, Clock, ListPlus, Check, Star, Sparkles, Settings, Building2
 } from 'lucide-react';
+import { ROUTES } from '../constants';
 
 const defaultFormData = {
   name: '', description: '', category: '', city: '',
@@ -46,7 +47,7 @@ export default function VendorDashboard() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      navigate('/login');
+      navigate(ROUTES.LOGIN);
       return;
     }
     fetchVendors();

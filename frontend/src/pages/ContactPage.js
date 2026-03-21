@@ -4,7 +4,8 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { toast } from 'sonner';
-import {Link, useNavigate} from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { ROUTES, DASHBOARD_ADD_LISTING } from '../constants';
 import { useAuth } from '../lib/auth';
 import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
 
@@ -27,11 +28,11 @@ export default function ContactPage() {
 
   const handleAddListingsClick = () => {
     if (!user) {
-      navigate('/register');
+      navigate(ROUTES.REGISTER);
       return;
     }
     if (user.role === 'vendor' || user.role === 'admin') {
-      navigate('/dashboard?tab=add-listing');
+      navigate(DASHBOARD_ADD_LISTING);
       return;
     }
   };  

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ROUTES } from '../constants';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
@@ -83,7 +84,7 @@ export default function AboutPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/register">
+                <Link to={ROUTES.REGISTER}>
                   <Button className={`w-full mt-6 ${plan.popular ? 'bg-secondary-500 hover:bg-secondary-600 text-white' : 'bg-spruce-700 hover:bg-spruce-800 text-white'}`}>
                     Get Started
                   </Button>
@@ -102,7 +103,7 @@ export default function AboutPage() {
             Whether you're moving to Alberta or you're a local business, we'd love to have you.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/directory">
+            <Link to={ROUTES.DIRECTORY}>
               <Button className="bg-secondary-500 hover:bg-secondary-600 text-white h-12 px-8" data-testid="about-browse-btn">
                 Browse Directory
               </Button>

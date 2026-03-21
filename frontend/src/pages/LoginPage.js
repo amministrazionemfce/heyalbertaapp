@@ -6,6 +6,7 @@ import { Label } from '../components/ui/label';
 import { useAuth } from '../lib/auth';
 import { toast } from 'sonner';
 import { Mountain, Loader2, ArrowLeft } from 'lucide-react';
+import { ROUTES } from '../constants';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -15,7 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) navigate('/', { replace: true });
+    if (user) navigate(ROUTES.HOME, { replace: true });
   }, [user, navigate]);
 
   const handleSubmit = async (e) => {
@@ -23,9 +24,9 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = await login(email, password);
-      if (res.user.role === 'admin') navigate('/admin');
-      else if (res.user.role === 'vendor') navigate('/dashboard');
-      else navigate('/');
+      if (res.user.role === 'admin') navigate(ROUTES.ADMIN);
+      else if (res.user.role === 'vendor') navigate(ROUTES.DASHBOARD);
+      else navigate(ROUTES.HOME);
     } catch (err) {
       if(err.response?.status === 401) {
         toast.error('Invalid email or password');
@@ -57,20 +58,20 @@ export default function LoginPage() {
       {/* Right - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
-          <Link to="/" className="flex items-center gap-2 mb-6">
+          <Link to={ROUTES.HOME} className="flex items-center gap-2 mb-6">
             <div className="w-9 h-9 bg-spruce-700 rounded-lg flex items-center justify-center">
               <Mountain className="w-5 h-5 text-white" />
             </div>
             <span className="font-heading font-bold text-xl text-spruce-700">Hey <span className="text-secondary-500">Alberta</span></span>
           </Link>
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700 mb-8" data-testid="login-back-home">
+          <Link to={ROUTES.HOME} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700 mb-8" data-testid="login-back-home">
             <ArrowLeft className="w-4 h-4" /> Return to main page
           </Link>
 
           <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">Log in to your account</h1>
           <p className="text-sm text-muted-foreground mb-8">
             Don't have an account? {' '}
-            <Link to="/register" className="text-spruce-700 hover:underline font-medium">Sign up</Link>
+            <Link to={ROUTES.REGISTER} className="text-spruce-700 hover:underline font-medium">Sign up</Link>
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">

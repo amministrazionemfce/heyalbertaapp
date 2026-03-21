@@ -1,18 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Badge } from '../components/ui/badge';
-import VendorCard from '../components/VendorCard';
+import FeaturedVendorsLogoGrid from '../components/FeaturedVendorsLogoGrid';
+import TestimonialsFlowSection from '../components/TestimonialsFlowSection';
+import CategoryBrowseCard from '../components/CategoryBrowseCard';
+import CategoryBrowseToolbar from '../components/CategoryBrowseToolbar';
+import ExploreAlbertaCitiesSection from '../components/ExploreAlbertaCitiesSection';
+import FeaturedListingsSection from '../components/FeaturedListingsSection';
+import HomeCtaSection from '../components/HomeCtaSection';
+import HomeMembershipTiersSection from '../components/HomeMembershipTiersSection';
 import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
 import { useAddListingClick } from '../hooks/useAddListingClick';
-import { StarRating } from '../components/StarRating';
-import { vendorAPI, listingAPI } from '../lib/api';
-import { CATEGORIES, getCategoryIcon, CITIES } from '../data/categories';
-import {
-  Search, ArrowRight, BadgeCheck, Users, BookOpen, MapPin,
-  ChevronRight, ChevronDown, ChevronUp, Sparkles
-} from 'lucide-react';
+import { listingAPI } from '../lib/api';
+import { CATEGORIES } from '../data/categories';
+import { Search } from 'lucide-react';
+import { directorySearchQuery } from '../constants';
 
 const INITIAL_CATEGORIES = 8;
 
@@ -20,11 +23,9 @@ export default function HomePage() {
   const navigate = useNavigate();
   const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [searchQuery, setSearchQuery] = useState('');
-  const [featuredVendors, setFeaturedVendors] = useState([]);
-  const [showAllVendors, setShowAllVendors] = useState(false);
-  const [loading, setLoading] = useState(true);
   const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [listingCounts, setListingCounts] = useState({});
+  const [cityCounts, setCityCounts] = useState({});
   const [categorySearch, setCategorySearch] = useState('');
   const [categoryOrder, setCategoryOrder] = useState('listing'); // 'listing' | 'review' | 'popular'
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
@@ -39,18 +40,15 @@ export default function HomePage() {
 
   useEffect(() => {
     Promise.allSettled([
-      vendorAPI.list({ featured: true, limit: 6 }).then(res => {
-        const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
-        setFeaturedVendors(list);
-      }),
-      listingAPI.countsByCategory().then(res => setListingCounts(res.data || {})),
-    ]).finally(() => setLoading(false));
+      listingAPI.countsByCategory().then((res) => setListingCounts(res.data || {})),
+      listingAPI.countsByCity().then((res) => setCityCounts(res.data || {})),
+    ]);
   }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/directory?search=${encodeURIComponent(searchQuery)}`);
+      navigate(directorySearchQuery(searchQuery));
     }
   };
 
@@ -85,291 +83,90 @@ export default function HomePage() {
           <div className="absolute inset-0 bg-gradient-to-b from-slate-900/70 to-slate-900/40" />
         </div>
 
-        <div className="relative container mx-auto px-4 md:px-8 max-w-7xl pt-16 pb-24 md:py-36">
-          <div className="max-w-3xl">
-            <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight mb-6 -mt-2 md:mt-0">
-              Welcome Home to <span className="text-secondary-400">Alberta</span>
+        <div className="relative container mx-auto px-4 md:px-8 max-w-7xl pt-16 pb-24 md:py-36 flex flex-col items-center text-center">
+            <h1 className="font-heading text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight mb-6 -mt-2 md:mt-0 flex flex-col items-center text-center gap-2 sm:gap-3 md:gap-4">
+              <span className="block">Find trusted local Companies</span>
+              <span className="block">and community resources.</span>
             </h1>
-            <p className="text-lg md:text-xl text-slate-200 leading-relaxed mb-10 max-w-2xl">
-              Discover verified local services across 16 categories. From finding your dream home to settling your family, we connect you with trusted vendors who make relocation effortless.
+            <p className="text-lg md:text-xl text-slate-200 leading-relaxed mb-10 w-full max-w-2xl">
+            Everything you need for a fresh start in Alberta — from movers and real estate to schools and utilities.
             </p>
 
             {/* Search Bar */}
-            <form onSubmit={handleSearch} className="flex gap-3 max-w-xl" data-testid="hero-search-form">
+            <form onSubmit={handleSearch} className="flex gap-3 w-full max-w-xl justify-center" data-testid="hero-search-form">
               <div className="relative flex-1">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
                 
                 <Input
-                  placeholder={isMobile ? 'Search ...' : 'Search services, vendors, or cities...'}
+                  placeholder={isMobile ? 'Search ...' : 'Search services ...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-4 md:pl-12 h-14 text-base bg-white/95 backdrop-blur border-0 shadow-lg rounded-xl "
+                  className="pl-4 md:pl-12 h-14 !text-lg placeholder:!text-lg placeholder:text-slate-500 bg-white/95 backdrop-blur border-0 shadow-lg rounded-xl"
                   data-testid="hero-search-input"
                 />
               </div>
               <Button
                 type="submit"
-                className="h-14 px-4 md:px-8 bg-secondary-500 hover:bg-secondary-600 text-white rounded-xl font-semibold shadow-lg flex items-center justify-center"
+                className="h-14 px-4 md:px-8 rounded-xl shadow-lg flex items-center justify-center bg-purple-700 hover:bg-purple-800 text-white"
                 data-testid="hero-search-btn"
               >
                 <Search className="w-5 h-5 md:mr-2 shrink-0" aria-hidden />
-                <span className="hidden md:inline">Search</span>
+                <span className="hidden md:inline text-sm">SEARCH LISTING</span>
               </Button>
             </form>
-
-            <div className="flex items-center gap-6 mt-8 text-sm text-slate-300">
-              <span className="flex items-center gap-1.5"><BadgeCheck className="w-4 h-4 text-secondary-400" /> Verified Vendors</span>
-              <span className="flex items-center gap-1.5"><Users className="w-4 h-4 text-secondary-400" /> Free to Browse</span>
-              <span className="flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-secondary-400" /> Relocation Guides</span>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* Categories Bento Grid — 8 visible, expand with Show more */}
-      <section className="py-10 md:py-16 bg-white" data-testid="categories-section">
+      {/* Categories — eyebrow + grid (6 per row on xl) */}
+      <section className="pt-16 md:pt-24 pb-12 md:pb-20 bg-slate-50" data-testid="categories-section">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-          <div className="mb-8">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-center text-slate-900 mb-8">
-              Browse by Category
+          <div className="text-center mb-10 md:mb-12 max-w-4xl mx-auto">
+           
+            <h2 className="font-heading text-3xl sm:text-4xl md:text-[2.5rem] font-bold text-slate-900 leading-tight">
+              Browse Top Categories.
             </h2>
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 max-w-2xl mx-auto">
-              <div className="relative flex-1 h-10 flex items-center">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                <Input
-                  placeholder="Search categories..."
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  className="pl-9 h-10 border-slate-200 rounded-lg"
-                  data-testid="category-search"
-                />
-              </div>
-              <select
-                value={categoryOrder}
-                onChange={(e) => setCategoryOrder(e.target.value)}
-                className="h-10 px-4 rounded-lg border bg-white border-slate-200 text-slate-700 font-medium text-sm cursor-pointer"
-                data-testid="category-order"
-              >
-                <option value="listing">By listings</option>
-                <option value="review">By review</option>
-                <option value="popular">Popular</option>
-              </select>
-
-            {sortedCategories.length > INITIAL_CATEGORIES && (
-              <div className="flex justify-center mb-2">
-                <button
-                  type="button"
-                  onClick={() => setCategoriesExpanded((v) => !v)}
-                  className="inline-flex items-center w-full gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium text-sm hover:bg-slate-50 hover:border-slate-300 transition-colors"
-                  data-testid="categories-show-more"
-                >
-                  {categoriesExpanded ? (
-                    <>
-                      Show less <ChevronUp className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      Show All 16 Categories
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <CategoryBrowseToolbar
+            categorySearch={categorySearch}
+            onCategorySearchChange={setCategorySearch}
+            categoryOrder={categoryOrder}
+            onCategoryOrderChange={setCategoryOrder}
+            showExpandToggle={sortedCategories.length > INITIAL_CATEGORIES}
+            categoriesExpanded={categoriesExpanded}
+            onToggleCategoriesExpanded={() => setCategoriesExpanded((v) => !v)}
+            totalCategoriesShown={sortedCategories.length}
+          />
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-5">
             {categoriesToShow.map((cat) => {
-                const Icon = getCategoryIcon(cat.icon);
-                const idx = CATEGORIES.findIndex((c) => c.id === cat.id);
-                const imageNum = idx >= 0 ? idx + 1 : 1;
-                const imageSrc = `/services/${imageNum}.jpg`;
-                const count = listingCounts[cat.id] ?? 0;
-                return (
-                <Link
+              const idx = CATEGORIES.findIndex((c) => c.id === cat.id);
+              const imageNum = idx >= 0 ? idx + 1 : 1;
+              const imageSrc = `/services/${imageNum}.jpg`;
+              return (
+                <CategoryBrowseCard
                   key={cat.id}
-                  to={`/directory?category=${cat.id}`}
-                  className="flex flex-col rounded-2xl overflow-hidden bg-slate-50 hover:bg-white hover:shadow-lg transition-all border border-slate-100 hover:border-slate-200 cursor-pointer group"
-                  data-testid={`category-card-${cat.id}`}
-                >
-                  <div className="relative aspect-[4/3] overflow-hidden bg-slate-200">
-                    <img
-                      src={imageSrc}
-                      alt=""
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.style.display = 'none';
-                        e.target.nextElementSibling?.classList.remove('hidden');
-                      }}
-                    />
-                    <div className="hidden w-full h-full flex items-center justify-center bg-spruce-100 group-hover:bg-spruce-700 transition-colors" aria-hidden>
-                      <Icon className="w-10 h-10 text-spruce-600 group-hover:text-white transition-colors" />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
-                    <div className="absolute bottom-2 left-2 right-2 flex items-end justify-between gap-2">
-                      <span className="font-heading font-semibold text-sm text-white drop-shadow-sm">{cat.name}</span>
-                      <span className="text-xs font-medium text-white/90 bg-white/20 backdrop-blur-sm px-2 py-0.5 rounded-full shrink-0">
-                        <span className="text-2xl">{count>0 ? count : ''} </span> 
-                        {count === 1 ? 'listing' : count === 0 ? '' : 'listings'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <span className="text-xs text-slate-500 line-clamp-2">{cat.description}</span>
-                  </div>
-                </Link>
-                );
-              })}
+                  category={cat}
+                  listingCount={listingCounts[cat.id] ?? 0}
+                  imageSrc={imageSrc} 
+                />
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Vendors section: featured by default, expandable to all */}
-      <section className="py-24 md:py-24 bg-slate-50" data-testid="featured-vendors-section">
-        <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-          <div className="mb-12">
-            <div>
-              <h2 className="font-heading text-3xl md:text-4xl font-bold text-center text-slate-900 mb-3">
-                {showAllVendors ? 'All Vendors' : 'Featured Vendors'}
-              </h2>
-              <p className="text-base text-center md:text-lg text-slate-500">
-                {showAllVendors
-                  ? 'Browse all approved vendors.'
-                  : 'Trusted service providers ready to help with your relocation.'}
-              </p>
-            </div>
+      <FeaturedListingsSection />
 
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  if (showAllVendors) {
-                    const res = await vendorAPI.list({ featured: true, limit: 6 });
-                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
-                    setFeaturedVendors(list);
-                    setShowAllVendors(false);
-                  } else {
-                    const res = await vendorAPI.list({});
-                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
-                    setFeaturedVendors(list);
-                    setShowAllVendors(true);
-                  }
-                } catch {
-                  // ignore errors, keep current list
-                }
-              }}
-              className="hidden mt-10 justify-center md:inline-flex items-center gap-1 text-spruce-700 font-medium hover:bg-slate-100 rounded-lg px-4 py-2"
-              data-testid="view-all-vendors"
-            >
-              {showAllVendors ? (
-                <>Featured Vendors <ChevronUp className="w-4 h-4" /></>
-              ) : (
-                <>Show All Vendors <ChevronRight className="w-4 h-4" /></>
-              )}
-            </button>
-          </div>
+      <FeaturedVendorsLogoGrid />
 
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {[1,2,3].map(i => (
-                <div key={i} className="animate-pulse rounded-xl bg-white h-80 border" />
-              ))}
-            </div>
-          ) : featuredVendors.length === 0 ? (
-            <p className="text-center text-slate-500 py-8">
-              {showAllVendors
-                ? 'No vendors yet.'
-                : 'No featured vendors yet. Admins can feature approved vendors from the dashboard.'}
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {featuredVendors.map(vendor => (
-                <VendorCard key={vendor.id} vendor={vendor} />
-              ))}
-            </div>
-          )}
+      <ExploreAlbertaCitiesSection cityCounts={cityCounts} />
 
-          <div className="mt-10 text-center md:hidden">
-            <Button
-              variant="outline"
-              data-testid="view-all-vendors-mobile"
-              onClick={async () => {
-                try {
-                  if (showAllVendors) {
-                    const res = await vendorAPI.list({ featured: true, limit: 6 });
-                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
-                    setFeaturedVendors(list);
-                    setShowAllVendors(false);
-                  } else {
-                    const res = await vendorAPI.list({});
-                    const list = Array.isArray(res.data) ? res.data : (res.data?.vendors || []);
-                    setFeaturedVendors(list);
-                    setShowAllVendors(true);
-                  }
-                } catch {
-                  // ignore errors
-                }
-              }}
-            >
-              {showAllVendors ? 'Only Featured' : 'Show All Vendors'}
-            </Button>
-          </div>
-        </div>
-      </section>
+      <TestimonialsFlowSection />
 
-      {/* Cities Section */}
-      <section className="py-24 md:py-32 bg-white" data-testid="cities-section">
-        <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-          <div className="mb-12">
-            <h2 className="font-heading text-3xl md:text-4xl font-bold text-center text-slate-900 mb-3">
-              Explore Alberta Cities
-            </h2>
-            <p className="text-base text-center md:text-lg text-slate-500">
-              Find services in your destination city.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            {CITIES.map(city => (
-              <Link
-                key={city}
-                to={`/directory?city=${city}`}
-                className="flex items-center gap-2 px-5 py-3 rounded-full border border-slate-200 hover:border-spruce-300 hover:bg-spruce-700 transition-all text-sm font-medium text-slate-700 hover:text-white"
-                data-testid={`city-link-${city.toLowerCase()}`}
-              >
-                <MapPin className="w-3.5 h-3.5" /> {city}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+      <HomeMembershipTiersSection onGetStarted={handleAddListingClick} />
 
-      {/* CTA Section */}
-      <section className="py-24 md:py-32 bg-spruce-700 text-white" data-testid="cta-section">
-        <div className="container mx-auto px-4 md:px-8 max-w-7xl text-center">
-          <h2 className="font-heading text-3xl md:text-4xl font-bold text-white mb-4">
-            Are You a Local Business?
-          </h2>
-          <p className="text-lg text-spruce-100 mb-10 max-w-2xl mx-auto">
-            Join Hey Alberta and connect with thousands of newcomers looking for trusted services. Start with a free listing today.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              onClick={handleAddListingClick}
-              className="bg-white/10 text-white h-12 px-8 text-base rounded-xl"
-              data-testid="cta-register-btn"
-            >
-              List Your Business <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-            <Link to="/about">
-              <Button className="bg-secondary-600 border-white/30 text-white hover:bg-white/10 h-12 px-8 text-base rounded-xl" data-testid="cta-learn-more-btn">
-                Learn More
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+      <HomeCtaSection onListBusiness={handleAddListingClick} />
       <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );

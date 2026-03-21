@@ -57,6 +57,7 @@ export const listingAPI = {
   myListings: () => API.get('/listings/my-listings'),
   listByVendor: (vendorId) => API.get('/listings/listByVendor', { params: { vendorId } }),
   countsByCategory: () => API.get('/listings/counts-by-category'),
+  countsByCity: () => API.get('/listings/counts-by-city'),
   directory: (params) => API.get('/listings', { params }),
   create: (data) => API.post('/listings', data),
   update: (id, data) => API.put(`/listings/${id}`, data),

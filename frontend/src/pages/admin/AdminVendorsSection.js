@@ -7,6 +7,7 @@ import { AdminVendorsFiltersBar } from './AdminVendorsFiltersBar';
 import { AdminVendorsTable } from './AdminVendorsTable';
 import { AdminVendorsGrid } from './AdminVendorsGrid';
 import { AdminVendorDetailDialog } from './AdminVendorDetailDialog';
+import { vendorPath } from '../../constants';
 
 export function AdminVendorsSection({ onUpdate }) {
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ export function AdminVendorsSection({ onUpdate }) {
         onReject={rejectVendor}
         onToggleFeature={featureVendor}
         actionLoading={actionLoading}
-        onViewPublic={(id) => navigate(`/vendors/${id}`)}
+        onViewPublic={(id) => navigate(vendorPath(id))}
       />
     </div>
   );

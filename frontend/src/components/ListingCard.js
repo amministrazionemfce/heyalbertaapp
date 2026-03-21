@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { CATEGORIES } from '../data/categories';
+import { listingPath } from '../constants';
 
 export default function ListingCard({ listing }) {
   const vendor = listing.vendor || {};
@@ -8,7 +9,7 @@ export default function ListingCard({ listing }) {
 
   return (
     <Link
-      to={`/listings/${listing.id}`}
+      to={listingPath(listing.id)}
       className="group relative overflow-hidden rounded-xl border bg-white shadow-sm transition-all hover:shadow-lg hover:-translate-y-1"
       data-testid={`listing-card-${listing.id}`}
     >
