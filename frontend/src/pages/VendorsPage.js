@@ -15,7 +15,6 @@ export default function VendorsPage() {
   const [tier, setTier] = useState('');
   const [sort, setSort] = useState('newest');
   const [featuredOnly, setFeaturedOnly] = useState(false);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -29,7 +28,6 @@ export default function VendorsPage() {
           category: category || undefined,
           tier: tier || undefined,
           featured: featuredOnly || undefined,
-          verified: verifiedOnly || undefined,
           sort,
         });
         if (!alive) return;
@@ -45,7 +43,7 @@ export default function VendorsPage() {
     return () => {
       alive = false;
     };
-  }, [search, city, category, tier, featuredOnly, verifiedOnly, sort]);
+  }, [search, city, category, tier, featuredOnly, sort]);
 
   const normalizedVendors = useMemo(
     () =>
@@ -64,10 +62,9 @@ export default function VendorsPage() {
     setTier('');
     setSort('newest');
     setFeaturedOnly(false);
-    setVerifiedOnly(false);
   };
 
-  const filterCount = [search, city, category, tier, featuredOnly, verifiedOnly].filter(Boolean).length;
+  const filterCount = [search, city, category, tier, featuredOnly].filter(Boolean).length;
 
   return (
     <div className="bg-slate-50 min-h-screen" data-testid="vendors-page">
@@ -172,15 +169,6 @@ export default function VendorsPage() {
                   className="h-4 w-4 rounded border-slate-300 text-spruce-700 focus:ring-spruce-500"
                 />
                 Featured vendors only
-              </label>
-              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={verifiedOnly}
-                  onChange={(e) => setVerifiedOnly(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-spruce-700 focus:ring-spruce-500"
-                />
-                Verified vendors only
               </label>
             </div>
           </aside>

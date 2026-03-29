@@ -19,7 +19,6 @@ import {
   Phone,
   Mail,
   Globe,
-  BadgeCheck,
   ExternalLink,
   MessageSquare,
   Send,
@@ -463,11 +462,6 @@ export default function VendorDetailPage() {
               <VendorImageCarousel images={gallery} alt={vendor.name} />
               <div className="absolute top-4 left-4 z-20 flex gap-2 flex-wrap">
                 {vendor.featured && <Badge className="bg-yellow-500 text-white border-0">Featured</Badge>}
-                {vendor.verified && (
-                  <Badge className="bg-spruce-700 text-white border-0 flex items-center gap-1">
-                    <BadgeCheck className="w-3.5 h-3.5" /> Verified
-                  </Badge>
-                )}
               </div>
               <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button

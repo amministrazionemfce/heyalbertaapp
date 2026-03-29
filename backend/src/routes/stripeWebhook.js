@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import Vendor from "../models/Vendor.js";
 import { planIdFromPriceId } from "../utils/stripePlan.js";
+import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
 function getStripe() {
   const key = String(process.env.STRIPE_SECRET_KEY || "").trim();
@@ -14,15 +15,16 @@ function getStripe() {
 
 async function applyPaidTier(userId, planId) {
   if (!userId || (planId !== "standard" && planId !== "premium")) return;
-  await Vendor.updateMany({ userId: String(userId) }, { $set: { tier: planId, verified: true } });
+  const uid = String(userId);
+  await Vendor.updateMany({ userId: uid }, { $set: { tier: planId } });
+  await setFeaturedForPaidUser(uid);
 }
 
 async function applyFreeTier(userId) {
   if (!userId) return;
-  await Vendor.updateMany(
-    { userId: String(userId) },
-    { $set: { tier: "free", verified: false } }
-  );
+  const uid = String(userId);
+  await Vendor.updateMany({ userId: uid }, { $set: { tier: "free" } });
+  await clearFeaturedForFreeUser(uid);
 }
 
 /**

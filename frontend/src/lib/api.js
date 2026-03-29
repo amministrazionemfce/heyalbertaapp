@@ -137,11 +137,9 @@ export const adminAPI = {
   updateVendor: (id, data) => API.put(`/admin/vendors/${id}`, data),
   approveVendor: (id) => API.put(`/admin/vendors/${id}/approve`),
   rejectVendor: (id) => API.put(`/admin/vendors/${id}/reject`),
-  featureVendor: (id, featured) => API.put(`/admin/vendors/${id}/feature`, { featured }),
   /** Cascade: deletes all listings & reviews for this vendor, then the vendor. */
   deleteVendor: (id, body) => API.delete(`/admin/vendors/${id}`, { data: body || {} }),
   listings: (params) => API.get('/admin/listings', { params }),
-  featureListing: (id, featured) => API.put(`/admin/listings/${id}/feature`, { featured }),
   stats: () => API.get('/admin/stats'),
   users: () => API.get('/admin/users'),
   cityImages: () => API.get('/admin/city-images'),

@@ -61,6 +61,9 @@ export default function AdminVendorDetailPage() {
     try {
       const res = await adminAPI.getVendor(vendorId);
       setVendor(res.data);
+      const rawTier = res.data.tier || 'free';
+      const tierForForm =
+        String(rawTier).toLowerCase() === 'premium' ? 'gold' : rawTier;
       setEditForm({
         name: res.data.name || '',
         description: res.data.description || '',
@@ -70,9 +73,8 @@ export default function AdminVendorDetailPage() {
         phone: res.data.phone || '',
         email: res.data.email || '',
         website: res.data.website || '',
-        tier: res.data.tier || 'free',
+        tier: tierForForm,
         videoUrl: res.data.videoUrl || '',
-        verified: !!res.data.verified,
       });
     } catch (e) {
       setLoadError(e.response?.data?.message || 'Could not load vendor.');
@@ -121,20 +123,6 @@ export default function AdminVendorDetailPage() {
     }
   };
 
-  const handleFeature = async (featured) => {
-    if (!vendor) return;
-    setActionLoading(true);
-    try {
-      await adminAPI.featureVendor(vendorIdOf(vendor), featured);
-      toast.success(featured ? 'Vendor featured' : 'Vendor unfeatured');
-      await fetchVendor();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleSaveEdit = async () => {
     if (!editForm || !vendor) return;
     setSavingEdit(true);
@@ -150,7 +138,6 @@ export default function AdminVendorDetailPage() {
         website: editForm.website.trim(),
         tier: editForm.tier,
         videoUrl: editForm.videoUrl.trim(),
-        verified: editForm.verified,
       };
       await adminAPI.updateVendor(vendorIdOf(vendor), payload);
       toast.success('Vendor updated');
@@ -205,7 +192,7 @@ export default function AdminVendorDetailPage() {
 
   return (
     <div className="bg-admin-50 min-h-screen pb-16" data-testid="admin-vendor-detail">
-      <div className="max-w-4xl mx-auto px-4 py-6 md:py-10">
+      <div className="w-full px-4 md:px-6 py-6 md:py-10">
         <button
           type="button"
           onClick={backToVendors}
@@ -234,9 +221,6 @@ export default function AdminVendorDetailPage() {
                       <Star className="w-3.5 h-3.5 fill-white" /> Featured
                     </Badge>
                   )}
-                  {vendor.verified && (
-                    <Badge className="bg-admin-600 text-white border-0">Verified</Badge>
-                  )}
                 </div>
               </div>
             </div>
@@ -248,8 +232,8 @@ export default function AdminVendorDetailPage() {
                 Quick actions
               </h2>
               <p className="text-sm text-slate-600 mb-4">
-                Approve or reject new listings, feature on the homepage, edit details, or remove the vendor and all
-                related data.
+                Approve or reject, edit details, or remove the vendor and related data. Homepage featuring is applied
+                automatically when this business has a Standard or Gold membership (Stripe).
               </p>
               <div className="flex flex-wrap gap-2">
                 {vendor.status === 'pending' && (
@@ -275,22 +259,6 @@ export default function AdminVendorDetailPage() {
                     </Button>
                   </>
                 )}
-                <Button
-                  type="button"
-                  variant={vendor.featured ? 'outline' : 'default'}
-                  className={
-                    vendor.featured
-                      ? 'border-amber-300 text-amber-800'
-                      : 'bg-amber-500 hover:bg-amber-600 text-white'
-                  }
-                  disabled={actionLoading || vendor.status !== 'approved'}
-                  title={vendor.status !== 'approved' ? 'Approve vendor first to feature' : undefined}
-                  onClick={() => handleFeature(!vendor.featured)}
-                  data-testid="detail-feature"
-                >
-                  <Star className={`w-4 h-4 mr-1 ${vendor.featured ? 'fill-amber-600' : ''}`} />
-                  {vendor.featured ? 'Unfeature' : 'Feature'}
-                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -435,18 +403,6 @@ export default function AdminVendorDetailPage() {
                       onChange={(e) => setEditForm({ ...editForm, videoUrl: e.target.value })}
                       className="mt-1"
                     />
-                  </div>
-                  <div className="md:col-span-2 flex items-center gap-2">
-                    <input
-                      id="ev-verified"
-                      type="checkbox"
-                      checked={editForm.verified}
-                      onChange={(e) => setEditForm({ ...editForm, verified: e.target.checked })}
-                      className="h-4 w-4 rounded border-slate-300"
-                    />
-                    <Label htmlFor="ev-verified" className="font-normal cursor-pointer">
-                      Mark as verified
-                    </Label>
                   </div>
                 </div>
                 <div className="flex gap-2 pt-2">

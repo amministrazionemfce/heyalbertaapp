@@ -23,6 +23,8 @@ export function AdminVendorsSection({ onUpdate }) {
     loading,
     statusFilter,
     setStatusFilter,
+    featuredFilter,
+    setFeaturedFilter,
     search,
     setSearch,
     viewMode,
@@ -62,6 +64,8 @@ export function AdminVendorsSection({ onUpdate }) {
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        featuredFilter={featuredFilter}
+        onFeaturedFilterChange={setFeaturedFilter}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       />
@@ -77,7 +81,7 @@ export function AdminVendorsSection({ onUpdate }) {
           <p className="text-sm text-slate-500 mt-1">
             {search ? 'Try a different search or clear filters.' : 'Change the status filter or wait for new submissions.'}
           </p>
-          {(search || statusFilter) && (
+          {(search || statusFilter || featuredFilter !== 'all') && (
             <Button variant="outline" className="mt-4" onClick={clearFilters}>
               Clear filters
             </Button>

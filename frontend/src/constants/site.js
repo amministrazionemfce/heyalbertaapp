@@ -10,7 +10,7 @@ export const SITE_CONTACT = Object.freeze({
 
 export const SITE_TAGLINE = Object.freeze({
   FOOTER:
-    'Your trusted companion for relocating to Alberta. Find verified local services and everything you need for a smooth transition.',
+    'Your trusted companion for relocating to Alberta. Find local services and everything you need for a smooth transition.',
 });
 
 export const SITE_LEGAL = Object.freeze({

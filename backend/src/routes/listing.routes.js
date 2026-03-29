@@ -386,7 +386,6 @@ router.get("/:id", async (req, res) => {
       website: vendor.website,
       images: vendor.images,
       tier: vendor.tier,
-      verified: vendor.verified,
     };
     res.json(listingObj);
   } catch (err) {

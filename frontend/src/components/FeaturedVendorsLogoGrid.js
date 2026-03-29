@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BadgeCheck, MapPin, Star } from 'lucide-react';
+import { MapPin, Star } from 'lucide-react';
 import { CATEGORIES, CATEGORY_IMAGES } from '../data/categories';
 import { ROUTES, vendorPath } from '../constants';
 import { vendorAPI } from '../lib/api';
@@ -55,12 +55,6 @@ function VendorCard({ vendor }) {
             {vendor.featured && (
               <span className="rounded-lg bg-yellow-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
                 Featured
-              </span>
-            )}
-            {vendor.verified && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2 py-1 text-[10px] font-semibold text-spruce-800 shadow-sm backdrop-blur">
-                <BadgeCheck className="h-3.5 w-3.5 text-spruce-700" />
-                Verified
               </span>
             )}
           </div>

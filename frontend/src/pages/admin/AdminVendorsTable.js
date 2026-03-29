@@ -1,6 +1,7 @@
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Eye, Trash2 } from 'lucide-react';
+import { Eye } from 'lucide-react';
+import { formatAdminJoinedAt } from '../../lib/formatAdminDate';
 import { getVendorStatusBadgeClass } from './vendorStatus';
 import { CheckCircle } from 'lucide-react';
 
@@ -16,6 +17,7 @@ export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onSee
               <th className="text-left p-4 font-semibold text-slate-700">Category</th>
               <th className="text-left p-4 font-semibold text-slate-700">Status</th>
               <th className="text-left p-4 font-semibold text-slate-700">Tier</th>
+              <th className="text-left p-4 font-semibold text-slate-700 whitespace-nowrap">Joined</th>
               <th className="text-left p-4 font-semibold text-slate-700">Reviews</th>
               <th className="text-right p-4 font-semibold text-slate-700">Actions</th>
             </tr>
@@ -47,6 +49,9 @@ export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onSee
                     <Badge variant="secondary" className={tierInfo.color}>
                       {tierInfo.name}
                     </Badge>
+                  </td>
+                  <td className="p-4 text-slate-600 whitespace-nowrap tabular-nums">
+                    {formatAdminJoinedAt(v)}
                   </td>
                   <td className="p-4 text-slate-600">
                     {v.reviewCount ?? 0} ({v.avgRating ?? 0})

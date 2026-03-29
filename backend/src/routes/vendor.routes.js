@@ -36,14 +36,13 @@ function isValidObjectId(id) {
 }
 
 router.get("/", async (req, res) => {
-  const { featured, limit, page, category, city, tier, verified, q, sort } = req.query;
+  const { featured, limit, page, category, city, tier, q, sort } = req.query;
 
   const query = { status: "approved" };
   if (featured === "true" || featured === true) query.featured = true;
   if (category) query.category = String(category).trim();
   if (city) query.city = new RegExp(`^${String(city).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
   if (tier) query.tier = String(tier).trim();
-  if (verified === "true" || verified === true) query.verified = true;
   if (q) {
     const search = String(q).trim();
     if (search) {
@@ -127,7 +126,6 @@ router.get("/", async (req, res) => {
         googleMapUrl: 1,
         latitude: 1,
         longitude: 1,
-        verified: 1,
         featured: 1,
         status: 1,
         createdAt: 1,

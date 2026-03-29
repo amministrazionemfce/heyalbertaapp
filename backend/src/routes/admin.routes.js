@@ -12,6 +12,7 @@ import CategoryImage from "../models/CategoryImage.js";
 import SiteSettings from "../models/SiteSettings.js";
 import ContactMessage from "../models/ContactMessage.js";
 import { matchReviewsByVendorId } from "../utils/reviewVendorQuery.js";
+import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
 const router = express.Router();
 
@@ -28,6 +29,12 @@ function isValidObjectId(id) {
     typeof id === "string"
     && id !== "undefined"
     && mongoose.Types.ObjectId.isValid(id);
+}
+
+/** Tiers that should trigger homepage featuring (aligned with Stripe Standard / Gold). */
+function isPaidMembershipTier(t) {
+  const x = String(t || "").toLowerCase();
+  return x === "standard" || x === "premium" || x === "gold";
 }
 
 
@@ -146,17 +153,28 @@ router.put("/vendors/:vendorId", requireAdmin, async (req, res) => {
 
     const allowed = [
       "name", "description", "category", "city", "neighborhood",
-      "phone", "email", "website", "images", "tier", "videoUrl", "verified",
+      "phone", "email", "website", "images", "tier", "videoUrl",
     ];
     const payload = {};
     for (const key of allowed) {
       if (req.body[key] !== undefined) payload[key] = req.body[key];
     }
 
+    const prevTier = vendor.tier;
+
     const updated = await Vendor.findByIdAndUpdate(vendorId, payload, {
       new: true,
       runValidators: false,
     });
+
+    if (payload.tier !== undefined && payload.tier !== prevTier && updated?.userId) {
+      const uid = String(updated.userId);
+      if (isPaidMembershipTier(payload.tier)) {
+        await setFeaturedForPaidUser(uid);
+      } else if (String(payload.tier).toLowerCase() === "free") {
+        await clearFeaturedForFreeUser(uid);
+      }
+    }
 
     res.json({ message: "Vendor updated", vendor: updated });
   } catch (error) {
@@ -212,34 +230,6 @@ router.put("/vendors/:vendorId/reject", requireAdmin, async (req, res) => {
       return res.status(404).json({ message: "Vendor not found" });
 
     res.json({ message: "Vendor rejected", vendor });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-/*
-------------------------------------------------
-FEATURE / UNFEATURE VENDOR
-------------------------------------------------
-*/
-router.put("/vendors/:vendorId/feature", requireAdmin, async (req, res) => {
-  try {
-    const { vendorId } = req.params;
-    const { featured } = req.body;
-    if (!isValidObjectId(vendorId))
-      return res.status(400).json({ message: "Invalid vendor id" });
-
-    const value = featured === true || featured === "true";
-    const vendor = await Vendor.findByIdAndUpdate(
-      vendorId,
-      { featured: value },
-      { new: true }
-    );
-
-    if (!vendor)
-      return res.status(404).json({ message: "Vendor not found" });
-
-    res.json({ message: value ? "Vendor featured" : "Vendor unfeatured", vendor });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -311,34 +301,6 @@ router.get("/listings", requireAdmin, async (req, res) => {
     }
 
     res.json(result);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-/*
-------------------------------------------------
-FEATURE / UNFEATURE LISTING
-------------------------------------------------
-*/
-router.put("/listings/:listingId/feature", requireAdmin, async (req, res) => {
-  try {
-    const { listingId } = req.params;
-    const { featured } = req.body;
-    if (!isValidObjectId(listingId))
-      return res.status(400).json({ message: "Invalid listing id" });
-
-    const value = featured === true || featured === "true";
-    const listing = await Listing.findByIdAndUpdate(
-      listingId,
-      { featured: value },
-      { new: true }
-    );
-
-    if (!listing)
-      return res.status(404).json({ message: "Listing not found" });
-
-    res.json({ message: value ? "Listing featured" : "Listing unfeatured", listing });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -532,6 +494,15 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       "newsCtaPrimaryLink",
       "newsCtaSecondaryText",
       "newsCtaSecondaryLink",
+      "membershipEyebrow",
+      "membershipTitle",
+      "membershipSubtitle",
+      "membershipDescFree",
+      "membershipDescStandard",
+      "membershipDescPremium",
+      "membershipFeaturesFree",
+      "membershipFeaturesStandard",
+      "membershipFeaturesPremium",
     ];
     for (const k of allowed) {
       if (req.body[k] !== undefined) s[k] = req.body[k];

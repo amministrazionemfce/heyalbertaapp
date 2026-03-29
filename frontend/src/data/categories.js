@@ -63,6 +63,11 @@ export const TIERS = [
   { id: "enterprise", name: "Enterprise", color: "bg-blue-100 text-blue-700", description: "Full partnership" },
 ];
 
+/**
+ * Stripe / billing store Gold as `premium`; admin UI uses `gold`. Normalize for display.
+ */
 export function getTierInfo(tierId) {
-  return TIERS.find(t => t.id === tierId) || TIERS[0];
+  const raw = String(tierId || '').trim().toLowerCase();
+  const lookupId = raw === 'premium' ? 'gold' : raw;
+  return TIERS.find((t) => t.id === lookupId) || TIERS[0];
 }

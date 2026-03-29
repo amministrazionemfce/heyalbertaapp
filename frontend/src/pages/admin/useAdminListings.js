@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminAPI } from '../../lib/api';
 import { CATEGORIES } from '../../data/categories';
-import { toast } from 'sonner';
 
 export function useAdminListings({ onUpdate } = {}) {
   const [listings, setListings] = useState([]);
@@ -10,7 +9,6 @@ export function useAdminListings({ onUpdate } = {}) {
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'table' | 'list'
   const [detailListing, setDetailListing] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
 
   const fetchListings = useCallback(async () => {
     setLoading(true);
@@ -28,24 +26,6 @@ export function useAdminListings({ onUpdate } = {}) {
   useEffect(() => {
     fetchListings();
   }, [fetchListings]);
-
-  const featureListing = useCallback(
-    async (id, featured) => {
-      setActionLoading(true);
-      try {
-        await adminAPI.featureListing(id, featured);
-        toast.success(featured ? 'Listing featured' : 'Listing unfeatured');
-        await fetchListings();
-        onUpdate?.();
-        setDetailListing((prev) => (prev?.id === id ? { ...prev, featured } : prev));
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to update feature');
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [fetchListings, onUpdate]
-  );
 
   const filteredListings = useMemo(() => {
     if (!search) return listings;
@@ -80,8 +60,6 @@ export function useAdminListings({ onUpdate } = {}) {
     detailListing,
     openDetail,
     closeDetail,
-    actionLoading,
-    featureListing,
     filteredListings,
     refresh: fetchListings,
     clearFilters,

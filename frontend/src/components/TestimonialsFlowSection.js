@@ -26,7 +26,7 @@ const TESTIMONIALS = [
     name: 'Elena R.',
     time: '2 weeks ago',
     text:
-      'Loved the verified vendor badges. Felt safer choosing childcare and healthcare providers for our family.',
+      'Loved how easy it was to compare childcare and healthcare providers for our family in one place.',
     rating: 5,
   },
   {

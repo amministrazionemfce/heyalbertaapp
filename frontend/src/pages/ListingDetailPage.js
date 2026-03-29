@@ -21,7 +21,6 @@ import {
   Phone,
   Mail,
   Globe,
-  BadgeCheck,
   ExternalLink,
   Send,
   Loader2,
@@ -815,12 +814,6 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            {vendor.verified && (
-              <div className="flex items-center justify-center gap-2 rounded-full bg-emerald-50 border border-emerald-100 py-2 px-3 text-sm text-emerald-800">
-                <BadgeCheck className="w-4 h-4 shrink-0" />
-                Verified business
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.js";
 import Vendor from "../models/Vendor.js";
 import { planIdFromPriceId } from "../utils/stripePlan.js";
+import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
 const router = express.Router();
 
@@ -59,9 +60,11 @@ async function setVendorsTier(userId, tier) {
   const uid = String(userId || "");
   if (!uid) return;
   if (tier === "standard" || tier === "premium") {
-    await Vendor.updateMany({ userId: uid }, { $set: { tier, verified: true } });
+    await Vendor.updateMany({ userId: uid }, { $set: { tier } });
+    await setFeaturedForPaidUser(uid);
   } else {
-    await Vendor.updateMany({ userId: uid }, { $set: { tier: "free", verified: false } });
+    await Vendor.updateMany({ userId: uid }, { $set: { tier: "free" } });
+    await clearFeaturedForFreeUser(uid);
   }
 }
 

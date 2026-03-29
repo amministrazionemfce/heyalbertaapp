@@ -1,8 +1,8 @@
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import {
-  BadgeCheck,
   Ban,
+  Calendar,
   CheckCircle,
   Clock,
   Eye,
@@ -14,6 +14,7 @@ import {
 import { CATEGORY_IMAGES } from '../../data/categories';
 import { getVendorStatusBadgeClass } from './vendorStatus';
 import { resolveMediaUrl } from '../../lib/mediaUrl';
+import { formatAdminJoinedAt } from '../../lib/formatAdminDate';
 
 const DEFAULT_BUSINESS_COVER =
   'https://images.unsplash.com/photo-1497366216548-37526070297c?w=900&q=80';
@@ -39,7 +40,7 @@ export function AdminVendorsGrid({
   onReject,
 }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 lg:gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 lg:gap-6">
       {vendors.map((v) => {
         const tierInfo = getTierInfo(v.tier);
         const categoryName = getCategoryName(v.category);
@@ -119,22 +120,17 @@ export function AdminVendorsGrid({
                     <span className="text-slate-600">Tier:</span>
                     <span className="font-semibold text-slate-800">{tierInfo.name}</span>
                   </Badge>
-
-                  {v.verified && (
-                    <span
-                      className="inline-flex items-center gap-1 rounded-full bg-spruce-50 px-2 py-0.5 text-xs font-semibold text-spruce-800 border border-spruce-200/80"
-                      title="Verified business"
-                    >
-                      <BadgeCheck className="w-3.5 h-3.5 text-spruce-700" aria-hidden />
-                      Verified
-                    </span>
-                  )}
                 </div>
               </div>
 
               <div className="flex min-w-0 items-start gap-1.5 text-sm text-spruce-700">
                 <MapPin className="h-4 w-4 shrink-0 mt-0.5" aria-hidden />
                 <span className="font-medium leading-snug">{locationLine}</span>
+              </div>
+
+              <div className="flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+                <Calendar className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="tabular-nums">Joined {formatAdminJoinedAt(v)}</span>
               </div>
 
               {(count > 0 || avg > 0) && (

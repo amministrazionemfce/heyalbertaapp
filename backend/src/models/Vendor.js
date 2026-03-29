@@ -17,7 +17,6 @@ const vendorSchema = new mongoose.Schema({
   googleMapUrl: String,
   latitude: Number,
   longitude: Number,
-  verified: { type: Boolean, default: false },
   featured: { type: Boolean, default: false },
   status: String,
   createdAt: String,

@@ -12,7 +12,6 @@ export const MEMBERSHIP_PLANS = Object.freeze([
       'No video links',
       'No direct contact links',
       'No ability to reply to reviews',
-      'Labeled as "Non-Verified"',
     ],
   },
   {
@@ -31,7 +30,6 @@ export const MEMBERSHIP_PLANS = Object.freeze([
       'Embedded YouTube video introduction',
       'Direct contact options (phone, email, website)',
       'Ability to reply to reviews',
-      'Verified badge',
     ],
   },
   {

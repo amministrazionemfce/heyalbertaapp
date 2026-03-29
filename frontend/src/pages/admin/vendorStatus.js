@@ -47,3 +47,12 @@ export function getStatusFilterClass(_status, options = {}) {
 
   return '!bg-white !text-black border-slate-300 hover:!bg-slate-50';
 }
+
+/** Featured filter chips (All / Featured / Not featured) — same active style as status filters. */
+export function getFeaturedFilterClass(_value, options = {}) {
+  const { active = false } = options;
+  if (active) {
+    return '!bg-spruce-700 !text-white border-spruce-800 hover:!bg-spruce-800 shadow-sm';
+  }
+  return '!bg-white !text-black border-slate-300 hover:!bg-slate-50';
+}

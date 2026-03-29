@@ -331,7 +331,7 @@ export function AdminCityImagesSection() {
 
   return (
     <div className="space-y-6" data-testid="admin-city-images-section">
-      <div className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm w-full max-w-[1600px] mx-auto">
+      <div className="bg-white rounded-xl border border-slate-200 p-5 md:p-6 shadow-sm w-full">
         <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_auto] gap-4 xl:gap-6 xl:items-start">
           <div className="min-w-0">
             <h2 className="font-heading text-lg font-semibold text-slate-900 flex items-center gap-2">

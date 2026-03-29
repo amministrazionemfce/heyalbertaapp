@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI } from '../lib/api';
-import { Loader2, Megaphone, CreditCard, Settings } from 'lucide-react';
+import { Loader2, Megaphone, Settings } from 'lucide-react';
 import { ADMIN_SECTIONS } from './admin/adminConfig';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminStatsSection } from './admin/AdminStatsSection';
@@ -13,6 +13,7 @@ import { AdminUsersSection } from './admin/AdminUsersSection';
 import { AdminNewsSection } from './admin/AdminNewsSection';
 import { AdminCityImagesSection } from './admin/AdminCityImagesSection';
 import { AdminSupportSection } from './admin/AdminSupportSection';
+import { AdminMembershipsSection } from './admin/AdminMembershipsSection';
 import { ROUTES } from '../constants';
 
 export default function AdminDashboard() {
@@ -67,7 +68,7 @@ export default function AdminDashboard() {
 
       {/* Main content */}
       <main className="flex-1 min-w-0 py-6 px-4 md:px-6">
-        <div className={validSection === 'support' ? 'max-w-6xl' : 'max-w-5xl'}>
+        <div className="w-full max-w-none">
           {validSection === 'statistics' && <AdminStatsSection stats={stats} />}
           {validSection === 'users' && <AdminUsersSection />}
           {validSection === 'vendors' && <AdminVendorsSection onUpdate={refreshStats} />}
@@ -78,9 +79,7 @@ export default function AdminDashboard() {
           {validSection === 'marketings' && (
             <AdminPlaceholder icon={Megaphone} title="Marketings" description="Campaigns and promotions. Coming soon." />
           )}
-          {validSection === 'memberships' && (
-            <AdminPlaceholder icon={CreditCard} title="Memberships" description="Tiers and billing. Coming soon." />
-          )}
+          {validSection === 'memberships' && <AdminMembershipsSection onUpdate={refreshStats} />}
           {validSection === 'general' && (
             <AdminPlaceholder icon={Settings} title="General" description="Site settings and preferences. Coming soon." />
           )}

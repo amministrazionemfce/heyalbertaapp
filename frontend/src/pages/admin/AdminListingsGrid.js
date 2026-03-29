@@ -1,10 +1,11 @@
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Eye, Star } from 'lucide-react';
+import { Calendar, Eye, Star } from 'lucide-react';
+import { formatListingRegisteredAt } from '../../lib/formatAdminDate';
 
 export function AdminListingsGrid({ listings, getCategoryName, onView }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
       {listings.map((l) => (
         <div
           key={l.id}
@@ -23,6 +24,10 @@ export function AdminListingsGrid({ listings, getCategoryName, onView }) {
             {getCategoryName(l.categoryId) && (
               <p className="text-xs text-slate-400 mt-0.5">{getCategoryName(l.categoryId)}</p>
             )}
+            <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5 tabular-nums">
+              <Calendar className="w-3.5 h-3.5 shrink-0" aria-hidden />
+              Registered {formatListingRegisteredAt(l)}
+            </p>
           </div>
           <p className="text-sm text-slate-600 line-clamp-2 flex-1">{l.description}</p>
           <div className="flex flex-wrap gap-2 mt-auto pt-1">

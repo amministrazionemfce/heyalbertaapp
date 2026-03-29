@@ -54,7 +54,7 @@ export default function FeaturedListingsSection() {
         <div className="mb-10 text-center md:mb-12">
           <h2 className="font-heading text-3xl font-bold text-slate-900 md:text-4xl">Featured Listings</h2>
           <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600 md:text-lg">
-            Hand-picked services from verified vendors across Alberta.
+            Hand-picked services from Alberta vendors across the province.
           </p>
         </div>
 

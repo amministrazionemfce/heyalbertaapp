@@ -2,15 +2,9 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 import { Star } from 'lucide-react';
+import { formatListingRegisteredAt } from '../../lib/formatAdminDate';
 
-export function AdminListingDetailDialog({
-  listing,
-  onClose,
-  getCategoryName,
-  onToggleFeature,
-  actionLoading,
-  onViewPublic,
-}) {
+export function AdminListingDetailDialog({ listing, onClose, getCategoryName, onViewPublic }) {
   const open = !!listing;
 
   return (
@@ -24,7 +18,7 @@ export function AdminListingDetailDialog({
                 <Badge variant={listing.status === 'published' ? 'default' : 'secondary'} className={listing.status === 'published' ? 'bg-admin-600 border-0' : ''}>
                   {listing.status}
                 </Badge>
-                {listing.featured && <Star className="w-5 h-5 text-amber-500 fill-amber-500" />}
+                {listing.featured && <Star className="w-5 h-5 text-amber-500 fill-amber-500" aria-hidden />}
               </DialogTitle>
             </DialogHeader>
 
@@ -39,27 +33,24 @@ export function AdminListingDetailDialog({
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div><span className="text-slate-500">Vendor</span><p className="font-medium">{listing.vendorName || '—'}</p></div>
                 <div><span className="text-slate-500">Category</span><p className="font-medium">{getCategoryName(listing.categoryId) || listing.categoryId || '—'}</p></div>
+                <div>
+                  <span className="text-slate-500">Registered</span>
+                  <p className="font-medium tabular-nums">{formatListingRegisteredAt(listing)}</p>
+                </div>
                 <div><span className="text-slate-500">Status</span><p className="font-medium">{listing.status || '—'}</p></div>
-                <div><span className="text-slate-500">Featured</span><p className="font-medium">{listing.featured ? 'Yes' : 'No'}</p></div>
+                <div>
+                  <span className="text-slate-500">Featured</span>
+                  <p className="font-medium">{listing.featured ? 'Yes' : 'No'}</p>
+                  <p className="mt-1 text-xs text-slate-500">Set automatically when the vendor has a Standard or Gold membership.</p>
+                </div>
               </div>
 
-              <div className="flex flex-wrap justify-between gap-2 pt-4 border-t">
+              <div className="flex flex-wrap gap-2 pt-4 border-t">
                 {onViewPublic && listing.status === 'published' && (
                   <Button size="sm" variant="outline" onClick={() => onViewPublic(listing.id)} data-testid={`listing-view-public-${listing.id}`}>
                     View on site
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant={listing.featured ? 'outline' : 'default'}
-                  className={listing.featured ? 'border-amber-300 text-amber-700 hover:bg-amber-50' : 'bg-amber-500 hover:bg-amber-600 text-white'}
-                  onClick={() => onToggleFeature(listing.id, !listing.featured)}
-                  disabled={actionLoading}
-                  data-testid={`listing-detail-feature-${listing.id}`}
-                >
-                  <Star className={`w-4 h-4 shrink-0 mr-1 ${listing.featured ? 'fill-amber-500' : ''}`} />
-                  {listing.featured ? ' Unfeature this listing' : ' Feature this listing'}
-                </Button>
               </div>
             </div>
           </>

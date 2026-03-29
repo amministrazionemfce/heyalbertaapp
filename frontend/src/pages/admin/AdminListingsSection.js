@@ -22,8 +22,6 @@ export function AdminListingsSection({ onUpdate }) {
     detailListing,
     openDetail,
     closeDetail,
-    actionLoading,
-    featureListing,
     filteredListings,
     clearFilters,
   } = useAdminListings({ onUpdate });
@@ -76,8 +74,6 @@ export function AdminListingsSection({ onUpdate }) {
         listing={detailListing}
         onClose={closeDetail}
         getCategoryName={getCategoryName}
-        onToggleFeature={featureListing}
-        actionLoading={actionLoading}
         onViewPublic={(id) => navigate(listingPath(id))}
       />
     </div>

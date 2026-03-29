@@ -36,6 +36,16 @@ const siteSettingsSchema = new mongoose.Schema(
     newsCtaPrimaryLink: { type: String, default: "/register" },
     newsCtaSecondaryText: { type: String, default: "List your business" },
     newsCtaSecondaryLink: { type: String, default: "/register" },
+    /** Admin-editable copy for public membership tiers section */
+    membershipEyebrow: { type: String, default: "" },
+    membershipTitle: { type: String, default: "" },
+    membershipSubtitle: { type: String, default: "" },
+    membershipDescFree: { type: String, default: "" },
+    membershipDescStandard: { type: String, default: "" },
+    membershipDescPremium: { type: String, default: "" },
+    membershipFeaturesFree: { type: String, default: "" },
+    membershipFeaturesStandard: { type: String, default: "" },
+    membershipFeaturesPremium: { type: String, default: "" },
   },
   { versionKey: false, timestamps: { createdAt: false, updatedAt: true } }
 );

@@ -147,7 +147,7 @@ export default function AboutPage() {
             </h1>
             <p className="text-lg text-white leading-relaxed">
               Hey Alberta is the go-to platform for individuals and families relocating to Alberta. We connect newcomers with
-              verified, trusted local service providers across 16 essential categories, making the transition as smooth and
+              trusted local service providers across 16 essential categories, making the transition as smooth and
               stress-free as possible.
             </p>
           </div>
@@ -169,7 +169,7 @@ export default function AboutPage() {
                 best places to live, shop, and connect.
               </p>
               <p>
-                We created Hey Alberta to make that journey easier. Our goal is to connect people with verified companies, honest
+                We created Hey Alberta to make that journey easier. Our goal is to connect people with local companies, honest
                 reviews, and practical resources — all in one trusted platform.
               </p>
             </div>

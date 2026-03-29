@@ -7,6 +7,8 @@ export function useAdminVendors({ onUpdate } = {}) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  /** 'all' | 'featured' | 'unfeatured' */
+  const [featuredFilter, setFeaturedFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'table' | 'list'
   const [actionLoading, setActionLoading] = useState(false);
@@ -62,23 +64,6 @@ export function useAdminVendors({ onUpdate } = {}) {
     [fetchVendors, onUpdate]
   );
 
-  const featureVendor = useCallback(
-    async (id, featured) => {
-      setActionLoading(true);
-      try {
-        await adminAPI.featureVendor(id, featured);
-        toast.success(featured ? 'Vendor featured' : 'Vendor unfeatured');
-        await fetchVendors();
-        onUpdate?.();
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to update feature');
-      } finally {
-        setActionLoading(false);
-      }
-    },
-    [fetchVendors, onUpdate]
-  );
-
   const deleteVendor = useCallback(
     async (id, options = {}) => {
       if (!id) return null;
@@ -104,19 +89,22 @@ export function useAdminVendors({ onUpdate } = {}) {
   );
 
   const filteredVendors = useMemo(() => {
-    if (!search) return vendors;
-    const q = search.toLowerCase();
     return vendors.filter((v) => {
+      if (featuredFilter === 'featured' && !v.featured) return false;
+      if (featuredFilter === 'unfeatured' && v.featured) return false;
+      if (!search) return true;
+      const q = search.toLowerCase();
       const name = (v.name || '').toLowerCase();
       const city = (v.city || '').toLowerCase();
       const categoryName = (CATEGORIES.find((c) => c.id === v.category)?.name || '').toLowerCase();
       return name.includes(q) || city.includes(q) || categoryName.includes(q);
     });
-  }, [vendors, search]);
+  }, [vendors, search, featuredFilter]);
 
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('');
+    setFeaturedFilter('all');
     fetchVendors();
   }, [fetchVendors]);
 
@@ -125,6 +113,8 @@ export function useAdminVendors({ onUpdate } = {}) {
     loading,
     statusFilter,
     setStatusFilter,
+    featuredFilter,
+    setFeaturedFilter,
     search,
     setSearch,
     viewMode,
@@ -132,7 +122,6 @@ export function useAdminVendors({ onUpdate } = {}) {
     actionLoading,
     approveVendor,
     rejectVendor,
-    featureVendor,
     deleteVendor,
     filteredVendors,
     refresh: fetchVendors,

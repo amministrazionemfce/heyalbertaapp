@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Badge } from '../components/ui/badge';
 import { StarRating } from '../components/StarRating';
-import { MapPin, BadgeCheck, Phone } from 'lucide-react';
+import { MapPin, Phone } from 'lucide-react';
 import { getCategoryIcon, getTierInfo } from '../data/categories';
 import { vendorPath } from '../constants';
 import { resolveMediaUrl } from '../lib/mediaUrl';
@@ -33,11 +33,6 @@ export default function VendorCard({ vendor, showTierBadge = true }) {
           {showTierBadge && (
             <Badge className={`${tierInfo.color} text-xs font-medium`} data-testid={`vendor-tier-${vendor.id}`}>
               {tierInfo.name}
-            </Badge>
-          )}
-          {vendor.verified && (
-            <Badge className="bg-spruce-700 text-white text-xs flex items-center gap-1">
-              <BadgeCheck className="w-3 h-3" /> Verified
             </Badge>
           )}
         </div>
