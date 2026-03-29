@@ -2,15 +2,39 @@ import axios from 'axios';
 
 // Use REACT_APP_BACKEND_URL from .env, or fallback for local dev (e.g. backend on port 8000)
 export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+
+/** Ngrok free tier serves a browser warning HTML page unless this header is sent; that page has no CORS headers, so the browser reports a CORS failure. */
+function isNgrokBackendUrl(url) {
+  try {
+    const h = new URL(url).hostname;
+    return h === 'ngrok-free.app' || h.endsWith('.ngrok-free.app') || h.endsWith('.ngrok.io');
+  } catch {
+    return false;
+  }
+}
+
+const NGROK_SKIP_WARNING = isNgrokBackendUrl(BACKEND_URL);
+
+/** Merge into `fetch(..., { headers })` when calling BACKEND_URL through ngrok free. */
+export const BACKEND_EXTRA_FETCH_HEADERS = NGROK_SKIP_WARNING
+  ? { 'ngrok-skip-browser-warning': 'true' }
+  : {};
+
 const API = axios.create({
   baseURL: `${BACKEND_URL}/api`,
-  headers: { 'Content-Type': 'application/json' },
+  headers: {
+    'Content-Type': 'application/json',
+    ...(NGROK_SKIP_WARNING ? { 'ngrok-skip-browser-warning': 'true' } : {}),
+  },
 });
 
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem('hey_alberta_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  if (NGROK_SKIP_WARNING) {
+    config.headers['ngrok-skip-browser-warning'] = 'true';
   }
   return config;
 });
@@ -45,12 +69,20 @@ export const billingAPI = {
 };
 
 /** Upload a promotional video (auth required). Returns `{ url }` for storing on vendor.videoUrl. */
+function uploadHeaders(extra = {}) {
+  const token = localStorage.getItem('hey_alberta_token');
+  return {
+    ...extra,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(NGROK_SKIP_WARNING ? { 'ngrok-skip-browser-warning': 'true' } : {}),
+  };
+}
+
 export function uploadVendorVideo(file) {
   const form = new FormData();
   form.append('video', file);
-  const token = localStorage.getItem('hey_alberta_token');
   return axios.post(`${BACKEND_URL}/api/uploads/video`, form, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: uploadHeaders(),
   });
 }
 
@@ -58,9 +90,8 @@ export function uploadVendorVideo(file) {
 export function uploadAvatar(file) {
   const form = new FormData();
   form.append('avatar', file);
-  const token = localStorage.getItem('hey_alberta_token');
   return axios.post(`${BACKEND_URL}/api/uploads/avatar`, form, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: uploadHeaders(),
   });
 }
 
@@ -68,9 +99,8 @@ export function uploadAvatar(file) {
 export function uploadAdminImage(file) {
   const form = new FormData();
   form.append('image', file);
-  const token = localStorage.getItem('hey_alberta_token');
   return axios.post(`${BACKEND_URL}/api/uploads/image`, form, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: uploadHeaders(),
   });
 }
 

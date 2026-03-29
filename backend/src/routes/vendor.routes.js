@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { requireAuth } from "../middleware/auth.js";
 import Vendor from "../models/Vendor.js";
 import { findReviewsForVendorSorted, serializeReviewForApi } from "../utils/reviewVendorQuery.js";
+import { vendorMaySetPublicContactFields } from "../utils/listingTierCaps.js";
 
 const router = express.Router();
 
@@ -208,6 +209,19 @@ router.post("/", requireAuth, async (req, res) => {
   const tags = normalizeTags(req.body.tags);
   const openingHours = normalizeOpeningHours(req.body.openingHours);
 
+  const registerTier = req.body.tier !== undefined && req.body.tier !== null ? req.body.tier : "free";
+  if (!vendorMaySetPublicContactFields(registerTier)) {
+    if (String(req.body.phone || "").trim()) {
+      return res.status(400).json({ message: "Phone is available on Standard and Gold plans." });
+    }
+    if (String(req.body.email || "").trim()) {
+      return res.status(400).json({ message: "Email is available on Standard and Gold plans." });
+    }
+    if (String(req.body.website || "").trim()) {
+      return res.status(400).json({ message: "Website is available on Standard and Gold plans." });
+    }
+  }
+
   const vendor = await Vendor.create({
     ...req.body,
     images,
@@ -280,6 +294,29 @@ router.put("/:id", requireAuth, async (req, res) => {
   if (payload.longitude !== undefined) {
     const parsed = payload.longitude === "" ? undefined : Number(payload.longitude);
     payload.longitude = Number.isFinite(parsed) ? parsed : undefined;
+  }
+  if (!vendorMaySetPublicContactFields(vendor.tier)) {
+    if (payload.phone !== undefined) {
+      const next = String(payload.phone || "").trim();
+      const prev = String(vendor.phone || "").trim();
+      if (next && next !== prev) {
+        return res.status(400).json({ message: "Phone is available on Standard and Gold plans." });
+      }
+    }
+    if (payload.email !== undefined) {
+      const next = String(payload.email || "").trim();
+      const prev = String(vendor.email || "").trim();
+      if (next && next !== prev) {
+        return res.status(400).json({ message: "Email is available on Standard and Gold plans." });
+      }
+    }
+    if (payload.website !== undefined) {
+      const next = String(payload.website || "").trim();
+      const prev = String(vendor.website || "").trim();
+      if (next && next !== prev) {
+        return res.status(400).json({ message: "Website is available on Standard and Gold plans." });
+      }
+    }
   }
   const updated = await Vendor.findByIdAndUpdate(id, payload, { new: true, runValidators: false });
   res.json(updated);

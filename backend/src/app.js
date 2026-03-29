@@ -21,17 +21,37 @@ const uploadsRoot = path.join(__dirname, "..", "uploads");
 
 const app = express();
 
+/** Comma-separated exact origins (no trailing slash). If unset, the cors package reflects the request Origin (fine for local dev). */
 const corsOrigin =
   process.env.CORS_ORIGINS?.trim()
-    ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
+    ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean)
     : true;
 
-app.use(
-  cors({
-    origin: corsOrigin,
-    credentials: true,
-  })
-);
+const allowVercelPreview =
+  process.env.CORS_ALLOW_VERCEL_PREVIEW === "1" || process.env.CORS_ALLOW_VERCEL_PREVIEW === "true";
+
+const corsOptions =
+  Array.isArray(corsOrigin) && allowVercelPreview
+    ? {
+        origin(origin, callback) {
+          if (!origin) return callback(null, true);
+          const normalized = origin.replace(/\/$/, "");
+          if (corsOrigin.includes(normalized)) return callback(null, true);
+          try {
+            const host = new URL(origin).hostname;
+            if (host === "vercel.app" || host.endsWith(".vercel.app")) {
+              return callback(null, true);
+            }
+          } catch {
+            /* ignore */
+          }
+          return callback(null, false);
+        },
+        credentials: true,
+      }
+    : { origin: corsOrigin, credentials: true };
+
+app.use(cors(corsOptions));
 
 app.use(
   "/uploads",

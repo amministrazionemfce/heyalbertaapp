@@ -1,4 +1,16 @@
-export function listingFormValidation(data) {
+import {
+  FREE_LISTING_DESCRIPTION_MAX_WORDS,
+  listingPlanTierCapabilities,
+  countWords,
+  descriptionHasBlockedContactPatterns,
+} from '../lib/listingTierRules';
+
+/**
+ * @param {object} data - trimmed listing form fields
+ * @param {'free'|'standard'|'premium'} [planTier] - from `membershipPlanTierFromVendors`
+ */
+export function listingFormValidation(data, planTier = 'free') {
+  const cap = listingPlanTierCapabilities(planTier);
   const errors = {};
   const title = (data.title || '').trim();
   if (!title) errors.title = 'Title is required';
@@ -7,6 +19,12 @@ export function listingFormValidation(data) {
   const desc = (data.description || '').trim();
   if (!desc) errors.description = 'Description is required';
   else if (desc.length < 10) errors.description = 'Description must be at least 10 characters';
+  if (cap.maxDescriptionWords != null && countWords(desc) > cap.maxDescriptionWords) {
+    errors.description = `Description is limited to ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words on the Free plan.`;
+  }
+  if (!cap.allowContactInListingDescription && desc && descriptionHasBlockedContactPatterns(desc)) {
+    errors.description = 'URLs and email addresses are not allowed in your listing description on the Free plan.';
+  }
 
   if (!(data.categoryId || '').trim()) errors.categoryId = 'Please select a category';
 
@@ -18,6 +36,9 @@ export function listingFormValidation(data) {
 
   const images = Array.isArray(data.images) ? data.images : [];
   if (images.length === 0) errors.images = 'Add at least one image';
+  if (cap.maxImages != null && images.length > cap.maxImages) {
+    errors.images = 'Your plan allows only one image per listing.';
+  }
 
   const coverIdx = Number(data.coverImageIndex);
   const idx = Number.isFinite(coverIdx) ? Math.floor(coverIdx) : 0;
@@ -26,9 +47,13 @@ export function listingFormValidation(data) {
   }
 
   if (data.videoUrl && String(data.videoUrl).trim()) {
-    const u = String(data.videoUrl).trim();
-    if (!/^https?:\/\/.+/i.test(u) && !u.startsWith('/uploads')) {
-      errors.videoUrl = 'Video must be a valid URL (https://…) or an uploaded file.';
+    if (!cap.allowListingVideo) {
+      errors.videoUrl = 'Video is not available on the Free plan.';
+    } else {
+      const u = String(data.videoUrl).trim();
+      if (!/^https?:\/\/.+/i.test(u) && !u.startsWith('/uploads')) {
+        errors.videoUrl = 'Video must be a valid URL (https://…) or an uploaded file.';
+      }
     }
   }
 

@@ -15,6 +15,7 @@ import { ROUTES, vendorPath, listingPath, directoryCategoryQuery } from '../cons
 import { getListingCoverImageUrl, getListingGalleryImageUrls } from '../lib/listingCover';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { getVendorVideoKind } from '../lib/vendorVideoEmbed';
+import { listingPlanFromVendorTier } from '../lib/listingTierRules';
 import {
   ArrowLeft,
   MapPin,
@@ -720,7 +721,7 @@ export default function ListingDetailPage() {
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm" data-testid="listing-contact-card">
               <h3 className="font-heading font-semibold text-lg mb-4 text-slate-900">Contact &amp; location</h3>
 
-              {vendor.tier === 'free' ? (
+              {listingPlanFromVendorTier(vendor.tier) === 'free' ? (
                 <p className="text-sm text-slate-500 mb-4">
                   Contact info available for upgraded listings.
                   <Link to={ROUTES.ABOUT} className="text-spruce-700 hover:underline ml-1 font-medium">

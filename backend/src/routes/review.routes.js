@@ -8,6 +8,7 @@ import {
   serializeReviewForApi,
   matchExistingReviewForUser,
 } from "../utils/reviewVendorQuery.js";
+import { vendorMayReplyToReviews } from "../utils/listingTierCaps.js";
 
 const router = express.Router();
 
@@ -103,6 +104,10 @@ router.put("/:reviewId/reply", requireAuth, async (req, res) => {
 
   if (vendor.userId !== req.user._id.toString() && req.user.role !== "admin")
     return res.status(403).json({ message: "Not authorized" });
+
+  if (req.user.role !== "admin" && !vendorMayReplyToReviews(vendor.tier)) {
+    return res.status(403).json({ message: "Review replies require Standard or Gold membership." });
+  }
 
   review.reply = req.body.reply;
   await review.save();

@@ -8,7 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAuth } from '../lib/auth';
 import { vendorAPI, reviewAPI, listingAPI, uploadVendorVideo, BACKEND_URL } from '../lib/api';
-import { CATEGORIES, CITIES, getTierInfo } from '../data/categories';
+import { CATEGORIES, CITIES } from '../data/categories';
 import { listingValidation, hasListingErrors } from '../validations/listingValidation';
 import { listingFormValidation, hasListingFormErrors } from '../validations/listingFormValidation';
 import AuthFormError from '../components/AuthFormError';
@@ -17,13 +17,20 @@ import { StarRating } from '../components/StarRating';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, Loader2, Store, MessageSquare,
-  Eye, BadgeCheck, Clock, ListPlus, Check, Star, Sparkles, Settings, Building2, Video, ImageIcon,
+  Eye, BadgeCheck, Clock, ListPlus, Star, Settings, Building2, Video, ImageIcon,
 } from 'lucide-react';
 import { ROUTES } from '../constants';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { getVendorVideoKind, isDirectPlayableVideoUrl } from '../lib/vendorVideoEmbed';
 import { VendorTagField } from '../components/VendorTagField';
 import { emptyOpeningHours, OPENING_DAY_LABELS, OPENING_DAY_ORDER } from '../lib/vendorOpeningHours';
+import { membershipPlanTierFromVendors } from '../lib/membershipTier';
+import {
+  listingPlanTierCapabilities,
+  FREE_LISTING_DESCRIPTION_MAX_WORDS,
+  countWords,
+} from '../lib/listingTierRules';
+import MembershipTierEntitlementsCard, { MembershipUpgradeCard } from '../components/MembershipTierEntitlementsCard';
 
 const defaultFormData = {
   name: '', description: '', category: '', city: '',
@@ -218,6 +225,7 @@ export default function VendorDashboard() {
   const effectiveTab = !hasVendor ? 'settings' : tabFromUrl;
   const isVendorApproved = hasVendor && vendors[0]?.status === 'approved';
   const isAddListingBlocked = effectiveTab === 'add-listing' && hasVendor && !isVendorApproved;
+  const vendorListingPlan = membershipPlanTierFromVendors(vendors);
 
   // Re-show "company not approved" message when entering Add Listing while blocked
   useEffect(() => {
@@ -381,7 +389,7 @@ export default function VendorDashboard() {
       videoUrl: (listingForm.videoUrl || '').trim(),
     };
 
-    const errors = listingFormValidation(trimmed);
+    const errors = listingFormValidation(trimmed, vendorListingPlan);
     setListingFormErrors(errors);
     setListingApiErrorLines([]);
     if (hasListingFormErrors(errors)) return;
@@ -480,14 +488,15 @@ export default function VendorDashboard() {
         </div>
       </aside>
 
-      {/* Main content — left half = tab content, right half = Listings overview */}
+      {/* Main content */}
       <main className="flex-1 min-w-0 min-h-0 flex flex-col py-6 px-4 md:px-6">
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-0 w-full">
+        <div className="flex-1 min-h-0 flex flex-col w-full">
           <div className="flex-1 min-w-0 flex flex-col">
           {effectiveTab === 'settings' && (
             <SettingsView
               hasVendor={hasVendor}
               vendors={vendors}
+              vendorListingPlan={vendorListingPlan}
               settingsEditMode={settingsEditMode}
               formData={formData}
               setFormData={setFormData}
@@ -552,6 +561,7 @@ export default function VendorDashboard() {
                 disabled={!isVendorApproved}
                 errors={listingFormErrors}
                 apiErrorLines={listingApiErrorLines}
+                vendorListingPlan={vendorListingPlan}
               />
             </div>
           )}
@@ -571,14 +581,17 @@ export default function VendorDashboard() {
                 setSearchParams({ tab: 'add-listing' });
               }}
               onEditListing={(listing) => {
+                const cap = listingPlanTierCapabilities(vendorListingPlan);
+                let imgs = Array.isArray(listing.images) ? [...listing.images] : [];
+                if (cap.maxImages === 1 && imgs.length > 1) imgs = imgs.slice(0, 1);
                 setListingForm({
                   title: listing.title || '',
                   description: listing.description || '',
                   price: listing.price != null ? String(listing.price) : '',
                   categoryId: listing.categoryId || '',
                   status: listing.status || 'draft',
-                  images: Array.isArray(listing.images) ? listing.images : [],
-                  coverImageIndex: Number(listing.coverImageIndex) || 0,
+                  images: imgs,
+                  coverImageIndex: imgs.length ? Math.min(Number(listing.coverImageIndex) || 0, imgs.length - 1) : 0,
                   videoUrl: listing.videoUrl || '',
                 });
                 setListingFormErrors({});
@@ -589,101 +602,17 @@ export default function VendorDashboard() {
               onDeleteListing={handleDeleteListing}
             />
           )}
-          {effectiveTab === 'reviews' && <VendorReviews vendors={vendors} />}
-          </div>
-
-          {/* Right half of main: Listings overview (below tab content on small screens) */}
-          {hasVendor && (
-            <div className="lg:w-72 flex-shrink-0 flex flex-col gap-4 order-last lg:order-none border-slate-200 lg:pl-6">
-              <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
-                <h3 className="font-heading font-semibold text-slate-900 mb-3 text-sm">Listings overview</h3>
-                {listings.length === 0 ? (
-                  <p className="text-xs text-slate-500">No listings yet. Add one from My Listings.</p>
-                ) : (
-                  <>
-                    <div className="overflow-x-auto -mx-1">
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200">
-                            <th className="text-left py-2 px-1 font-medium text-slate-600">Title</th>
-                            <th className="text-left py-2 px-1 font-medium text-slate-600">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {listings.slice(0, 8).map((listing) => (
-                            <tr key={listing.id} className="border-b border-slate-100 last:border-0">
-                              <td className="py-2 px-1 truncate max-w-[120px]" title={listing.title}>{listing.title || '—'}</td>
-                              <td className="py-2 px-1">
-                                <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                                  listing.status === 'published' ? 'bg-emerald-100 text-emerald-800' :
-                                  listing.status === 'draft' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-800'
-                                }`}>
-                                  {listing.status || 'draft'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    {listings.length > 8 && <p className="text-[10px] text-slate-500 mt-2">+{listings.length - 8} more</p>}
-                  </>
-                )}
-              </div>
-            </div>
+          {effectiveTab === 'reviews' && (
+            <VendorReviews vendors={vendors} canReplyToReviews={listingPlanTierCapabilities(vendorListingPlan).allowReviewReplies} />
           )}
+          </div>
         </div>
       </main>
 
-      {/* Right sidebar: Tips + Upgrade only */}
+      {/* Right sidebar: plan entitlements + upgrade */}
       <aside className="hidden lg:block w-72 flex-shrink-0 border-l border-slate-200 bg-white/50 p-6 space-y-6">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
-          <h3 className="font-heading font-semibold text-slate-900 mb-3">Tips for a Better Listing</h3>
-          <ul className="space-y-2 text-sm text-slate-600">
-            <li className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <span>Use clear business name</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <span>Write at least 50–100 words</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <span>Add images to increase trust</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-emerald-500 flex-shrink-0 mt-0.5" />
-              <span>Add website & phone</span>
-            </li>
-          </ul>
-          <p className="mt-4 text-sm font-medium text-spruce-700 bg-spruce-50 rounded-lg px-3 py-2">
-            Listings with images get <strong>3x more views</strong>.
-          </p>
-        </div>
-        <div className="bg-gradient-to-br from-amber-50 to-secondary-50 rounded-xl border border-amber-200/60 p-5 shadow-sm">
-          <h3 className="font-heading font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            Upgrade to Gold
-          </h3>
-          <ul className="space-y-2 text-sm text-slate-700 mb-4">
-            <li className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <span>Verified badge</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <span>Priority listing</span>
-            </li>
-            <li className="flex items-center gap-2">
-              <Star className="w-4 h-4 text-amber-500 flex-shrink-0" />
-              <span>Featured in search</span>
-            </li>
-          </ul>
-          <Button className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm">
-            Upgrade to Gold
-          </Button>
-        </div>
+        <MembershipTierEntitlementsCard planTier={vendorListingPlan} />
+        <MembershipUpgradeCard planTier={vendorListingPlan} />
       </aside>
 
     </div>
@@ -835,10 +764,17 @@ function ListingFormSection({
   disabled,
   errors,
   apiErrorLines,
+  vendorListingPlan,
 }) {
   const [videoUploading, setVideoUploading] = useState(false);
   const [videoUploadError, setVideoUploadError] = useState('');
   const images = listingForm.images || [];
+  const cap = listingPlanTierCapabilities(vendorListingPlan);
+  const descWordCount = countWords(listingForm.description || '');
+  const descWordsLabel =
+    cap.maxDescriptionWords != null
+      ? `${descWordCount} / ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words`
+      : null;
 
   const handleAddImages = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -852,12 +788,19 @@ function ListingFormSection({
         /* skip */
       }
     }
-    if (newUrls.length) {
+    if (!newUrls.length) return;
+    if (cap.maxImages === 1) {
       patchListingForm((prev) => ({
         ...prev,
-        images: [...(prev.images || []), ...newUrls],
+        images: newUrls.slice(0, 1),
+        coverImageIndex: 0,
       }));
+      return;
     }
+    patchListingForm((prev) => ({
+      ...prev,
+      images: [...(prev.images || []), ...newUrls],
+    }));
   };
 
   const removeImageAt = (idx) => {
@@ -904,79 +847,116 @@ function ListingFormSection({
         {editingListingId ? 'Edit listing' : 'Add listing'}
       </h2>
       <p className="text-xs text-slate-500 mb-4">
-        All fields are required except video. Listing title must be unique. Include pricing (any format). Add one or more images and choose which one is the cover (shown on the directory and listing page).
+        All fields are required except video (Standard and Gold). Listing title must be unique. Include pricing (any format).
+        {cap.maxImages === 1
+          ? ' Free plan: one image and a short description — see your plan on the right.'
+          : ' Add images and choose the cover shown on the directory and listing page.'}
       </p>
       <form onSubmit={(e) => { e.preventDefault(); if (!disabled) onSave(); }} className="space-y-3">
         <AuthFormError lines={apiErrorLines} data-testid="listing-form-api-error" />
 
-        <div>
-          <Label htmlFor="listing-title" className="text-xs">Title *</Label>
-          <Input
-            id="listing-title"
-            value={listingForm.title}
-            onChange={(e) => patchListingForm({ title: e.target.value })}
-            className="mt-1 h-9"
-            placeholder="e.g. Family Law Consultation"
-            data-testid="listing-form-title"
-          />
-          {errors.title && <p className="text-red-500 text-sm mt-0.5">{errors.title}</p>}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label htmlFor="listing-title" className="text-xs">Title *</Label>
+            <Input
+              id="listing-title"
+              value={listingForm.title}
+              onChange={(e) => patchListingForm({ title: e.target.value })}
+              className="mt-1 h-9"
+              placeholder="e.g. Family Law Consultation"
+              data-testid="listing-form-title"
+            />
+            {errors.title && <p className="text-red-500 text-sm mt-0.5">{errors.title}</p>}
+          </div>
+          <div>
+            <Label htmlFor="listing-price" className="text-xs">Pricing *</Label>
+            <Input
+              id="listing-price"
+              value={listingForm.price ?? ''}
+              onChange={(e) => patchListingForm({ price: e.target.value })}
+              className="mt-1 h-9"
+              placeholder="e.g. $500, From $99/hr, Contact for quote"
+              data-testid="listing-form-price"
+            />
+            {errors.price && <p className="text-red-500 text-sm mt-0.5">{errors.price}</p>}
+          </div>
         </div>
-        <div>
-          <Label htmlFor="listing-price" className="text-xs">Pricing *</Label>
-          <Input
-            id="listing-price"
-            value={listingForm.price ?? ''}
-            onChange={(e) => patchListingForm({ price: e.target.value })}
-            className="mt-1 h-9"
-            placeholder="e.g. $500, From $99/hr, Contact for quote"
-            data-testid="listing-form-price"
-          />
-          {errors.price && <p className="text-red-500 text-sm mt-0.5">{errors.price}</p>}
-        </div>
-        <div>
-          <Label htmlFor="listing-desc" className="text-xs">Description *</Label>
+
+        <div className="md:col-span-2">
+          <div className="flex items-center justify-between gap-2">
+            <Label htmlFor="listing-desc" className="text-xs">Description *</Label>
+            {descWordsLabel ? (
+              <span
+                className={`text-[11px] tabular-nums ${descWordCount > FREE_LISTING_DESCRIPTION_MAX_WORDS ? 'text-red-600 font-medium' : 'text-slate-500'}`}
+              >
+                {descWordsLabel}
+              </span>
+            ) : null}
+          </div>
           <Textarea
             id="listing-desc"
             value={listingForm.description}
             onChange={(e) => patchListingForm({ description: e.target.value })}
             rows={4}
             className="mt-1 min-h-[5rem]"
-            placeholder="Describe this offering (at least 10 characters)..."
+            placeholder={
+              cap.maxDescriptionWords != null
+                ? `Up to ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words (no URLs or email addresses). At least 10 characters.`
+                : 'Describe this offering (at least 10 characters)…'
+            }
             data-testid="listing-form-desc"
           />
+          {cap.maxDescriptionWords != null ? (
+            <p className="text-[11px] text-slate-500 mt-1">Do not include website links or email addresses in the description on the Free plan.</p>
+          ) : null}
           {errors.description && <p className="text-red-500 text-sm mt-0.5">{errors.description}</p>}
         </div>
-        <div>
-          <Label className="text-xs">Category *</Label>
-          <Select value={listingForm.categoryId} onValueChange={(v) => patchListingForm({ categoryId: v })}>
-            <SelectTrigger className="mt-1 h-9" data-testid="listing-form-category">
-              <SelectValue placeholder="Select category" />
-            </SelectTrigger>
-            <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-          {errors.categoryId && <p className="text-red-500 text-sm mt-0.5">{errors.categoryId}</p>}
-        </div>
-        <div>
-          <Label className="text-xs">Status *</Label>
-          <Select value={listingForm.status} onValueChange={(v) => patchListingForm({ status: v })}>
-            <SelectTrigger className="mt-1 h-9" data-testid="listing-form-status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="published">Published</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.status && <p className="text-red-500 text-sm mt-0.5">{errors.status}</p>}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <Label className="text-xs">Category *</Label>
+            <Select value={listingForm.categoryId} onValueChange={(v) => patchListingForm({ categoryId: v })}>
+              <SelectTrigger className="mt-1 h-9" data-testid="listing-form-category">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+            {errors.categoryId && <p className="text-red-500 text-sm mt-0.5">{errors.categoryId}</p>}
+          </div>
+          <div>
+            <Label className="text-xs">Status *</Label>
+            <Select value={listingForm.status} onValueChange={(v) => patchListingForm({ status: v })}>
+              <SelectTrigger className="mt-1 h-9" data-testid="listing-form-status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+              </SelectContent>
+            </Select>
+            {errors.status && <p className="text-red-500 text-sm mt-0.5">{errors.status}</p>}
+          </div>
         </div>
 
         <div>
           <Label className="text-xs flex items-center gap-1">
             <ImageIcon className="w-3.5 h-3.5" aria-hidden /> Images * (cover for directory)
           </Label>
-          <p className="text-[11px] text-slate-500 mt-0.5 mb-2">Upload one or more photos. Click the star to set the cover image.</p>
+          <p className="text-[11px] text-slate-500 mt-0.5 mb-2">
+            {cap.maxImages === 1
+              ? 'Free plan: upload one photo (replaces any previous image).'
+              : 'Upload one or more photos. Click the star to set the cover image.'}
+          </p>
           <label className="inline-flex cursor-pointer">
-            <input type="file" accept="image/*" multiple className="sr-only" onChange={handleAddImages} disabled={disabled} data-testid="listing-form-images" />
+            <input
+              type="file"
+              accept="image/*"
+              multiple={cap.maxImages !== 1}
+              className="sr-only"
+              onChange={handleAddImages}
+              disabled={disabled}
+              data-testid="listing-form-images"
+            />
             <span className="inline-flex items-center justify-center h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
               Add images
             </span>
@@ -1014,53 +994,62 @@ function ListingFormSection({
           )}
         </div>
 
-        <div>
-          <Label className="text-xs flex items-center gap-1">
-            <Video className="w-3.5 h-3.5" aria-hidden /> Video (optional)
-          </Label>
-          <p className="text-[11px] text-slate-500 mt-0.5 mb-1.5">
-            Paste a link (YouTube, Vimeo, TikTok, Instagram) or upload a file (max 80MB).
-          </p>
-          <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-stretch sm:items-center">
-            <label className="cursor-pointer shrink-0">
-              <input
-                type="file"
-                accept="video/*"
-                className="sr-only"
-                onChange={handleVideoFile}
-                disabled={videoUploading || disabled}
-                data-testid="listing-form-video-file"
+        {cap.allowListingVideo ? (
+          <div>
+            <Label className="text-xs flex items-center gap-1">
+              <Video className="w-3.5 h-3.5" aria-hidden /> Video (optional)
+            </Label>
+            <p className="text-[11px] text-slate-500 mt-0.5 mb-1.5">
+              Paste a link (YouTube, Vimeo, TikTok, Instagram) or upload a file (max 80MB).
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-stretch sm:items-center">
+              <label className="cursor-pointer shrink-0">
+                <input
+                  type="file"
+                  accept="video/*"
+                  className="sr-only"
+                  onChange={handleVideoFile}
+                  disabled={videoUploading || disabled}
+                  data-testid="listing-form-video-file"
+                />
+                <span className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                  {videoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : null}
+                  {videoUploading ? 'Uploading…' : 'Upload video'}
+                </span>
+              </label>
+              <Input
+                value={listingForm.videoUrl || ''}
+                onChange={(e) => {
+                  setVideoUploadError('');
+                  patchListingForm({ videoUrl: e.target.value });
+                }}
+                placeholder="Or paste a video URL…"
+                className="h-9 flex-1 min-w-[12rem]"
+                data-testid="listing-form-video-url"
               />
-              <span className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
-                {videoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : null}
-                {videoUploading ? 'Uploading…' : 'Upload video'}
-              </span>
-            </label>
-            <Input
-              value={listingForm.videoUrl || ''}
-              onChange={(e) => {
-                setVideoUploadError('');
-                patchListingForm({ videoUrl: e.target.value });
-              }}
-              placeholder="Or paste a video URL…"
-              className="h-9 flex-1 min-w-[12rem]"
-              data-testid="listing-form-video-url"
-            />
+              {(listingForm.videoUrl || '').trim() ? (
+                <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={clearVideo}>
+                  Clear video
+                </Button>
+              ) : null}
+            </div>
+            {videoUploadError && <p className="text-red-500 text-xs mt-1">{videoUploadError}</p>}
+            {errors.videoUrl && <p className="text-red-500 text-sm mt-0.5">{errors.videoUrl}</p>}
             {(listingForm.videoUrl || '').trim() ? (
-              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={clearVideo}>
-                Clear video
-              </Button>
+              <VendorVideoBlock
+                url={listingForm.videoUrl}
+                classNameFile="mt-2 max-h-40 w-full max-w-md rounded-lg border border-slate-200 bg-black"
+              />
             ) : null}
           </div>
-          {videoUploadError && <p className="text-red-500 text-xs mt-1">{videoUploadError}</p>}
-          {errors.videoUrl && <p className="text-red-500 text-sm mt-0.5">{errors.videoUrl}</p>}
-          {(listingForm.videoUrl || '').trim() ? (
-            <VendorVideoBlock
-              url={listingForm.videoUrl}
-              classNameFile="mt-2 max-h-40 w-full max-w-md rounded-lg border border-slate-200 bg-black"
-            />
-          ) : null}
-        </div>
+        ) : (listingForm.videoUrl || '').trim() ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 space-y-2">
+            <p>Your plan does not include listing video. Remove the video to save changes, or upgrade to Standard or Gold.</p>
+            <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={clearVideo}>
+              Remove video from listing
+            </Button>
+          </div>
+        ) : null}
 
         <div className="flex gap-2 pt-1">
           <Button type="submit" disabled={saving || disabled || videoUploading} className="bg-spruce-700 hover:bg-spruce-800 text-white h-9" data-testid="listing-form-submit">
@@ -1077,7 +1066,7 @@ function ListingFormSection({
 }
 
 function SettingsView({
-  hasVendor, vendors, settingsEditMode, formData, setFormData, errors, saving,
+  hasVendor, vendors, vendorListingPlan, settingsEditMode, formData, setFormData, errors, saving,
   onSave, onSaveEdit, resetForm, onStartEdit, onCancelEdit
 }) {
   if (hasVendor && !settingsEditMode && vendors[0]) {
@@ -1260,6 +1249,7 @@ function SettingsView({
           isEdit={true}
           title="Edit company details"
           submitLabel="Update"
+          vendorListingPlan={vendorListingPlan}
         />
       </div>
     );
@@ -1284,6 +1274,7 @@ function SettingsView({
             isEdit={false}
             title="Company details"
             submitLabel="Register company"
+            vendorListingPlan={vendorListingPlan}
           />
         </div>
       </div>
@@ -1291,10 +1282,12 @@ function SettingsView({
   );
 }
 
-function AddListingForm({ formData, setFormData, errors, saving, onSave, onCancel, isEdit, title, submitLabel }) {
+function AddListingForm({ formData, setFormData, errors, saving, onSave, onCancel, isEdit, title, submitLabel, vendorListingPlan = 'free' }) {
   const formTitle = title || (isEdit ? 'Edit listing' : 'Create a new listing');
   const formSubtitle = 'Fields marked with * are required.';
   const submitText = submitLabel || (isEdit ? 'Update listing' : 'Create listing');
+  const profileCap = listingPlanTierCapabilities(vendorListingPlan);
+  const allowPublicContact = profileCap.allowVendorProfileContactFields;
   const vendorImages = Array.isArray(formData.images) ? formData.images : [];
   const coverIndex = Math.min(Math.max(0, Number(formData.coverImageIndex) || 0), Math.max(0, vendorImages.length - 1));
   const [videoUploading, setVideoUploading] = useState(false);
@@ -1433,7 +1426,11 @@ function AddListingForm({ formData, setFormData, errors, saving, onSave, onCance
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="mt-1 h-9"
               placeholder="(403) 555-0100"
+              disabled={!allowPublicContact}
             />
+            {!allowPublicContact ? (
+              <p className="text-[11px] text-slate-500 mt-1">Shown on Standard and Gold.</p>
+            ) : null}
           </div>
           <div>
             <Label htmlFor="add-email" className="text-xs">Email (optional)</Label>
@@ -1445,8 +1442,12 @@ function AddListingForm({ formData, setFormData, errors, saving, onSave, onCance
               className="mt-1 h-9"
               placeholder="contact@example.com"
               data-testid="add-listing-email"
+              disabled={!allowPublicContact}
             />
             {errors.email && <p className="text-red-500 text-xs mt-0.5">{errors.email}</p>}
+            {!allowPublicContact ? (
+              <p className="text-[11px] text-slate-500 mt-1">Shown on Standard and Gold.</p>
+            ) : null}
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1459,8 +1460,12 @@ function AddListingForm({ formData, setFormData, errors, saving, onSave, onCance
               className="mt-1 h-9"
               placeholder="https://..."
               data-testid="add-listing-website"
+              disabled={!allowPublicContact}
             />
             {errors.website && <p className="text-red-500 text-xs mt-0.5">{errors.website}</p>}
+            {!allowPublicContact ? (
+              <p className="text-[11px] text-slate-500 mt-1">Shown on Standard and Gold.</p>
+            ) : null}
           </div>
           <div>
             <Label className="text-xs">Company Images (optional)</Label>
@@ -1644,7 +1649,7 @@ function AddListingForm({ formData, setFormData, errors, saving, onSave, onCance
   );
 }
 
-function VendorReviews({ vendors }) {
+function VendorReviews({ vendors, canReplyToReviews }) {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [replyingTo, setReplyingTo] = useState(null);
@@ -1710,7 +1715,7 @@ function VendorReviews({ vendors }) {
                 <p className="text-sm">{review.reply}</p>
               </div>
             )}
-            {!review.reply && (
+            {!review.reply && canReplyToReviews && (
               replyingTo === review.id ? (
                 <div className="flex gap-2 mt-3">
                   <Input value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder="Write reply..." className="text-sm" />
@@ -1718,11 +1723,14 @@ function VendorReviews({ vendors }) {
                   <Button size="sm" variant="ghost" onClick={() => setReplyingTo(null)}>Cancel</Button>
                 </div>
               ) : (
-                <button onClick={() => { setReplyingTo(review.id); setReplyText(''); }} className="text-xs text-spruce-700 hover:underline mt-3 flex items-center gap-1">
+                <button type="button" onClick={() => { setReplyingTo(review.id); setReplyText(''); }} className="text-xs text-spruce-700 hover:underline mt-3 flex items-center gap-1">
                   <MessageSquare className="w-3 h-3" /> Reply to this review
                 </button>
               )
             )}
+            {!review.reply && !canReplyToReviews ? (
+              <p className="text-xs text-slate-500 mt-3">Replies are available on Standard and Gold.</p>
+            ) : null}
           </div>
         ))
       )}

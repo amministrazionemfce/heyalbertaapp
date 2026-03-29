@@ -5,6 +5,7 @@ import Listing from "../models/Listing.js";
 import Vendor from "../models/Vendor.js";
 import CityImage from "../models/CityImage.js";
 import CategoryImage from "../models/CategoryImage.js";
+import { validateListingForVendorTier } from "../utils/listingTierCaps.js";
 
 const router = express.Router();
 
@@ -194,7 +195,25 @@ router.get("/", optionalAuth, async (req, res) => {
     if (hasMaxPrice) pipeline.push({ $match: { priceNumeric: { $lte: maxPriceQ } } });
 
     pipeline.push(
-      { $sort: { createdAt: -1 } },
+      {
+        $addFields: {
+          _vendorSearchBoost: {
+            $cond: [
+              {
+                $or: [
+                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "premium"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "gold"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "platinum"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "enterprise"] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+      },
+      { $sort: { _vendorSearchBoost: -1, featured: -1, createdAt: -1 } },
       {
         $facet: {
           total: [{ $count: "n" }],
@@ -411,6 +430,12 @@ router.post("/", requireAuth, async (req, res) => {
   if (images.length === 0) return res.status(400).json({ message: "At least one image is required" });
   const priceStr = price != null ? String(price).trim() : "";
   if (!priceStr) return res.status(400).json({ message: "Price is required" });
+  const tierCheck = validateListingForVendorTier(vendor.tier, {
+    description: desc,
+    images,
+    videoUrl: videoUrl != null ? String(videoUrl).trim() : "",
+  });
+  if (!tierCheck.ok) return res.status(400).json({ message: tierCheck.message });
   const dup = await findListingByTitleCaseInsensitive(tit);
   if (dup) return res.status(400).json({ message: "A listing with this title already exists. Choose a different title." });
   const coverImageIndex = normalizeCoverIndex(body.coverImageIndex, images.length);
@@ -509,6 +534,16 @@ router.put("/:id", requireAuth, async (req, res) => {
     }
     payload.videoUrl = u;
   }
+  const mergedDesc =
+    payload.description !== undefined ? String(payload.description || "").trim() : String(listing.description || "").trim();
+  const mergedVideo =
+    payload.videoUrl !== undefined ? String(payload.videoUrl || "").trim() : String(listing.videoUrl || "").trim();
+  const tierCheckPut = validateListingForVendorTier(vendor.tier, {
+    description: mergedDesc,
+    images: mergedImages,
+    videoUrl: mergedVideo,
+  });
+  if (!tierCheckPut.ok) return res.status(400).json({ message: tierCheckPut.message });
   const newTitle = payload.title !== undefined ? payload.title : listing.title;
   if (newTitle && String(newTitle).trim().toLowerCase() !== String(listing.title || "").trim().toLowerCase()) {
     const dup = await findListingByTitleCaseInsensitive(newTitle, listing._id);

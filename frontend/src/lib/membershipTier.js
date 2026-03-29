@@ -14,7 +14,7 @@ export function membershipPlanTierFromVendors(vendors) {
       .toLowerCase();
     let rank = 0;
     let normalized = 'free';
-    if (raw === 'premium' || raw === 'gold') {
+    if (raw === 'premium' || raw === 'gold' || raw === 'platinum' || raw === 'enterprise') {
       rank = 2;
       normalized = 'premium';
     } else if (raw === 'standard') {

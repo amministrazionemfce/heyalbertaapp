@@ -7,7 +7,7 @@ import { ROUTES } from '../constants';
 import { SITE_CONTACT } from '../constants/site';
 import { useAuth } from '../lib/auth';
 import { getPlanById, getPlanPriceDisplay } from '../data/membershipPlans';
-import { BACKEND_URL } from '../lib/api';
+import { BACKEND_URL, BACKEND_EXTRA_FETCH_HEADERS } from '../lib/api';
 
 const STORAGE_KEY = 'hey_alberta_checkout_payload';
 
@@ -17,7 +17,9 @@ async function resolveStripePublishableKey() {
   const base = String(BACKEND_URL || '').replace(/\/$/, '');
   if (!base) return '';
   try {
-    const res = await fetch(`${base}/api/billing/public-config`);
+    const res = await fetch(`${base}/api/billing/public-config`, {
+      headers: { ...BACKEND_EXTRA_FETCH_HEADERS },
+    });
     if (!res.ok) return '';
     const data = await res.json();
     pk = String(data?.publishableKey || '').trim();
