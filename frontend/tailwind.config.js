@@ -64,6 +64,40 @@ module.exports = {
           800: "#0a3628",
           900: "#062419",
         },
+        /** Admin portal primary (purple) + semantic actions */
+        admin: {
+          DEFAULT: "#7D2AE8",
+          50: "#faf5ff",
+          100: "#f3e8ff",
+          200: "#e9d5ff",
+          300: "#d8b4fe",
+          400: "#c084fc",
+          500: "#7D2AE8",
+          600: "#6d28d9",
+          700: "#5b21b6",
+          800: "#4c1d95",
+          900: "#3b0764",
+        },
+        /** Destructive remove (delete vendor, etc.) */
+        adminDanger: {
+          DEFAULT: "#E53935",
+          50: "#ffebee",
+          100: "#ffcdd2",
+          500: "#E53935",
+          600: "#E53935",
+          700: "#c62828",
+          800: "#b71c1c",
+        },
+        /** Reject / decline (non-delete) */
+        adminReject: {
+          DEFAULT: "#f97316",
+          50: "#fff7ed",
+          100: "#ffedd5",
+          500: "#f97316",
+          600: "#ea580c",
+          700: "#c2410c",
+          800: "#9a3412",
+        },
         wheat: {
           DEFAULT: "#f59e0b",
           50: "#fffbeb",

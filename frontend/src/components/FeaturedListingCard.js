@@ -1,20 +1,10 @@
-import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Star, Heart } from 'lucide-react';
 import { CATEGORIES } from '../data/categories';
 import { listingPath } from '../constants';
-
-const FAV_KEY = 'hey_alberta_favorite_listings';
-
-function readFavorites() {
-  try {
-    const raw = localStorage.getItem(FAV_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+import { getListingCoverImageUrl } from '../lib/listingCover';
+import { resolveMediaUrl } from '../lib/mediaUrl';
+import { useListingFavorite } from '../lib/listingFavorites';
 
 /**
  * Featured listing tile — image, badges, location, reviews, feature tags.
@@ -24,26 +14,15 @@ export default function FeaturedListingCard({ listing }) {
   const categoryName = CATEGORIES.find((c) => c.id === listing.categoryId)?.name || listing.categoryId;
   const reviewCount = listing.reviewCount ?? 0;
   const features = Array.isArray(listing.features) ? listing.features : [];
+  const cover = getListingCoverImageUrl(listing);
   const img =
+    resolveMediaUrl(cover) ||
+    cover ||
     vendor.images?.[0] ||
     (typeof vendor.images === 'string' ? vendor.images : null) ||
     '/services/1.jpg';
 
-  const [favorited, setFavorited] = useState(false);
-  useEffect(() => {
-    setFavorited(readFavorites().includes(listing.id));
-  }, [listing.id]);
-
-  const toggleFavorite = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = readFavorites();
-    const idx = next.indexOf(listing.id);
-    if (idx >= 0) next.splice(idx, 1);
-    else next.push(listing.id);
-    localStorage.setItem(FAV_KEY, JSON.stringify(next));
-    setFavorited(idx < 0);
-  };
+  const { favorited, toggleFavorite } = useListingFavorite(listing.id);
 
   const locationLine = [vendor.city, 'Alberta'].filter(Boolean).join(', ');
   const tagsLine =
@@ -71,7 +50,7 @@ export default function FeaturedListingCard({ listing }) {
             loading="lazy"
           />
           <div className="absolute left-3 top-3 z-10 flex items-center gap-2">
-            <span className="rounded-lg bg-red-700 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+            <span className="rounded-lg bg-yellow-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
               Featured
             </span>
           </div>
@@ -88,12 +67,12 @@ export default function FeaturedListingCard({ listing }) {
         </div>
 
         <div className="flex flex-1 flex-col p-4">
-          <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-bold leading-snug text-slate-900 group-hover:text-purple-800">
+          <h3 className="font-heading line-clamp-2 min-h-[2.75rem] text-base font-bold leading-snug text-slate-900 group-hover:text-spruce-800">
             {listing.title}
           </h3>
 
           <div className="mt-3 flex items-start justify-between gap-2 text-sm">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-purple-700">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 text-spruce-700">
               <MapPin className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate font-medium">{locationLine}</span>
             </div>

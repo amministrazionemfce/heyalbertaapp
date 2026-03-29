@@ -4,52 +4,46 @@ export const VENDOR_STATUS = /** @type {const} */ ({
   rejected: 'rejected',
 });
 
+/** Labels + classes for detail page status pill */
 export const statusConfig = {
-  pending: { label: 'Pending', className: 'bg-amber-50 text-amber-800 border border-amber-300' },
-  approved: { label: 'Approved', className: 'bg-blue-50 text-blue-800 border border-blue-300' },
-  rejected: { label: 'Rejected', className: 'bg-red-50 text-red-800 border border-red-300' },
+  pending: { label: 'Pending', className: 'bg-amber-500 text-white border-0' },
+  approved: { label: 'Approved', className: 'bg-spruce-700 text-white border-0' },
+  rejected: { label: 'Rejected', className: 'bg-red-600 text-white border-0' },
 };
 
 export function getStatusPresentation(status) {
-  return statusConfig[status] || statusConfig.pending;
+  const s = (status || '').toLowerCase();
+  if (s === 'approved') return statusConfig.approved;
+  if (s === 'rejected') return statusConfig.rejected;
+  return statusConfig.pending;
+}
+
+/** Badge chips on cards/tables — matches filter bar colors */
+export function getVendorStatusBadgeClass(status) {
+  const s = (status || '').toLowerCase();
+  if (s === 'pending') {
+    return 'bg-amber-500 text-white border-0 shadow-sm hover:bg-amber-600';
+  }
+  if (s === 'approved') {
+    return 'bg-spruce-700 text-white border-0 shadow-sm hover:bg-spruce-800';
+  }
+  if (s === 'rejected') {
+    return 'bg-red-600 text-white border-0 shadow-sm hover:bg-red-700';
+  }
+  return 'bg-slate-100 text-slate-800 border border-slate-200';
 }
 
 /**
- * Get reusable Tailwind classes for status filter buttons to ensure
- * consistent colors across filters, table badges, and grid badges.
- *
- * @param {string} status - 'pending' | 'approved' | 'rejected' | 'All' | ''
+ * Status filter buttons: active = spruce + white; inactive = white + black text.
+ * @param {string} status - 'pending' | 'approved' | 'rejected' | ''
  * @param {{ active?: boolean }} [options]
  */
-export function getStatusFilterClass(status, options = {}) {
+export function getStatusFilterClass(_status, options = {}) {
   const { active = false } = options;
-  const normalized = (status || '').toLowerCase();
 
   if (active) {
-    if (normalized === 'pending') {
-      return 'bg-amber-900 text-white hover:bg-spruce-900 border-amber-500';
-    }
-    if (normalized === 'approved') {
-      return 'bg-blue-900 text-white hover:bg-spruce-900 border-blue-500';
-    }
-    if (normalized === 'rejected') {
-      return 'bg-red-900 text-white hover:bg-spruce-900 border-red-500';
-    }
-    // "All" / default
-    return 'bg-spruce-900 text-white hover:bg-spruce-900 border-spruce-700';
+    return '!bg-spruce-700 !text-white border-spruce-800 hover:!bg-spruce-800 shadow-sm';
   }
 
-  if (normalized === 'pending') {
-    return 'border-amber-300 hover:bg-amber-900';
-  }
-  if (normalized === 'approved') {
-    return 'border-blue-300  hover:bg-blue-900';
-  }
-  if (normalized === 'rejected') {
-    return 'border-red-300 hover:bg-red-900';
-  }
-
-  // "All" / default
-  return 'border-slate-300 hover:bg-slate-50';
+  return '!bg-white !text-black border-slate-300 hover:!bg-slate-50';
 }
-

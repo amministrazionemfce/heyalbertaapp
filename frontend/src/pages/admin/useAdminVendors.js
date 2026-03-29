@@ -9,7 +9,6 @@ export function useAdminVendors({ onUpdate } = {}) {
   const [statusFilter, setStatusFilter] = useState('');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'table' | 'list'
-  const [detailVendor, setDetailVendor] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const fetchVendors = useCallback(async () => {
@@ -37,7 +36,6 @@ export function useAdminVendors({ onUpdate } = {}) {
         toast.success('Vendor approved');
         await fetchVendors();
         onUpdate?.();
-        setDetailVendor((prev) => (prev?.id === id ? { ...prev, status: 'approved' } : prev));
       } catch {
         toast.error('Failed to approve');
       } finally {
@@ -55,7 +53,6 @@ export function useAdminVendors({ onUpdate } = {}) {
         toast.success('Vendor rejected');
         await fetchVendors();
         onUpdate?.();
-        setDetailVendor((prev) => (prev?.id === id ? { ...prev, status: 'rejected' } : prev));
       } catch {
         toast.error('Failed to reject');
       } finally {
@@ -73,9 +70,32 @@ export function useAdminVendors({ onUpdate } = {}) {
         toast.success(featured ? 'Vendor featured' : 'Vendor unfeatured');
         await fetchVendors();
         onUpdate?.();
-        setDetailVendor((prev) => (prev?.id === id ? { ...prev, featured } : prev));
       } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to update feature');
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [fetchVendors, onUpdate]
+  );
+
+  const deleteVendor = useCallback(
+    async (id, options = {}) => {
+      if (!id) return null;
+      setActionLoading(true);
+      try {
+        const res = await adminAPI.deleteVendor(id, {
+          notifyEmail: !!options.notifyEmail,
+        });
+        const listings = res.data?.deletedListingsCount ?? 0;
+        const reviews = res.data?.deletedReviewsCount ?? 0;
+        toast.success(`Vendor deleted. Removed ${listings} listing(s) and ${reviews} review(s).`);
+        await fetchVendors();
+        onUpdate?.();
+        return res.data;
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to delete vendor');
+        throw err;
       } finally {
         setActionLoading(false);
       }
@@ -94,9 +114,6 @@ export function useAdminVendors({ onUpdate } = {}) {
     });
   }, [vendors, search]);
 
-  const openDetail = useCallback((v) => setDetailVendor(v), []);
-  const closeDetail = useCallback(() => setDetailVendor(null), []);
-
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('');
@@ -112,16 +129,13 @@ export function useAdminVendors({ onUpdate } = {}) {
     setSearch,
     viewMode,
     setViewMode,
-    detailVendor,
-    openDetail,
-    closeDetail,
     actionLoading,
     approveVendor,
     rejectVendor,
     featureVendor,
+    deleteVendor,
     filteredVendors,
     refresh: fetchVendors,
     clearFilters,
   };
 }
-

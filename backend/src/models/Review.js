@@ -42,6 +42,9 @@ const reviewSchema = new mongoose.Schema(
   { versionKey: false }
 );
 
+/** One review per user per vendor (company). */
+reviewSchema.index({ vendorId: 1, userId: 1 }, { unique: true });
+
 reviewSchema.virtual("id").get(function () {
   return this._id.toString();
 });

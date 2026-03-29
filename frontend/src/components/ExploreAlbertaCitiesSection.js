@@ -3,11 +3,33 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import CityBrowseCard from './CityBrowseCard';
 import { CITIES } from '../data/categories';
 import { getCityImageUrl } from '../data/cityImages';
+import { listingAPI } from '../lib/api';
 
 export default function ExploreAlbertaCitiesSection({ cityCounts = {} }) {
   const scrollRef = useRef(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(true);
+  const [cityImageOverrides, setCityImageOverrides] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    listingAPI
+      .cityImages()
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res.data || {};
+        const normalized = {};
+        for (const [k, v] of Object.entries(raw)) {
+          if (!k) continue;
+          normalized[String(k).toLowerCase()] = v;
+        }
+        setCityImageOverrides(normalized);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const updateScrollState = useCallback(() => {
     const el = scrollRef.current;
@@ -105,7 +127,7 @@ export default function ExploreAlbertaCitiesSection({ cityCounts = {} }) {
                 <CityBrowseCard
                   cityName={city}
                   listingCount={countForCity(city)}
-                  imageSrc={getCityImageUrl(city)}
+                  imageSrc={getCityImageUrl(city, cityImageOverrides)}
                 />
               </div>
             ))}

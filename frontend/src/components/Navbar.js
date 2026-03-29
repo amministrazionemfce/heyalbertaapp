@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
-import { Menu, User, LogOut, LayoutDashboard, ChevronDown, KeyRound } from 'lucide-react';
+import { Menu, User, LogOut, LayoutDashboard, ChevronDown, KeyRound, UserCircle, Plus } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { Button } from './ui/button';
 import {
@@ -9,6 +9,9 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger
 } from './ui/dropdown-menu';
 import { MAIN_NAV_LINKS, ROUTES } from '../constants';
+import { resolveMediaUrl } from '../lib/mediaUrl';
+import { useAddListingClick } from '../hooks/useAddListingClick';
+import UpgradeToVendorModal from './UpgradeToVendorModal';
 
 export default function Navbar() {
   const { pathname } = useLocation();
@@ -16,6 +19,7 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const isHome = pathname === ROUTES.HOME;
+  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
 
 
   const handleLogout = () => {
@@ -24,15 +28,20 @@ export default function Navbar() {
   };
   
   return (
-    <nav className=" z-50 bg-white/95 backdrop-blur-md border-b border-slate-200" data-testid="navbar">
-      <div className="container mx-auto px-4 md:px-8 max-w-7xl">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to={ROUTES.HOME} className="flex items-center gap-2 group" data-testid="navbar-logo">
-            <img 
-            src="logo.png" 
-            alt="Hey Alberta Logo" 
-            className="w-25 h-16 object-cover" />
+    <nav className="z-50 bg-white/95 backdrop-blur-md border-b border-slate-200" data-testid="navbar">
+      <div className="container mx-auto max-w-7xl px-3 sm:px-4 md:px-5">
+        <div className="flex min-h-[3.25rem] items-center justify-between gap-2 py-1 md:min-h-16 md:py-1">
+          {/* Invalid Tailwind w-25 was ignored; object-contain avoids cropping the asset */}
+          <Link
+            to={ROUTES.HOME}
+            className="group flex shrink-0 items-center"
+            data-testid="navbar-logo"
+          >
+            <img
+              src="/logo.png"
+              alt="Hey Alberta Logo"
+              className="h-11 w-auto max-w-[min(13.5rem,46vw)] object-contain object-left sm:h-12 md:h-14 md:max-w-[min(16rem,40vw)]"
+            />
           </Link>
 
           {/* Desktop Nav */}
@@ -46,8 +55,9 @@ export default function Navbar() {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`text-sm font-medium transition-colors border-b-2 border-transparent -mb-px pb-px
-                    ${isActive ? 'text-red-900 font-bold' : `text-slate-600 border-transparent ${isHome ? 'hover:text-purple-600' : 'hover:text-spruce-600'}`}`}
+                  className={`text-sm font-medium transition-colors ${
+                    isActive ? 'text-red-700 font-bold' : 'text-slate-600 hover:text-spruce-600'
+                  }`}
                   data-testid={`nav-${link.label.toLowerCase()}`}
                 >
                   {link.label}
@@ -56,22 +66,42 @@ export default function Navbar() {
             })}
           </div>
 
-          {/* Auth */}
-          <div className="hidden md:flex items-center gap-3 bg-white-900">
+          {/* Auth + Add Listings (desktop): action sits immediately left of login / user menu */}
+          <div className="hidden md:flex items-center gap-3">
+            <Button
+              type="button"
+              onClick={handleAddListingClick}
+              className="gap-2 bg-spruce-700 hover:bg-spruce-800 text-white shadow-sm"
+              data-testid="nav-add-listings-btn"
+            >
+              <Plus className="w-4 h-4 shrink-0" />
+              Add Listings
+            </Button>
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2" data-testid="user-menu-trigger">
                     <div
-                      className={`w-8 h-8 rounded-full text-black-900 bg-white flex items-center justify-center ${isHome ? 'bg-purple-50' : 'bg-spruce-50'}`}
+                      className="w-8 h-8 rounded-full overflow-hidden text-black-900 bg-white flex items-center justify-center shrink-0 bg-spruce-50"
                     >
-                      <User className="w-4 h-4" />
+                      {user.avatar_url ? (
+                        <img
+                          src={resolveMediaUrl(user.avatar_url) || user.avatar_url}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-4 h-4" />
+                      )}
                     </div>
                     <span className="text-sm font-medium">Hey, {user.name}</span>
                     <ChevronDown className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onClick={() => navigate(ROUTES.PROFILE)} data-testid="nav-profile">
+                    <UserCircle className="w-4 h-4 mr-2" /> Profile
+                  </DropdownMenuItem>
                   {(user.role === 'vendor' || user.role === 'admin') && (
                     <DropdownMenuItem onClick={() => navigate(ROUTES.DASHBOARD)} data-testid="nav-dashboard">
                       <LayoutDashboard className="w-4 h-4 mr-2" /> Dashboard
@@ -79,7 +109,11 @@ export default function Navbar() {
                   )}
                   {user.role === 'admin' && (
                     <>
-                      <DropdownMenuItem onClick={() => navigate(ROUTES.ADMIN)} data-testid="nav-admin">
+                      <DropdownMenuItem
+                        onClick={() => navigate(ROUTES.ADMIN)}
+                        data-testid="nav-admin"
+                        className={pathname.startsWith(ROUTES.ADMIN) ? 'text-admin-700 bg-admin-50 focus:bg-admin-50' : ''}
+                      >
                         <KeyRound className="w-4 h-4 mr-2" /> Admin Panel
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
@@ -94,17 +128,6 @@ export default function Navbar() {
               <>
                 <Button variant="ghost" onClick={() => navigate(ROUTES.LOGIN)} data-testid="nav-login-btn">
                   Log In
-                </Button>
-                <Button
-                  onClick={() => navigate(ROUTES.REGISTER)}
-                  className={
-                    isHome
-                      ? 'bg-purple-700 hover:bg-purple-800 text-white'
-                      : 'bg-spruce-700 hover:bg-spruce-800 text-white'
-                  }
-                  data-testid="nav-register-btn"
-                >
-                  Get Started
                 </Button>
               </>
             )}
@@ -132,32 +155,44 @@ export default function Navbar() {
                     </Link>
                   );
                 })}
+                <Button
+                  type="button"
+                  className={
+                    'w-full justify-center gap-2 bg-spruce-700 hover:bg-spruce-800 text-white shadow-sm'
+                  }
+                  onClick={() => {
+                    handleAddListingClick();
+                    setOpen(false);
+                  }}
+                  data-testid="nav-add-listings-btn-mobile"
+                >
+                  <Plus className="w-4 h-4 shrink-0" />
+                  Add Listings
+                </Button>
                 <hr className="border-slate-200" />
                 {user ? (
                   <>
                     <p className="text-sm text-muted-foreground">Signed in as {user.name}</p>
+                    <Link to={ROUTES.PROFILE} className="text-lg font-medium" onClick={() => setOpen(false)}>
+                      Profile
+                    </Link>
                     {(user.role === 'vendor' || user.role === 'admin') && (
                       <Link to={ROUTES.DASHBOARD} className="text-lg font-medium" onClick={() => setOpen(false)}>Dashboard</Link>
                     )}
                     {user.role === 'admin' && (
-                      <Link to={ROUTES.ADMIN} className="text-lg font-medium" onClick={() => setOpen(false)}>Admin Panel</Link>
+                      <Link
+                        to={ROUTES.ADMIN}
+                        className={`text-lg font-medium ${pathname.startsWith(ROUTES.ADMIN) ? 'text-admin-700' : ''}`}
+                        onClick={() => setOpen(false)}
+                      >
+                        Admin Panel
+                      </Link>
                     )}
                     <Button variant="outline" onClick={() => { handleLogout(); setOpen(false); }}>Logout</Button>
                   </>
                 ) : (
                   <>
                     <Button variant="outline" onClick={() => { navigate(ROUTES.LOGIN); setOpen(false); }}>Log In</Button>
-                    <Button
-                      className={
-                        isHome ? 'bg-purple-700 hover:bg-purple-800 text-white' : 'bg-spruce-700 text-white'
-                      }
-                      onClick={() => {
-                        navigate(ROUTES.REGISTER);
-                        setOpen(false);
-                      }}
-                    >
-                      Get Started
-                    </Button>
                   </>
                 )}
               </div>
@@ -165,6 +200,7 @@ export default function Navbar() {
           </Sheet>
         </div>
       </div>
+      <UpgradeToVendorModal {...upgradeModalProps} />
     </nav>
   );
 }

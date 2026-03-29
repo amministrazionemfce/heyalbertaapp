@@ -54,16 +54,49 @@ router.get("/me", requireAuth, (req, res) => {
 });
 
 router.patch("/me", requireAuth, async (req, res) => {
-  const { role } = req.body;
-  if (role !== "vendor")
-    return res.status(400).json({ message: "Only upgrade to vendor is allowed" });
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    { role: "vendor" },
-    { new: true }
-  );
-  if (!user) return res.status(404).json({ message: "User not found" });
-  res.json(user);
+  try {
+    const body = req.body || {};
+    const updates = {};
+
+    if (body.name !== undefined) {
+      const n = String(body.name).trim();
+      if (!n) return res.status(400).json({ message: "Name cannot be empty" });
+      updates.name = n;
+    }
+    if (body.email !== undefined) {
+      const e = String(body.email).trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+        return res.status(400).json({ message: "Invalid email" });
+      }
+      const taken = await User.findOne({ email: e, _id: { $ne: req.user._id } });
+      if (taken) return res.status(400).json({ message: "Email already in use" });
+      updates.email = e;
+    }
+    if (body.avatar_url !== undefined) {
+      const v = typeof body.avatar_url === "string" ? body.avatar_url.trim() : "";
+      updates.avatar_url = v.length > 2_000_000 ? v.slice(0, 2_000_000) : v;
+    }
+    if (body.role !== undefined) {
+      if (body.role !== "vendor") {
+        return res.status(400).json({ message: "Only upgrade to vendor is allowed" });
+      }
+      if (req.user.role === "user") {
+        updates.role = "vendor";
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      const user = await User.findById(req.user._id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json(user);
+    }
+
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
+    if (!user) return res.status(404).json({ message: "User not found" });
+    return res.json(user);
+  } catch (err) {
+    return res.status(500).json({ message: err.message || "Update failed" });
+  }
 });
 
 export default router;

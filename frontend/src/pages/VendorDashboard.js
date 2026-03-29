@@ -7,21 +7,164 @@ import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAuth } from '../lib/auth';
-import { vendorAPI, reviewAPI, listingAPI } from '../lib/api';
+import { vendorAPI, reviewAPI, listingAPI, uploadVendorVideo, BACKEND_URL } from '../lib/api';
 import { CATEGORIES, CITIES, getTierInfo } from '../data/categories';
 import { listingValidation, hasListingErrors } from '../validations/listingValidation';
+import { listingFormValidation, hasListingFormErrors } from '../validations/listingFormValidation';
+import AuthFormError from '../components/AuthFormError';
+import { getApiErrorLines } from '../lib/formatApiError';
 import { StarRating } from '../components/StarRating';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, Loader2, Store, MessageSquare,
-  Eye, BadgeCheck, Clock, ListPlus, Check, Star, Sparkles, Settings, Building2
+  Eye, BadgeCheck, Clock, ListPlus, Check, Star, Sparkles, Settings, Building2, Video, ImageIcon,
 } from 'lucide-react';
 import { ROUTES } from '../constants';
+import { resolveMediaUrl } from '../lib/mediaUrl';
+import { getVendorVideoKind, isDirectPlayableVideoUrl } from '../lib/vendorVideoEmbed';
+import { VendorTagField } from '../components/VendorTagField';
+import { emptyOpeningHours, OPENING_DAY_LABELS, OPENING_DAY_ORDER } from '../lib/vendorOpeningHours';
 
 const defaultFormData = {
   name: '', description: '', category: '', city: '',
-  neighborhood: '', phone: '', email: '', website: '', images: [], tier: 'free'
+  neighborhood: '', phone: '', email: '', website: '', images: [], coverImageIndex: 0, tier: 'free', videoUrl: '',
+  googleMapUrl: '', latitude: '', longitude: '',
+  tags: [],
+  openingHours: emptyOpeningHours(),
 };
+
+const emptyListingForm = {
+  title: '',
+  description: '',
+  price: '',
+  categoryId: '',
+  status: 'draft',
+  images: [],
+  coverImageIndex: 0,
+  videoUrl: '',
+};
+
+/** YouTube / Vimeo / TikTok / Instagram embed, uploaded file player, or external link. */
+function VendorVideoBlock({ url, classNameFile }) {
+  const k = getVendorVideoKind(url);
+  if (k.kind === 'empty') return null;
+  if (k.kind === 'embed') {
+    return (
+      <div className="mt-1 w-full max-w-md overflow-hidden rounded-lg border border-slate-200 bg-slate-100 aspect-video">
+        <iframe
+          src={k.embedSrc}
+          title={`${k.provider} video`}
+          className="h-full w-full min-h-[180px]"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+          loading="lazy"
+        />
+      </div>
+    );
+  }
+  if (isDirectPlayableVideoUrl(url)) {
+    return <VendorVideoPreview url={url} className={classNameFile} />;
+  }
+  return (
+    <a
+      href={k.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1 inline-block text-sm text-spruce-600 hover:underline font-medium break-all"
+    >
+      {k.href}
+    </a>
+  );
+}
+
+/** Inline preview: loads video directly from API (not via CRA proxy) so Range/MP4 works. */
+function VendorVideoPreview({ url, className }) {
+  const resolved = resolveMediaUrl(url);
+  const [headOk, setHeadOk] = useState(null);
+  const [headStatus, setHeadStatus] = useState(null);
+  const [playError, setPlayError] = useState(false);
+
+  useEffect(() => {
+    if (!resolved) return;
+    let cancelled = false;
+    setHeadOk(null);
+    setHeadStatus(null);
+    setPlayError(false);
+    fetch(resolved, { method: 'HEAD', mode: 'cors' })
+      .then((r) => {
+        if (!cancelled) {
+          setHeadOk(r.ok);
+          setHeadStatus(r.status);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHeadOk(false);
+          setHeadStatus(0);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [resolved]);
+
+  if (!resolved) return null;
+
+  const mixedContentBlocked =
+    typeof window !== 'undefined' &&
+    window.location.protocol === 'https:' &&
+    resolved.startsWith('http:');
+
+  if (mixedContentBlocked) {
+    return (
+      <p className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-md px-2 py-2 max-w-md">
+        HTTPS page cannot load HTTP video. Use <code className="rounded bg-white px-1 text-[11px]">http://</code> for this
+        app in dev, or serve the API over HTTPS and set <code className="rounded bg-white px-1 text-[11px]">REACT_APP_BACKEND_URL</code> to that URL.
+      </p>
+    );
+  }
+
+  if (headOk === false) {
+    return (
+      <div className="text-xs text-red-800 bg-red-50 border border-red-200 rounded-md px-2 py-2 max-w-md space-y-1">
+        <p>
+          No file at this URL (HTTP {headStatus || 'network'}). Is the API running at{' '}
+          <code className="rounded bg-white px-1 text-[11px]">{BACKEND_URL}</code>?
+        </p>
+        <p className="break-all font-mono text-[11px] text-red-900">{resolved}</p>
+      </div>
+    );
+  }
+
+  if (headOk === null) {
+    return <p className="text-xs text-slate-500">Loading video…</p>;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <video
+        key={resolved}
+        src={resolved}
+        title={resolved}
+        controls
+        playsInline
+        preload="metadata"
+        className={className}
+        onError={() => setPlayError(true)}
+        onLoadedData={() => setPlayError(false)}
+      />
+      {playError ? (
+        <p className="text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-md px-2 py-2 max-w-md">
+          Decoder failed (unusual). Try{' '}
+          <a href={resolved} target="_blank" rel="noopener noreferrer" className="font-medium text-spruce-700 underline">
+            open in new tab
+          </a>
+          . Re-upload or re-encode on the server (ffmpeg).
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 export default function VendorDashboard() {
   const { user, loading: authLoading } = useAuth();
@@ -32,14 +175,20 @@ export default function VendorDashboard() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingVendor, setEditingVendor] = useState(null);
-  const [formData, setFormData] = useState(defaultFormData);
+  const [formData, setFormData] = useState(() => ({
+    ...defaultFormData,
+    tags: [],
+    openingHours: emptyOpeningHours(),
+  }));
   const hasVendor = vendors.length > 0;
   const [saving, setSaving] = useState(false);
   const [addListingErrors, setAddListingErrors] = useState({});
   const [settingsEditMode, setSettingsEditMode] = useState(false);
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
-  const [listingForm, setListingForm] = useState({ title: '', description: '', categoryId: '', status: 'draft' });
+  const [listingForm, setListingForm] = useState(emptyListingForm);
+  const [listingFormErrors, setListingFormErrors] = useState({});
+  const [listingApiErrorLines, setListingApiErrorLines] = useState([]);
   const [editingListingId, setEditingListingId] = useState(null);
   const [listingSaving, setListingSaving] = useState(false);
   const [addListingBlockedDismissed, setAddListingBlockedDismissed] = useState(false);
@@ -91,7 +240,11 @@ export default function VendorDashboard() {
   };
 
   const resetForm = () => {
-    setFormData(defaultFormData);
+    setFormData({
+      ...defaultFormData,
+      tags: [],
+      openingHours: emptyOpeningHours(),
+    });
     setEditingVendor(null);
     setAddListingErrors({});
   };
@@ -101,13 +254,24 @@ export default function VendorDashboard() {
       name: vendor.name, description: vendor.description, category: vendor.category,
       city: vendor.city, neighborhood: vendor.neighborhood || '', phone: vendor.phone || '',
       email: vendor.email || '', website: vendor.website || '',
-      images: vendor.images || [], tier: vendor.tier
+      images: vendor.images || [], coverImageIndex: Number(vendor.coverImageIndex) || 0, tier: vendor.tier, videoUrl: vendor.videoUrl || '',
+      googleMapUrl: vendor.googleMapUrl || '',
+      latitude: vendor.latitude ?? '',
+      longitude: vendor.longitude ?? '',
+      tags: Array.isArray(vendor.tags) ? [...vendor.tags] : [],
+      openingHours: { ...emptyOpeningHours(), ...(vendor.openingHours || {}) },
     });
     setEditingVendor(vendor.id);
     setSearchParams({ tab: 'add-listing' });
   };
 
   const validateAndSave = async (isEdit) => {
+    const tags = [...new Set((formData.tags || []).map((t) => String(t).trim()).filter(Boolean))].slice(0, 30);
+    const openingHours = {};
+    for (const d of OPENING_DAY_ORDER) {
+      const v = formData.openingHours?.[d];
+      if (v != null && String(v).trim()) openingHours[d] = String(v).trim().slice(0, 120);
+    }
     const trimmed = {
       ...formData,
       name: (formData.name || '').trim(),
@@ -118,12 +282,20 @@ export default function VendorDashboard() {
       phone: (formData.phone || '').trim(),
       email: (formData.email || '').trim(),
       website: (formData.website || '').trim(),
+      videoUrl: (formData.videoUrl || '').trim(),
+      googleMapUrl: (formData.googleMapUrl || '').trim(),
+      latitude: formData.latitude === '' ? '' : Number(formData.latitude),
+      longitude: formData.longitude === '' ? '' : Number(formData.longitude),
+      coverImageIndex: Math.min(
+        Math.max(0, Number(formData.coverImageIndex) || 0),
+        Math.max(0, (formData.images || []).length - 1)
+      ),
+      tags,
+      openingHours,
     };
     const errors = listingValidation(trimmed);
     setAddListingErrors(errors);
     if (hasListingErrors(errors)) {
-      const firstError = Object.values(errors).find(Boolean);
-      toast.error(firstError || 'Please fix the errors below');
       return;
     }
     setSaving(true);
@@ -136,7 +308,11 @@ export default function VendorDashboard() {
       } else {
         await vendorAPI.create(trimmed);
         toast.success('You applied for a business registration! You will be notified when your business is approved.');
-        setFormData(defaultFormData);
+        setFormData({
+          ...defaultFormData,
+          tags: [],
+          openingHours: emptyOpeningHours(),
+        });
         setAddListingErrors({});
         setSearchParams({});
         fetchVendors();
@@ -174,34 +350,84 @@ export default function VendorDashboard() {
     } catch { toast.error('Failed to delete'); }
   };
 
+  const patchListingForm = (patchOrFn) => {
+    setListingForm((prev) => (typeof patchOrFn === 'function' ? patchOrFn(prev) : { ...prev, ...patchOrFn }));
+    setListingFormErrors((e) => {
+      if (typeof patchOrFn === 'function') return { ...e };
+      const next = { ...e };
+      Object.keys(patchOrFn).forEach((k) => {
+        if (next[k]) delete next[k];
+      });
+      return next;
+    });
+    setListingApiErrorLines([]);
+  };
+
   const handleSaveListing = async () => {
     if (!isVendorApproved) {
       setAddListingBlockedDismissed(false);
       return;
     }
-    const { title, description, categoryId, status } = listingForm;
-    if (!title?.trim()) { toast.error('Title is required'); return; }
-    if (!(description ?? '').trim()) { toast.error('Description is required'); return; }
-    if (!(categoryId ?? '').trim()) { toast.error('Category is required'); return; }
     if (!vendors[0]) return;
+
+    const trimmed = {
+      title: (listingForm.title || '').trim(),
+      description: (listingForm.description || '').trim(),
+      price: (listingForm.price != null ? String(listingForm.price) : '').trim(),
+      categoryId: (listingForm.categoryId || '').trim(),
+      status: (listingForm.status || '').trim(),
+      images: Array.isArray(listingForm.images) ? listingForm.images : [],
+      coverImageIndex: listingForm.coverImageIndex ?? 0,
+      videoUrl: (listingForm.videoUrl || '').trim(),
+    };
+
+    const errors = listingFormValidation(trimmed);
+    setListingFormErrors(errors);
+    setListingApiErrorLines([]);
+    if (hasListingFormErrors(errors)) return;
+
     setListingSaving(true);
     try {
+      const payload = {
+        title: trimmed.title,
+        description: trimmed.description,
+        price: trimmed.price,
+        categoryId: trimmed.categoryId,
+        status: trimmed.status,
+        images: trimmed.images,
+        coverImageIndex: Math.min(
+          Math.max(0, trimmed.coverImageIndex),
+          Math.max(0, trimmed.images.length - 1)
+        ),
+        videoUrl: trimmed.videoUrl || '',
+      };
       if (editingListingId) {
-        await listingAPI.update(editingListingId, { title: title.trim(), description: (description || '').trim(), categoryId: categoryId || '', status: status || 'draft' });
+        await listingAPI.update(editingListingId, payload);
         toast.success('Listing updated');
         setEditingListingId(null);
-        setListingForm({ title: '', description: '', categoryId: '', status: 'draft' });
+        setListingForm(emptyListingForm);
+        setListingFormErrors({});
+        setListingApiErrorLines([]);
         setSearchParams({});
       } else {
-        await listingAPI.create({ vendorId: vendors[0].id, title: title.trim(), description: (description || '').trim(), categoryId: categoryId || '', status: status || 'draft' });
+        await listingAPI.create({ vendorId: vendors[0].id, ...payload });
         toast.success('Listing created');
-        setListingForm({ title: '', description: '', categoryId: '', status: 'draft' });
+        setListingForm(emptyListingForm);
+        setListingFormErrors({});
+        setListingApiErrorLines([]);
         setSearchParams({});
       }
       fetchListings();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save listing');
-    } finally { setListingSaving(false); }
+      const lines = getApiErrorLines(err);
+      setListingApiErrorLines(lines);
+      const msg = lines[0] || '';
+      if (/title|already exists/i.test(msg)) {
+        setListingFormErrors((e) => ({ ...e, title: msg }));
+      }
+    } finally {
+      setListingSaving(false);
+    }
   };
 
   const statusColor = { pending: 'bg-yellow-100 text-yellow-700', approved: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700' };
@@ -277,7 +503,15 @@ export default function VendorDashboard() {
                     name: v.name, description: v.description || '', category: v.category || '',
                     city: v.city || '', neighborhood: v.neighborhood || '', phone: v.phone || '',
                     email: v.email || '', website: v.website || '',
-                    images: v.images || [], tier: v.tier || 'free'
+                    images: v.images || [],
+                    coverImageIndex: Number(v.coverImageIndex) || 0,
+                    tier: v.tier || 'free',
+                    videoUrl: v.videoUrl || '',
+                    googleMapUrl: v.googleMapUrl || '',
+                    latitude: v.latitude ?? '',
+                    longitude: v.longitude ?? '',
+                    tags: Array.isArray(v.tags) ? [...v.tags] : [],
+                    openingHours: { ...emptyOpeningHours(), ...(v.openingHours || {}) },
                   });
                   setEditingVendor(v.id);
                   setSettingsEditMode(true);
@@ -304,12 +538,20 @@ export default function VendorDashboard() {
               )}
               <ListingFormSection
                 listingForm={listingForm}
-                setListingForm={setListingForm}
+                patchListingForm={patchListingForm}
                 editingListingId={editingListingId}
                 saving={listingSaving}
                 onSave={handleSaveListing}
-                onCancel={() => { setEditingListingId(null); setListingForm({ title: '', description: '', categoryId: '', status: 'draft' }); setSearchParams({}); }}
+                onCancel={() => {
+                  setEditingListingId(null);
+                  setListingForm(emptyListingForm);
+                  setListingFormErrors({});
+                  setListingApiErrorLines([]);
+                  setSearchParams({});
+                }}
                 disabled={!isVendorApproved}
+                errors={listingFormErrors}
+                apiErrorLines={listingApiErrorLines}
               />
             </div>
           )}
@@ -321,9 +563,26 @@ export default function VendorDashboard() {
               vendors={vendors}
               listings={listings}
               loading={listingsLoading}
-              onAddListing={() => { setEditingListingId(null); setListingForm({ title: '', description: '', categoryId: '', status: 'draft' }); setSearchParams({ tab: 'add-listing' }); }}
+              onAddListing={() => {
+                setEditingListingId(null);
+                setListingForm(emptyListingForm);
+                setListingFormErrors({});
+                setListingApiErrorLines([]);
+                setSearchParams({ tab: 'add-listing' });
+              }}
               onEditListing={(listing) => {
-                setListingForm({ title: listing.title || '', description: listing.description || '', categoryId: listing.categoryId || '', status: listing.status || 'draft' });
+                setListingForm({
+                  title: listing.title || '',
+                  description: listing.description || '',
+                  price: listing.price != null ? String(listing.price) : '',
+                  categoryId: listing.categoryId || '',
+                  status: listing.status || 'draft',
+                  images: Array.isArray(listing.images) ? listing.images : [],
+                  coverImageIndex: Number(listing.coverImageIndex) || 0,
+                  videoUrl: listing.videoUrl || '',
+                });
+                setListingFormErrors({});
+                setListingApiErrorLines([]);
                 setEditingListingId(listing.id);
                 setSearchParams({ tab: 'add-listing' });
               }}
@@ -529,58 +788,288 @@ function ListingsTableView({
   );
 }
 
-function ListingFormSection({ listingForm, setListingForm, editingListingId, saving, onSave, onCancel, disabled }) {
+// Resize image to max dimension and compress as JPEG data URL (listings + company form)
+function imageFileToDataUrl(file, maxSize = 1200, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let w = img.width;
+      let h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) {
+          h = (h * maxSize) / w;
+          w = maxSize;
+        } else {
+          w = (w * maxSize) / h;
+          h = maxSize;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      try {
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = url;
+  });
+}
+
+function ListingFormSection({
+  listingForm,
+  patchListingForm,
+  editingListingId,
+  saving,
+  onSave,
+  onCancel,
+  disabled,
+  errors,
+  apiErrorLines,
+}) {
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUploadError, setVideoUploadError] = useState('');
+  const images = listingForm.images || [];
+
+  const handleAddImages = async (e) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    const newUrls = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        newUrls.push(await imageFileToDataUrl(file));
+      } catch {
+        /* skip */
+      }
+    }
+    if (newUrls.length) {
+      patchListingForm((prev) => ({
+        ...prev,
+        images: [...(prev.images || []), ...newUrls],
+      }));
+    }
+  };
+
+  const removeImageAt = (idx) => {
+    patchListingForm((prev) => {
+      const imgs = [...(prev.images || [])];
+      imgs.splice(idx, 1);
+      let cover = prev.coverImageIndex ?? 0;
+      if (idx === cover) cover = 0;
+      else if (idx < cover) cover = Math.max(0, cover - 1);
+      const nextCover = imgs.length > 0 ? Math.min(cover, imgs.length - 1) : 0;
+      return { ...prev, images: imgs, coverImageIndex: nextCover };
+    });
+  };
+
+  const handleVideoFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      setVideoUploadError('Please choose a video file.');
+      return;
+    }
+    setVideoUploadError('');
+    setVideoUploading(true);
+    try {
+      const res = await uploadVendorVideo(file);
+      patchListingForm({ videoUrl: res.data.url });
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Upload failed';
+      setVideoUploadError(typeof msg === 'string' ? msg : 'Upload failed');
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const clearVideo = () => {
+    setVideoUploadError('');
+    patchListingForm({ videoUrl: '' });
+  };
+
   return (
     <div className={`bg-white rounded-xl border border-slate-200 p-4 md:p-6 w-full ${disabled ? 'pointer-events-none opacity-60' : ''}`} data-testid="listing-form">
       <h2 className="font-heading text-lg font-semibold text-slate-900 mb-1">
         {editingListingId ? 'Edit listing' : 'Add listing'}
       </h2>
-      <p className="text-xs text-slate-500 mb-4">Create a listing under your business. Title, description, and category are required.</p>
+      <p className="text-xs text-slate-500 mb-4">
+        All fields are required except video. Listing title must be unique. Include pricing (any format). Add one or more images and choose which one is the cover (shown on the directory and listing page).
+      </p>
       <form onSubmit={(e) => { e.preventDefault(); if (!disabled) onSave(); }} className="space-y-3">
+        <AuthFormError lines={apiErrorLines} data-testid="listing-form-api-error" />
+
         <div>
           <Label htmlFor="listing-title" className="text-xs">Title *</Label>
           <Input
             id="listing-title"
             value={listingForm.title}
-            onChange={(e) => setListingForm({ ...listingForm, title: e.target.value })}
+            onChange={(e) => patchListingForm({ title: e.target.value })}
             className="mt-1 h-9"
             placeholder="e.g. Family Law Consultation"
+            data-testid="listing-form-title"
           />
+          {errors.title && <p className="text-red-500 text-sm mt-0.5">{errors.title}</p>}
+        </div>
+        <div>
+          <Label htmlFor="listing-price" className="text-xs">Pricing *</Label>
+          <Input
+            id="listing-price"
+            value={listingForm.price ?? ''}
+            onChange={(e) => patchListingForm({ price: e.target.value })}
+            className="mt-1 h-9"
+            placeholder="e.g. $500, From $99/hr, Contact for quote"
+            data-testid="listing-form-price"
+          />
+          {errors.price && <p className="text-red-500 text-sm mt-0.5">{errors.price}</p>}
         </div>
         <div>
           <Label htmlFor="listing-desc" className="text-xs">Description *</Label>
           <Textarea
             id="listing-desc"
             value={listingForm.description}
-            onChange={(e) => setListingForm({ ...listingForm, description: e.target.value })}
-            rows={3}
-            className="mt-1"
-            placeholder="Describe this offering..."
+            onChange={(e) => patchListingForm({ description: e.target.value })}
+            rows={4}
+            className="mt-1 min-h-[5rem]"
+            placeholder="Describe this offering (at least 10 characters)..."
+            data-testid="listing-form-desc"
           />
+          {errors.description && <p className="text-red-500 text-sm mt-0.5">{errors.description}</p>}
         </div>
         <div>
           <Label className="text-xs">Category *</Label>
-          <Select value={listingForm.categoryId} onValueChange={(v) => setListingForm({ ...listingForm, categoryId: v })}>
-            <SelectTrigger className="mt-1 h-9"><SelectValue placeholder="Select category" /></SelectTrigger>
+          <Select value={listingForm.categoryId} onValueChange={(v) => patchListingForm({ categoryId: v })}>
+            <SelectTrigger className="mt-1 h-9" data-testid="listing-form-category">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
             <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
+          {errors.categoryId && <p className="text-red-500 text-sm mt-0.5">{errors.categoryId}</p>}
         </div>
         <div>
-          <Label className="text-xs">Status</Label>
-          <Select value={listingForm.status} onValueChange={(v) => setListingForm({ ...listingForm, status: v })}>
-            <SelectTrigger className="mt-1 h-9"><SelectValue /></SelectTrigger>
+          <Label className="text-xs">Status *</Label>
+          <Select value={listingForm.status} onValueChange={(v) => patchListingForm({ status: v })}>
+            <SelectTrigger className="mt-1 h-9" data-testid="listing-form-status">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="draft">Draft</SelectItem>
               <SelectItem value="published">Published</SelectItem>
             </SelectContent>
           </Select>
+          {errors.status && <p className="text-red-500 text-sm mt-0.5">{errors.status}</p>}
         </div>
+
+        <div>
+          <Label className="text-xs flex items-center gap-1">
+            <ImageIcon className="w-3.5 h-3.5" aria-hidden /> Images * (cover for directory)
+          </Label>
+          <p className="text-[11px] text-slate-500 mt-0.5 mb-2">Upload one or more photos. Click the star to set the cover image.</p>
+          <label className="inline-flex cursor-pointer">
+            <input type="file" accept="image/*" multiple className="sr-only" onChange={handleAddImages} disabled={disabled} data-testid="listing-form-images" />
+            <span className="inline-flex items-center justify-center h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
+              Add images
+            </span>
+          </label>
+          {errors.images && <p className="text-red-500 text-sm mt-1">{errors.images}</p>}
+          {errors.coverImageIndex && <p className="text-red-500 text-sm mt-0.5">{errors.coverImageIndex}</p>}
+          {images.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {images.map((src, idx) => (
+                <div key={`${idx}-${src?.slice?.(0, 24) || idx}`} className="relative group">
+                  <img src={src} alt="" className="h-20 w-28 rounded-lg object-cover border border-slate-200 bg-slate-100" />
+                  <button
+                    type="button"
+                    title="Set as cover"
+                    onClick={() => patchListingForm({ coverImageIndex: idx })}
+                    className={`absolute top-1 left-1 w-7 h-7 rounded-full flex items-center justify-center text-xs shadow ${
+                      (listingForm.coverImageIndex ?? 0) === idx
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-white/90 text-slate-500 hover:bg-amber-100'
+                    }`}
+                  >
+                    <Star className={`w-3.5 h-3.5 ${(listingForm.coverImageIndex ?? 0) === idx ? 'fill-current' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Remove"
+                    onClick={() => removeImageAt(idx)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <Label className="text-xs flex items-center gap-1">
+            <Video className="w-3.5 h-3.5" aria-hidden /> Video (optional)
+          </Label>
+          <p className="text-[11px] text-slate-500 mt-0.5 mb-1.5">
+            Paste a link (YouTube, Vimeo, TikTok, Instagram) or upload a file (max 80MB).
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-stretch sm:items-center">
+            <label className="cursor-pointer shrink-0">
+              <input
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={handleVideoFile}
+                disabled={videoUploading || disabled}
+                data-testid="listing-form-video-file"
+              />
+              <span className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                {videoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : null}
+                {videoUploading ? 'Uploading…' : 'Upload video'}
+              </span>
+            </label>
+            <Input
+              value={listingForm.videoUrl || ''}
+              onChange={(e) => {
+                setVideoUploadError('');
+                patchListingForm({ videoUrl: e.target.value });
+              }}
+              placeholder="Or paste a video URL…"
+              className="h-9 flex-1 min-w-[12rem]"
+              data-testid="listing-form-video-url"
+            />
+            {(listingForm.videoUrl || '').trim() ? (
+              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={clearVideo}>
+                Clear video
+              </Button>
+            ) : null}
+          </div>
+          {videoUploadError && <p className="text-red-500 text-xs mt-1">{videoUploadError}</p>}
+          {errors.videoUrl && <p className="text-red-500 text-sm mt-0.5">{errors.videoUrl}</p>}
+          {(listingForm.videoUrl || '').trim() ? (
+            <VendorVideoBlock
+              url={listingForm.videoUrl}
+              classNameFile="mt-2 max-h-40 w-full max-w-md rounded-lg border border-slate-200 bg-black"
+            />
+          ) : null}
+        </div>
+
         <div className="flex gap-2 pt-1">
-          <Button type="submit" disabled={saving || disabled} className="bg-spruce-700 hover:bg-spruce-800 text-white h-9">
+          <Button type="submit" disabled={saving || disabled || videoUploading} className="bg-spruce-700 hover:bg-spruce-800 text-white h-9" data-testid="listing-form-submit">
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             {editingListingId ? 'Update' : 'Create'} listing
           </Button>
-          <Button type="button" variant="outline" size="sm" className="h-9" onClick={onCancel}>Cancel</Button>
+          <Button type="button" variant="outline" size="sm" className="h-9" onClick={onCancel}>
+            Cancel
+          </Button>
         </div>
       </form>
     </div>
@@ -593,6 +1082,30 @@ function SettingsView({
 }) {
   if (hasVendor && !settingsEditMode && vendors[0]) {
     const v = vendors[0];
+    const coverIndex = Math.min(Math.max(0, Number(v.coverImageIndex) || 0), Math.max(0, (v.images || []).length - 1));
+    const coverSrc = v.images?.[coverIndex] || v.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=200';
+    const hasCoords = Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude));
+    let extractedMapQuery = '';
+    if (!hasCoords && v.googleMapUrl?.trim()) {
+      try {
+        const u = new URL(v.googleMapUrl.trim());
+        extractedMapQuery = u.searchParams.get('q') || u.searchParams.get('query') || '';
+        if (!extractedMapQuery) {
+          const at = u.href.match(/@(-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)/);
+          if (at) extractedMapQuery = `${at[1]},${at[2]}`;
+        }
+        if (!extractedMapQuery) {
+          const place = u.pathname.match(/\/place\/([^/]+)/);
+          if (place?.[1]) extractedMapQuery = decodeURIComponent(place[1]).replace(/\+/g, ' ');
+        }
+      } catch {
+        extractedMapQuery = '';
+      }
+    }
+    const mapSearchQuery = hasCoords
+      ? `${v.latitude},${v.longitude}`
+      : extractedMapQuery || ([v.neighborhood, v.city, 'Alberta'].filter(Boolean).join(' ') || 'Alberta');
+    const mapEmbedUrl = `https://maps.google.com/maps?q=${encodeURIComponent(mapSearchQuery)}&t=&z=13&ie=UTF8&iwloc=&output=embed`;
     const statusClass = v.status === 'approved' ? 'bg-emerald-100 text-emerald-800' : v.status === 'pending' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800';
     const statusLabel = v.status === 'approved' ? 'Approved' : v.status === 'pending' ? 'Pending' : 'Rejected';
     const categoryName = CATEGORIES.find((c) => c.id === v.category)?.name || v.category;
@@ -602,7 +1115,7 @@ function SettingsView({
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-xl bg-slate-200 overflow-hidden flex-shrink-0">
               <img 
-                src={v.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=200'} 
+                src={coverSrc}
                 alt="" className="w-full h-full object-cover" 
               />
             </div>
@@ -653,6 +1166,78 @@ function SettingsView({
               <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Website</dt>
               <dd className="text-sm text-slate-700">
                 {v.website ? <a href={v.website.startsWith('http') ? v.website : `https://${v.website}`} target="_blank" rel="noopener noreferrer" className="text-spruce-600 hover:underline">{v.website}</a> : '—'}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Tags</dt>
+              <dd className="text-sm text-slate-700">
+                {Array.isArray(v.tags) && v.tags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {v.tags.map((tag) => (
+                      <span key={tag} className="rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  '—'
+                )}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Opening hours</dt>
+              <dd>
+                <div className="rounded-lg border border-slate-200 overflow-hidden max-w-lg">
+                  {OPENING_DAY_ORDER.map((day, i) => {
+                    const line = v.openingHours?.[day];
+                    return (
+                      <div
+                        key={day}
+                        className={`flex justify-between gap-3 px-3 py-2 text-sm ${i > 0 ? 'border-t border-slate-100' : ''}`}
+                      >
+                        <span className="text-slate-600">{OPENING_DAY_LABELS[day]}</span>
+                        <span className="text-slate-900 text-right tabular-nums">{line?.trim() || '—'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Google Map URL</dt>
+              <dd className="text-sm text-slate-700 break-all">
+                {v.googleMapUrl ? (
+                  <a href={v.googleMapUrl} target="_blank" rel="noopener noreferrer" className="text-spruce-600 hover:underline">
+                    {v.googleMapUrl}
+                  </a>
+                ) : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Coordinates</dt>
+              <dd className="text-sm text-slate-700">
+                {hasCoords ? `${v.latitude}, ${v.longitude}` : '—'}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                <Video className="w-3.5 h-3.5" aria-hidden /> Video
+              </dt>
+              <dd className="text-sm text-slate-700">
+                {!v.videoUrl?.trim() ? (
+                  '—'
+                ) : (
+                  <VendorVideoBlock
+                    url={v.videoUrl}
+                    classNameFile="mt-1 max-h-48 w-full max-w-md rounded-lg border border-slate-200 bg-black"
+                  />
+                )}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Location preview</dt>
+              <dd className="rounded-lg overflow-hidden border border-slate-200 h-56">
+                <iframe title="Business location map" src={mapEmbedUrl} className="w-full h-full border-0" loading="lazy" />
               </dd>
             </div>
           </div>
@@ -706,57 +1291,78 @@ function SettingsView({
   );
 }
 
-// Resize image to max dimension and compress as JPEG data URL
-function imageFileToDataUrl(file, maxSize = 1200, quality = 0.85) {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      let w = img.width, h = img.height;
-      if (w > maxSize || h > maxSize) {
-        if (w > h) { h = (h * maxSize) / w; w = maxSize; }
-        else { w = (w * maxSize) / h; h = maxSize; }
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, w, h);
-      try {
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      } catch (e) {
-        reject(e);
-      }
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to load image')); };
-    img.src = url;
-  });
-}
-
 function AddListingForm({ formData, setFormData, errors, saving, onSave, onCancel, isEdit, title, submitLabel }) {
   const formTitle = title || (isEdit ? 'Edit listing' : 'Create a new listing');
   const formSubtitle = 'Fields marked with * are required.';
   const submitText = submitLabel || (isEdit ? 'Update listing' : 'Create listing');
-  const imageUrl = formData.images?.[0] || '';
+  const vendorImages = Array.isArray(formData.images) ? formData.images : [];
+  const coverIndex = Math.min(Math.max(0, Number(formData.coverImageIndex) || 0), Math.max(0, vendorImages.length - 1));
+  const [videoUploading, setVideoUploading] = useState(false);
 
   const handleImageChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file (JPEG, PNG, etc.)');
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    const nextImages = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) continue;
+      try {
+        nextImages.push(await imageFileToDataUrl(file));
+      } catch {
+        /* skip */
+      }
+    }
+    if (!nextImages.length) {
+      toast.error('Please select image files (JPEG, PNG, etc.)');
+      e.target.value = '';
       return;
     }
     try {
-      const dataUrl = await imageFileToDataUrl(file);
-      setFormData({ ...formData, images: [dataUrl] });
+      setFormData((prev) => ({
+        ...prev,
+        images: [...(Array.isArray(prev.images) ? prev.images : []), ...nextImages],
+      }));
     } catch {
       toast.error('Failed to process image');
     }
     e.target.value = '';
   };
 
-  const clearImage = () => setFormData({ ...formData, images: [] });
+  const removeImageAt = (idx) => {
+    setFormData((prev) => {
+      const imgs = [...(Array.isArray(prev.images) ? prev.images : [])];
+      imgs.splice(idx, 1);
+      let cover = Number(prev.coverImageIndex) || 0;
+      if (idx === cover) cover = 0;
+      else if (idx < cover) cover = Math.max(0, cover - 1);
+      const nextCover = imgs.length > 0 ? Math.min(cover, imgs.length - 1) : 0;
+      return { ...prev, images: imgs, coverImageIndex: nextCover };
+    });
+  };
+
+  const clearAllImages = () => setFormData((prev) => ({ ...prev, images: [], coverImageIndex: 0 }));
+
+  const handleVideoFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please choose a video file.');
+      return;
+    }
+    setVideoUploading(true);
+    try {
+      const res = await uploadVendorVideo(file);
+      setFormData((prev) => ({ ...prev, videoUrl: res.data.url }));
+      toast.success('Video uploaded');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Upload failed';
+      toast.error(typeof msg === 'string' ? msg : 'Upload failed');
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const clearVideo = () => setFormData({ ...formData, videoUrl: '' });
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 w-full" data-testid="add-listing-form">
@@ -857,25 +1463,175 @@ function AddListingForm({ formData, setFormData, errors, saving, onSave, onCance
             {errors.website && <p className="text-red-500 text-xs mt-0.5">{errors.website}</p>}
           </div>
           <div>
-            <Label className="text-xs">Image (optional)</Label>
+            <Label className="text-xs">Company Images (optional)</Label>
             <div className="mt-1 flex items-center gap-2">
               <label className="flex-1 cursor-pointer">
-                <input type="file" accept="image/*" className="sr-only" onChange={handleImageChange} />
+                <input type="file" accept="image/*" multiple className="sr-only" onChange={handleImageChange} />
                 <span className="inline-flex items-center justify-center h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100 w-full">
-                  {imageUrl ? 'Change image' : 'Upload image'}
+                  Add image(s)
                 </span>
               </label>
-              {imageUrl && (
-                <div className="relative flex-shrink-0">
-                  <img src={imageUrl} alt="" className="w-12 h-12 rounded object-cover border border-slate-200" />
-                  <button type="button" onClick={clearImage} className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600">×</button>
-                </div>
+              {vendorImages.length > 0 && (
+                <Button type="button" variant="outline" size="sm" className="h-9" onClick={clearAllImages}>
+                  Clear all
+                </Button>
               )}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">Upload multiple images and select one as the cover photo.</p>
+            {vendorImages.length > 0 && (
+              <div className="mt-2 grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {vendorImages.map((img, idx) => (
+                  <div key={`${img}-${idx}`} className="relative group">
+                    <img src={img} alt="" className={`w-full h-16 rounded object-cover border ${idx === coverIndex ? 'border-spruce-600 ring-2 ring-spruce-200' : 'border-slate-200'}`} />
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, coverImageIndex: idx }))}
+                      className={`absolute left-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full border text-[10px] ${idx === coverIndex ? 'bg-spruce-700 border-spruce-700 text-white' : 'bg-white/95 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                      title="Set as cover image"
+                    >
+                      <Star className={`w-3 h-3 ${idx === coverIndex ? 'fill-current' : ''}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeImageAt(idx)}
+                      className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[10px] leading-none flex items-center justify-center hover:bg-red-600"
+                      aria-label="Remove image"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="md:col-span-3">
+            <Label htmlFor="add-map-url" className="text-xs">Google Map URL (optional)</Label>
+            <Input
+              id="add-map-url"
+              value={formData.googleMapUrl || ''}
+              onChange={(e) => setFormData({ ...formData, googleMapUrl: e.target.value })}
+              className="mt-1 h-9"
+              placeholder="https://maps.google.com/..."
+            />
+            {errors.googleMapUrl && <p className="text-red-500 text-xs mt-0.5">{errors.googleMapUrl}</p>}
+          </div>
+          <div>
+            <Label htmlFor="add-lat" className="text-xs">Latitude (optional)</Label>
+            <Input
+              id="add-lat"
+              type="number"
+              step="any"
+              value={formData.latitude ?? ''}
+              onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+              className="mt-1 h-9"
+              placeholder="53.5461"
+            />
+            {errors.latitude && <p className="text-red-500 text-xs mt-0.5">{errors.latitude}</p>}
+          </div>
+          <div>
+            <Label htmlFor="add-lng" className="text-xs">Longitude (optional)</Label>
+            <Input
+              id="add-lng"
+              type="number"
+              step="any"
+              value={formData.longitude ?? ''}
+              onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+              className="mt-1 h-9"
+              placeholder="-113.4938"
+            />
+            {errors.longitude && <p className="text-red-500 text-xs mt-0.5">{errors.longitude}</p>}
+          </div>
+          <div className="flex items-end">
+            <p className="text-[11px] text-slate-500">
+              Add map URL or both latitude and longitude for precise business location on detail page.
+            </p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:p-5 space-y-5">
+          <VendorTagField
+            selectedTags={Array.isArray(formData.tags) ? formData.tags : []}
+            onChange={(tags) => setFormData({ ...formData, tags })}
+          />
+          <div>
+            <Label className="text-xs">Opening hours</Label>
+            <p className="text-[11px] text-slate-500 mt-0.5 mb-3">
+              Enter hours for each day (e.g. <span className="font-mono text-slate-600">11:00 AM - 9:00 PM</span>) or{' '}
+              <span className="font-mono text-slate-600">Closed</span>.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {OPENING_DAY_ORDER.map((day) => (
+                <div key={day} className="flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-slate-600">{OPENING_DAY_LABELS[day]}</span>
+                  <Input
+                    value={formData.openingHours?.[day] ?? ''}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        openingHours: {
+                          ...emptyOpeningHours(),
+                          ...(formData.openingHours || {}),
+                          [day]: e.target.value,
+                        },
+                      })
+                    }
+                    className="h-9"
+                    placeholder="e.g. 9:00 AM - 5:00 PM"
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
+
+        <div>
+          <Label className="text-xs flex items-center gap-1">
+            <Video className="w-3.5 h-3.5" aria-hidden /> Video (optional)
+          </Label>
+          <p className="text-[11px] text-slate-500 mt-0.5 mb-1.5">
+            <strong className="text-slate-700">Paste a link</strong> (YouTube, Vimeo, TikTok, Instagram) — or{' '}
+            <strong className="text-slate-700">upload a file</strong> (max 80MB; server converts to MP4 when ffmpeg is available).
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2 flex-wrap items-stretch sm:items-center">
+            <label className="cursor-pointer shrink-0">
+              <input
+                type="file"
+                accept="video/*"
+                className="sr-only"
+                onChange={handleVideoFile}
+                disabled={videoUploading}
+                data-testid="add-listing-video-file"
+              />
+              <span className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-md border border-slate-200 bg-slate-50 text-xs font-medium text-slate-600 hover:bg-slate-100">
+                {videoUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> : null}
+                {videoUploading ? 'Uploading…' : 'Upload video'}
+              </span>
+            </label>
+            <Input
+              value={formData.videoUrl || ''}
+              onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
+              placeholder="YouTube, Vimeo, TikTok, Instagram URL…"
+              className="h-9 flex-1 min-w-[12rem]"
+              data-testid="add-listing-video-url"
+            />
+            {(formData.videoUrl || '').trim() ? (
+              <Button type="button" variant="outline" size="sm" className="h-9 shrink-0" onClick={clearVideo}>
+                Clear video
+              </Button>
+            ) : null}
+          </div>
+          {errors.videoUrl && <p className="text-red-500 text-xs mt-0.5">{errors.videoUrl}</p>}
+          {(formData.videoUrl || '').trim() ? (
+            <VendorVideoBlock
+              url={formData.videoUrl}
+              classNameFile="mt-2 max-h-40 w-full max-w-md rounded-lg border border-slate-200 bg-black"
+            />
+          ) : null}
+        </div>
         <div className="flex gap-2 pt-1">
-          <Button type="submit" disabled={saving} className="bg-spruce-700 hover:bg-spruce-800 text-white h-9" data-testid="add-listing-submit">
+          <Button type="submit" disabled={saving || videoUploading} className="bg-spruce-700 hover:bg-spruce-800 text-white h-9" data-testid="add-listing-submit">
             {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
             {saving ? (isEdit ? 'Updating…' : 'Creating…') : submitText}
           </Button>

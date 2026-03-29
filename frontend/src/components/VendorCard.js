@@ -4,10 +4,16 @@ import { StarRating } from '../components/StarRating';
 import { MapPin, BadgeCheck, Phone } from 'lucide-react';
 import { getCategoryIcon, getTierInfo } from '../data/categories';
 import { vendorPath } from '../constants';
+import { resolveMediaUrl } from '../lib/mediaUrl';
 
-export default function VendorCard({ vendor }) {
+const DEFAULT_VENDOR_COVER =
+  'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800';
+
+export default function VendorCard({ vendor, showTierBadge = true }) {
   const tierInfo = getTierInfo(vendor.tier);
   const CategoryIcon = getCategoryIcon(vendor.icon);
+  const coverRaw = vendor.images?.[0];
+  const coverSrc = coverRaw ? resolveMediaUrl(coverRaw) || coverRaw : DEFAULT_VENDOR_COVER;
 
   return (
     <Link
@@ -18,15 +24,17 @@ export default function VendorCard({ vendor }) {
       {/* Image */}
       <div className="relative h-48 overflow-hidden bg-slate-100">
         <img
-          src={vendor.images?.[0] || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800'}
+          src={coverSrc}
           alt={vendor.name}
           className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
         />
         <div className="absolute top-3 left-3 flex gap-2">
-          <Badge className={`${tierInfo.color} text-xs font-medium`} data-testid={`vendor-tier-${vendor.id}`}>
-            {tierInfo.name}
-          </Badge>
+          {showTierBadge && (
+            <Badge className={`${tierInfo.color} text-xs font-medium`} data-testid={`vendor-tier-${vendor.id}`}>
+              {tierInfo.name}
+            </Badge>
+          )}
           {vendor.verified && (
             <Badge className="bg-spruce-700 text-white text-xs flex items-center gap-1">
               <BadgeCheck className="w-3 h-3" /> Verified

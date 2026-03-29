@@ -57,8 +57,16 @@ export function AuthProvider({ children }) {
     return updated;
   };
 
+  const updateProfile = async (data) => {
+    const res = await authAPI.updateMe(data);
+    const updated = res.data;
+    setUser(updated);
+    localStorage.setItem('hey_alberta_user', JSON.stringify(updated));
+    return updated;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, upgradeToVendor }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, upgradeToVendor, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

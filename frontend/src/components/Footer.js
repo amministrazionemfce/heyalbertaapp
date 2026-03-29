@@ -16,8 +16,8 @@ export default function Footer() {
   const { pathname } = useLocation();
   const isHome = pathname === ROUTES.HOME;
   const topCategories = CATEGORIES.slice(0, 6);
-  const footerBg = isHome ? 'bg-purple-700' : 'bg-spruce-700';
-  const iconTileBg = isHome ? 'bg-purple-700' : 'bg-spruce-700';
+  const footerBg = 'bg-spruce-700';
+  const iconTileBg = 'bg-spruce-700';
 
   return (
     <footer className={`${footerBg} text-slate-300 border-t border-slate-100`} data-testid="footer">

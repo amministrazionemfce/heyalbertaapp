@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Badge } from '../components/ui/badge';
-import { Button } from '../components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
-import { useAddListingClick } from '../hooks/useAddListingClick';
 import { resourceAPI } from '../lib/api';
-import { ClipboardList, BookOpen, HelpCircle, Loader2, ChevronDown, ChevronUp, ArrowRight } from 'lucide-react';
+import { ClipboardList, BookOpen, HelpCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 
 export default function ResourceLibrary() {
-  const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState({});
@@ -22,12 +17,8 @@ export default function ResourceLibrary() {
 
   const toggle = (id) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
-  const checklists = resources.filter(r => r.type === 'checklist');
-  const guides = resources.filter(r => r.type === 'guide');
-  const faqs = resources.filter(r => r.type === 'faq');
-
   const typeIcon = { checklist: ClipboardList, guide: BookOpen, faq: HelpCircle };
-  const typeColor = { checklist: 'bg-blue-50 text-blue-600', guide: 'bg-green-50 text-green-600', faq: 'bg-purple-50 text-purple-600' };
+  const typeColor = { checklist: 'bg-blue-50 text-blue-600', guide: 'bg-green-50 text-green-600', faq: 'bg-spruce-50 text-spruce-600' };
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="w-8 h-8 animate-spin text-spruce-700" /></div>;
@@ -73,53 +64,24 @@ export default function ResourceLibrary() {
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="resource-library">
-      {/* Header */}
-      <div className="bg-white border-b">
-        <div className="container mx-auto px-4 md:px-8 max-w-7xl py-12">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="font-heading text-3xl md:text-4xl font-bold text-slate-900 mb-3">
-                Resource Library
-              </h1>
-              <p className="text-base md:text-lg text-slate-500 max-w-2xl">
-                Essential guides, checklists, and FAQs to help make your move to Alberta as smooth as possible.
-              </p>
-            </div>
-            <Button
-              onClick={handleAddListingClick}
-              className="bg-spruce-700 hover:bg-spruce-800 text-white shrink-0"
-              data-testid="resource-list-business-btn"
-            >
-              List Your Business <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
+      <div className="container mx-auto px-4 md:px-8 max-w-5xl py-10 md:py-14">
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
+          <h1 className="font-heading text-3xl md:text-4xl font-bold text-slate-900">Resource Library</h1>
+          <p className="mt-2 text-base text-slate-600">
+            Guides, checklists, and FAQs to help your Alberta journey. Content is managed by admin in the Resources section.
+          </p>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 md:px-8 max-w-4xl py-8">
-        <Tabs defaultValue="all" data-testid="resource-tabs">
-          <TabsList>
-            <TabsTrigger value="all">All ({resources.length})</TabsTrigger>
-            <TabsTrigger value="checklists"><ClipboardList className="w-4 h-4 mr-1" /> Checklists ({checklists.length})</TabsTrigger>
-            <TabsTrigger value="guides"><BookOpen className="w-4 h-4 mr-1" /> Guides ({guides.length})</TabsTrigger>
-            <TabsTrigger value="faqs"><HelpCircle className="w-4 h-4 mr-1" /> FAQs ({faqs.length})</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="mt-6 space-y-4">
+        {resources.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-slate-600">
+            No resources published yet.
+          </div>
+        ) : (
+          <div className="space-y-4">
             {resources.map(renderResource)}
-          </TabsContent>
-          <TabsContent value="checklists" className="mt-6 space-y-4">
-            {checklists.map(renderResource)}
-          </TabsContent>
-          <TabsContent value="guides" className="mt-6 space-y-4">
-            {guides.map(renderResource)}
-          </TabsContent>
-          <TabsContent value="faqs" className="mt-6 space-y-4">
-            {faqs.map(renderResource)}
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </div>
-      <UpgradeToVendorModal {...upgradeModalProps} />
     </div>
   );
 }

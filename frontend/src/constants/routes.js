@@ -4,12 +4,18 @@
  */
 export const ROUTES = Object.freeze({
   HOME: '/',
-  DIRECTORY: '/directory',
+  /** News & articles (public) */
+  NEWS: '/news',
+  /** @deprecated Use NEWS — kept for redirects */
   RESOURCES: '/resources',
   ABOUT: '/about',
   CONTACT: '/contact',
   REGISTER: '/register',
   LOGIN: '/login',
+  /** Pre-Stripe subscription review (split layout like login) */
+  CHECKOUT: '/checkout',
+  CHECKOUT_RETURN: '/checkout/return',
+  PROFILE: '/profile',
   DASHBOARD: '/dashboard',
   ADMIN: '/admin',
   /** Base segments for dynamic paths */
@@ -21,6 +27,8 @@ export const ROUTES = Object.freeze({
 export const ROUTE_PATTERNS = Object.freeze({
   VENDOR_DETAIL: '/vendors/:id',
   LISTING_DETAIL: '/listings/:id',
+  /** Admin-only vendor management */
+  ADMIN_VENDOR: '/admin/vendors/:vendorId',
 });
 
 /** Vendor dashboard — add listing tab (query string) */
@@ -34,14 +42,19 @@ export function vendorPath(id) {
   return `${ROUTES.VENDORS}/${id}`;
 }
 
+/** Admin dashboard — single vendor review / actions */
+export function adminVendorPath(id) {
+  return `${ROUTES.ADMIN}/vendors/${id}`;
+}
+
 export function directoryCategoryQuery(categoryId) {
-  return `${ROUTES.DIRECTORY}?category=${encodeURIComponent(categoryId)}`;
+  return `${ROUTES.LISTINGS}?category=${encodeURIComponent(categoryId)}`;
 }
 
 export function directoryCityQuery(cityName) {
-  return `${ROUTES.DIRECTORY}?city=${encodeURIComponent(cityName)}`;
+  return `${ROUTES.LISTINGS}?city=${encodeURIComponent(cityName)}`;
 }
 
 export function directorySearchQuery(search) {
-  return `${ROUTES.DIRECTORY}?search=${encodeURIComponent(search)}`;
+  return `${ROUTES.LISTINGS}?search=${encodeURIComponent(search)}`;
 }

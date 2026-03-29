@@ -5,8 +5,9 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAuth } from '../lib/auth';
-import { toast } from 'sonner';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { getApiErrorLines } from '../lib/formatApiError';
+import AuthFormError from '../components/AuthFormError';
 import { registerValidation } from '../validations/registerValidation';
 import { ROUTES } from '../constants';
 
@@ -27,14 +28,18 @@ export default function RegisterPage() {
   const [role, setRole] = useState('user');
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState(initialValdationError);
+  const [apiErrorLines, setApiErrorLines] = useState([]);
 
   useEffect(() => {
     if (user) navigate(ROUTES.HOME, { replace: true });
   }, [user, navigate]);
  
 
+  const clearApiError = () => setApiErrorLines([]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setApiErrorLines([]);
     setValidationError(initialValdationError);
     const errors = registerValidation(name, email, password, confirmPassword);
     const hasErrors = Object.values(errors).some(Boolean);
@@ -49,15 +54,15 @@ export default function RegisterPage() {
       if (role === 'vendor') navigate(ROUTES.DASHBOARD);
       else navigate(ROUTES.HOME);
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Registration failed');
+      setApiErrorLines(getApiErrorLines(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex" data-testid="register-page">
-      <div className="flex-1 flex items-center justify-center p-8">
+    <div className="min-h-screen flex bg-slate-200/90" data-testid="register-page">
+      <div className="flex-1 flex items-center justify-center p-8 bg-slate-100">
         <div className="w-full max-w-md">
           <Link to={ROUTES.HOME} className="flex items-center gap-2 mb-6">
             <div className="w-25 h-16 flex items-center justify-center">
@@ -75,12 +80,17 @@ export default function RegisterPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">
+            <AuthFormError lines={apiErrorLines} data-testid="register-api-error" />
+
             <div>
               <Label htmlFor="name">Full Name</Label>
               <Input 
                 id="name" 
                 value={name} 
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  clearApiError();
+                }}
                 className="mt-1.5" data-testid="register-name" />
             </div>
             {validationError.name && <p className="text-red-500 text-sm">{validationError.name}</p>}
@@ -89,7 +99,10 @@ export default function RegisterPage() {
               <Input 
                 id="email" 
                 type="email" 
-                onChange={(e) => setEmail(e.target.value)} 
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearApiError();
+                }} 
                 value={email} 
                 className="mt-1.5" data-testid="register-email" />
             </div>
@@ -100,24 +113,36 @@ export default function RegisterPage() {
                 id="password" 
                 type="password" 
                 value={password} 
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearApiError();
+                }}
                 className="mt-1.5" 
                 data-testid="register-password" />
             </div>
             {validationError.password && <p className="text-red-500 text-sm">{validationError.password}</p>}
             <div>
-               <Label htmlFor="password">Confirm Password</Label>
+               <Label htmlFor="confirmPassword">Confirm Password</Label>
                <Input 
-                    id="password" 
+                    id="confirmPassword" 
                     type="password" 
                     value={confirmPassword} 
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="mt-1.5" data-testid="register-password" />
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearApiError();
+                    }}
+                    className="mt-1.5" data-testid="register-confirm-password" />
             </div>
             {validationError.confirmPassword && <p className="text-red-500 text-sm">{validationError.confirmPassword}</p>}
             <div>
               <Label>I am a</Label>
-              <Select value={role} onValueChange={setRole}>
+              <Select
+                value={role}
+                onValueChange={(v) => {
+                  setRole(v);
+                  clearApiError();
+                }}
+              >
                 <SelectTrigger className="mt-1.5" data-testid="register-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -134,16 +159,21 @@ export default function RegisterPage() {
           </form>
         </div>
       </div>
-       <div className="hidden lg:flex lg:w-1/2 relative">
+      <div className="hidden lg:flex lg:w-1/2 relative min-h-screen">
         <img
           src="background.jpeg"
           alt="Alberta landscape"
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 flex items-end p-12">
-          <div>
-            <h2 className="font-heading text-3xl font-bold text-white mb-3">Join Hey Alberta</h2>
-            <p className="text-spruce-100 text-lg">Create an account to access the full directory or list your business.</p>
+        <div className="absolute inset-0 bg-slate-900/65" aria-hidden />
+        <div className="absolute inset-0 flex items-center justify-center p-8 sm:p-12">
+          <div className="max-w-lg text-center">
+            <h2 className="font-heading text-3xl sm:text-4xl font-bold text-white mb-4 drop-shadow-md">
+              Join Hey Alberta
+            </h2>
+            <p className="text-white/95 text-lg leading-relaxed drop-shadow-sm">
+              Create an account to access the full directory or list your business.
+            </p>
           </div>
         </div>
       </div>

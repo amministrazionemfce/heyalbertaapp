@@ -32,7 +32,7 @@ export default function CategoryBrowseCard({ category, listingCount = 0, imageSr
           className="hidden absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200"
           aria-hidden
         >
-          <Icon className="h-12 w-12 text-purple-600/80" />
+          <Icon className="h-12 w-12 text-spruce-600/80" />
         </div>
 
         {/* Bottom half: dark gradient for legible white text (matches reference) */}

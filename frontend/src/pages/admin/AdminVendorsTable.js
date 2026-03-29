@@ -1,10 +1,10 @@
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Eye } from 'lucide-react';
-import { getStatusFilterClass } from './vendorStatus';
+import { Eye, Trash2 } from 'lucide-react';
+import { getVendorStatusBadgeClass } from './vendorStatus';
 import { CheckCircle } from 'lucide-react';
 
-export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onView }) {
+export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onSeeDetails }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
@@ -35,10 +35,10 @@ export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onVie
                   <td className="p-4 text-slate-600">{categoryName || '—'}</td>
                   <td className="p-4">
                     {v.status !== 'approved' ?
-                      <Badge className={getStatusFilterClass(v.status, { active: true })}>
-                        <span className="p-1 hover:cursor-pointer"> {v.status}</span>
+                      <Badge className={getVendorStatusBadgeClass(v.status)}>
+                        <span className="p-1 hover:cursor-pointer capitalize"> {v.status}</span>
                       </Badge> :
-                      <Badge className="bg-blue-700 hover:bg-blue-700 text-white gap-1">
+                      <Badge className={`${getVendorStatusBadgeClass('approved')} gap-1 border-0`}>
                         <CheckCircle className="w-4 h-4" /> <span className="p-1 hover:cursor-pointer"> Approved</span>
                       </Badge>
                     }
@@ -52,9 +52,11 @@ export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onVie
                     {v.reviewCount ?? 0} ({v.avgRating ?? 0})
                   </td>
                   <td className="p-4 text-right">
-                    <Button size="sm" variant="outline" className="gap-1" onClick={() => onView(v)} data-testid={`view-vendor-${v.id}`}>
-                      <Eye className="w-4 h-4" /> View
-                    </Button>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => onSeeDetails(v)} data-testid={`see-details-vendor-${v.id}`}>
+                        <Eye className="w-4 h-4" /> See Details
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -65,4 +67,3 @@ export function AdminVendorsTable({ vendors, getCategoryName, getTierInfo, onVie
     </div>
   );
 }
-

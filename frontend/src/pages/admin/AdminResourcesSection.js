@@ -89,7 +89,7 @@ export function AdminResourcesSection({ onUpdate }) {
         </div>
         <Dialog open={showCreate} onOpenChange={setShowCreate}>
           <DialogTrigger asChild>
-            <Button className="bg-spruce-700 hover:bg-spruce-800 text-white gap-2" data-testid="create-resource-btn">
+            <Button className="bg-admin-600 hover:bg-admin-700 text-white gap-2 shadow-sm" data-testid="create-resource-btn">
               <Plus className="w-4 h-4" /> Add Resource
             </Button>
           </DialogTrigger>
@@ -143,7 +143,7 @@ export function AdminResourcesSection({ onUpdate }) {
                 />
               </div>
               <div className="flex gap-2 pt-2">
-                <Button onClick={handleCreate} className="flex-1 bg-spruce-700 hover:bg-spruce-800 text-white" data-testid="resource-form-save">
+                <Button onClick={handleCreate} className="flex-1 bg-admin-600 hover:bg-admin-700 text-white shadow-sm" data-testid="resource-form-save">
                   Create resource
                 </Button>
                 <Button variant="outline" onClick={() => setShowCreate(false)}>
@@ -157,14 +157,14 @@ export function AdminResourcesSection({ onUpdate }) {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-spruce-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
         </div>
       ) : filteredResources.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">
           <BookOpen className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-600 font-medium">No resources yet</p>
           <p className="text-sm text-slate-500 mt-1">Create guides, checklists, or FAQs to help newcomers.</p>
-          <Button className="mt-4 bg-spruce-700 text-white" onClick={() => setShowCreate(true)}>
+          <Button className="mt-4 bg-admin-600 hover:bg-admin-700 text-white shadow-sm" onClick={() => setShowCreate(true)}>
             <Plus className="w-4 h-4 mr-2" /> Add first resource
           </Button>
         </div>

@@ -32,7 +32,7 @@ export default function CategoryBrowseToolbar({
             <select
               value={categoryOrder}
               onChange={(e) => onCategoryOrderChange(e.target.value)}
-              className="h-11 w-full pl-3 pr-10 rounded-xl border border-slate-200/90 bg-white text-slate-700 font-medium text-sm cursor-pointer shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-300"
+              className="h-11 w-full pl-3 pr-10 rounded-xl border border-slate-200/90 bg-white text-slate-700 font-medium text-sm cursor-pointer shadow-sm appearance-none focus:outline-none focus:ring-2 focus:ring-spruce-500/20 focus:border-spruce-300"
               data-testid="category-order"
             >
               <option value="listing">By listings</option>

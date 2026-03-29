@@ -11,7 +11,7 @@ export const CATEGORIES = [
   { id: "moving-services", name: "Moving Services", slug: "moving-services", icon: "Truck", description: "Professional movers to help you settle in" },
   { id: "home-services", name: "Home Services", slug: "home-services", icon: "Wrench", description: "Repairs, renovations, and maintenance" },
   { id: "insurance", name: "Insurance", slug: "insurance", icon: "Shield", description: "Protect what matters most" },
-  { id: "banking-financial", name: "Banking & Financial", slug: "banking-financial", icon: "Landmark", description: "Banking, mortgages, and financial planning" },
+  { id: "banking-financial", name: "Banking", slug: "banking-financial", icon: "Landmark", description: "Banking, mortgages, and financial planning" },
   { id: "legal-services", name: "Legal Services", slug: "legal-services", icon: "Scale", description: "Immigration, real estate, and family law" },
   { id: "healthcare", name: "Healthcare", slug: "healthcare", icon: "Heart", description: "Doctors, dentists, and wellness services" },
   { id: "education", name: "Education", slug: "education", icon: "GraduationCap", description: "Schools, tutoring, and training programs" },
@@ -59,7 +59,7 @@ export const TIERS = [
   { id: "free", name: "Free", color: "bg-slate-100 text-slate-700", description: "Basic listing" },
   { id: "standard", name: "Standard", color: "bg-primary-100 text-primary-700", description: "Enhanced listing" },
   { id: "gold", name: "Gold", color: "bg-secondary-100 text-secondary-700", description: "Priority placement" },
-  { id: "platinum", name: "Platinum", color: "bg-purple-100 text-purple-700", description: "Premium visibility" },
+  { id: "platinum", name: "Platinum", color: "bg-spruce-100 text-spruce-700", description: "Premium visibility" },
   { id: "enterprise", name: "Enterprise", color: "bg-blue-100 text-blue-700", description: "Full partnership" },
 ];
 

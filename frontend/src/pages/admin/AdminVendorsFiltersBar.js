@@ -50,12 +50,14 @@ export function AdminVendorsFiltersBar({
         })}
       </div>
 
-      <div className="flex items-center gap-1 border border-slate-200 rounded-lg p-1 bg-white">
+      <div className="flex items-center gap-1 rounded-xl border border-slate-200/90 bg-slate-50 p-1 shadow-sm">
         <button
           type="button"
           onClick={() => onViewModeChange('table')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'table' ? 'bg-spruce-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'table'
+              ? 'bg-spruce-700 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-white hover:text-spruce-800'
           }`}
           data-testid="view-table"
           title="Table view"
@@ -65,8 +67,10 @@ export function AdminVendorsFiltersBar({
         <button
           type="button"
           onClick={() => onViewModeChange('list')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'list' ? 'bg-spruce-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            viewMode === 'list'
+              ? 'bg-spruce-700 text-white shadow-sm'
+              : 'text-slate-600 hover:bg-white hover:text-spruce-800'
           }`}
           data-testid="view-list"
           title="List view"

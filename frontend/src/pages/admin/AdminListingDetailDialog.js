@@ -21,7 +21,7 @@ export function AdminListingDetailDialog({
             <DialogHeader>
               <DialogTitle className="font-heading text-xl flex items-center gap-2 flex-wrap">
                 {listing.title}
-                <Badge variant={listing.status === 'published' ? 'default' : 'secondary'} className={listing.status === 'published' ? 'bg-spruce-600' : ''}>
+                <Badge variant={listing.status === 'published' ? 'default' : 'secondary'} className={listing.status === 'published' ? 'bg-admin-600 border-0' : ''}>
                   {listing.status}
                 </Badge>
                 {listing.featured && <Star className="w-5 h-5 text-amber-500 fill-amber-500" />}

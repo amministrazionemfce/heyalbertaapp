@@ -8,6 +8,10 @@ const listingSchema = new mongoose.Schema({
   status: { type: String, required: true, default: "draft" },
   featured: { type: Boolean, required: true, default: false },
   features: { type: [String], default: [] },
+  images: { type: [String], default: [] },
+  coverImageIndex: { type: Number, default: 0 },
+  videoUrl: { type: String, default: "" },
+  price: { type: String, default: "" },
   createdAt: { type: Date, default: Date.now }
 });
 

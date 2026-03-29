@@ -54,7 +54,7 @@ function TestimonialCard({ item }) {
     >
       <div className="flex items-start gap-3">
         <div
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-violet-700 text-sm font-bold text-white"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-spruce-800 to-spruce-700 text-sm font-bold text-white"
           aria-hidden
         >
           {initials}
@@ -76,7 +76,7 @@ function TestimonialCard({ item }) {
       <p className="mt-3 text-left text-sm leading-relaxed text-slate-600 line-clamp-4">{item.text}</p>
       <Link
         to={ROUTES.ABOUT}
-        className="mt-2 inline-block text-sm font-semibold text-violet-600 hover:text-violet-700 hover:underline"
+        className="mt-2 inline-block text-sm font-semibold text-spruce-700 hover:text-spruce-800 hover:underline"
       >
         Read more
       </Link>
@@ -129,7 +129,7 @@ export default function TestimonialsFlowSection() {
               aria-selected={i === active}
               onClick={() => setActive(i)}
               className={`h-1.5 rounded-full transition-all ${
-                i === active ? 'w-8 bg-violet-600' : 'w-4 bg-slate-300 hover:bg-slate-400'
+                i === active ? 'w-8 bg-spruce-800' : 'w-4 bg-slate-300 hover:bg-slate-400'
               }`}
               aria-label={`Go to testimonial ${i + 1}`}
             />

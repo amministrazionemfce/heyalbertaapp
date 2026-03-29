@@ -14,7 +14,7 @@ export function AdminListingsGrid({ listings, getCategoryName, onView }) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 mb-1">
               <h3 className="font-heading font-semibold text-slate-900 line-clamp-2 w-full">{l.title}</h3>
-              <Badge variant={l.status === 'published' ? 'default' : 'secondary'} className={l.status === 'published' ? 'bg-spruce-600 text-xs' : 'text-xs'}>
+              <Badge variant={l.status === 'published' ? 'default' : 'secondary'} className={l.status === 'published' ? 'bg-admin-600 text-xs border-0' : 'text-xs'}>
                 {l.status}
               </Badge>
               {l.featured && <Star className="w-4 h-4 text-amber-500 fill-amber-500 flex-shrink-0" />}

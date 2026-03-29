@@ -31,7 +31,7 @@ export default function CityBrowseCard({ cityName, listingCount = 0, imageSrc })
           className="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-100 to-slate-200"
           aria-hidden
         >
-          <MapPin className="h-10 w-10 text-purple-600/80" />
+          <MapPin className="h-10 w-10 text-spruce-600/80" />
         </div>
 
         <div

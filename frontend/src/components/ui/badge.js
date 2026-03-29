@@ -5,6 +5,8 @@ const variants = {
   secondary: 'bg-slate-100 text-slate-900 hover:bg-slate-200',
   destructive: 'bg-red-100 text-red-700',
   outline: 'text-slate-900 border border-slate-200',
+  /** Nav / sidebar counts — explicit colors so parent `text-white` / Tailwind order never hides the number */
+  counter: '!bg-white !text-black border border-slate-300 font-bold tabular-nums shadow-sm',
 };
 
 export function Badge({ className = '', variant = 'default', ...props }) {

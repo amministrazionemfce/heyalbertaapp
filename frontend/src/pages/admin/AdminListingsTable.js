@@ -28,7 +28,7 @@ export function AdminListingsTable({ listings, getCategoryName, onView }) {
                 <td className="p-4 text-slate-600">{l.vendorName || '—'}</td>
                 <td className="p-4 text-slate-600">{getCategoryName(l.categoryId) || '—'}</td>
                 <td className="p-4">
-                  <Badge variant={l.status === 'published' ? 'default' : 'secondary'} className={l.status === 'published' ? 'bg-spruce-600' : ''}>
+                  <Badge variant={l.status === 'published' ? 'default' : 'secondary'} className={l.status === 'published' ? 'bg-admin-600 border-0' : ''}>
                     {l.status}
                   </Badge>
                 </td>

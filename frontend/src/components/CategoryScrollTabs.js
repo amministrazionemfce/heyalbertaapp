@@ -9,7 +9,7 @@ export default function CategoryScrollTabs({
   items,
   value,
   onChange,
-  accentClass = 'bg-purple-700 text-white shadow-md',
+  accentClass = 'bg-spruce-700 text-white shadow-md',
   inactiveClass = 'bg-white text-slate-700 border border-slate-200',
   'aria-label': ariaLabel = 'Category filters',
   'data-testid': dataTestId = 'category-scroll-tabs',
@@ -51,7 +51,7 @@ export default function CategoryScrollTabs({
         type="button"
         onClick={() => scrollByDir(-1)}
         disabled={!canLeft}
-        className="absolute left-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-purple-200 bg-white shadow-md transition disabled:pointer-events-none disabled:opacity-25 md:h-10 md:w-10"
+        className="absolute left-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-spruce-200 bg-white shadow-md transition disabled:pointer-events-none disabled:opacity-25 md:h-10 md:w-10"
         aria-label="Scroll categories left"
         data-testid="category-tabs-prev"
       >
@@ -61,7 +61,7 @@ export default function CategoryScrollTabs({
         type="button"
         onClick={() => scrollByDir(1)}
         disabled={!canRight}
-        className="absolute right-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-purple-200 bg-white shadow-md transition disabled:pointer-events-none disabled:opacity-25 md:h-10 md:w-10"
+        className="absolute right-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-spruce-200 bg-white shadow-md transition disabled:pointer-events-none disabled:opacity-25 md:h-10 md:w-10"
         aria-label="Scroll categories right"
         data-testid="category-tabs-next"
       >

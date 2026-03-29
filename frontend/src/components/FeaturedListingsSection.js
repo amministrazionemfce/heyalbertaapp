@@ -43,7 +43,7 @@ export default function FeaturedListingsSection() {
     load();
   }, [load]);
 
-  const viewMoreHref = categoryId ? directoryCategoryQuery(categoryId) : ROUTES.DIRECTORY;
+  const viewMoreHref = categoryId ? directoryCategoryQuery(categoryId) : ROUTES.LISTINGS;
 
   return (
     <section
@@ -94,7 +94,7 @@ export default function FeaturedListingsSection() {
         <div className="mt-12 flex justify-center">
           <Link
             to={viewMoreHref}
-            className="inline-flex min-w-[200px] items-center justify-center rounded-full border-2 border-purple-800 bg-white px-10 py-3 text-sm font-semibold text-purple-900 shadow-sm transition hover:bg-purple-900 hover:text-white"
+            className="inline-flex min-w-[200px] items-center justify-center rounded-full border-2 border-spruce-800 bg-white px-10 py-3 text-sm font-semibold text-spruce-900 shadow-sm transition hover:bg-spruce-900 hover:text-white"
             data-testid="featured-listings-view-more"
           >
             View more

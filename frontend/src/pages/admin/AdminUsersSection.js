@@ -19,7 +19,7 @@ export function AdminUsersSection() {
 
   const roleConfig = {
     admin: { label: 'Admin', class: 'bg-yellow-800 text-violet-800' },
-    vendor: { label: 'Vendor', class: 'bg-spruce-100 text-spruce-800' },
+    vendor: { label: 'Vendor', class: 'bg-admin-100 text-admin-900' },
     user: { label: 'User', class: 'bg-slate-100 text-slate-700' },
   };
 
@@ -50,7 +50,7 @@ export function AdminUsersSection() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-spruce-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">

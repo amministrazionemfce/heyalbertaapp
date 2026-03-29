@@ -37,6 +37,10 @@ export const CITY_IMAGES = {
     'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?auto=format&fit=crop&w=1200&q=80',
 };
 
-export function getCityImageUrl(cityName) {
-  return CITY_IMAGES[cityName] || FALLBACK;
+export function getCityImageUrl(cityName, overrides) {
+  const key = String(cityName || '').trim();
+  const lower = key.toLowerCase();
+  const o = overrides || {};
+  // Try exact, then try case-insensitive via lower-cased keys.
+  return o[key] || o[lower] || CITY_IMAGES[key] || FALLBACK;
 }

@@ -1,4 +1,7 @@
 node_modules
+backend/uploads
+# Wrong path used before upload.routes fix — ignore if recreated
+backend/src/uploads
 .env
 .env.local
 .env.development.local

@@ -10,7 +10,7 @@ const resourceSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["checklist", "guide", "faq"]
+      enum: ["checklist", "guide", "faq", "article", "news_category"]
     },
 
     content: {
@@ -22,6 +22,14 @@ const resourceSchema = new mongoose.Schema(
       type: String,
       default: "general"
     },
+
+    imageUrl: { type: String, default: "" },
+    excerpt: { type: String, default: "" },
+    featured: { type: Boolean, default: false },
+    sortOrder: { type: Number, default: 0 },
+    linkUrl: { type: String, default: "" },
+    publishedAt: { type: String, default: "" },
+    authorLabel: { type: String, default: "heyalberta" },
 
     createdAt: {
       type: String,
