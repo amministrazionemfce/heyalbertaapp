@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Star, Heart } from 'lucide-react';
+import { MapPin, Heart } from 'lucide-react';
+import StarRatingDisplay from './StarRatingDisplay';
 import { CATEGORIES } from '../data/categories';
 import { listingPath } from '../constants';
 import { getListingCoverImageUrl } from '../lib/listingCover';
@@ -13,6 +14,7 @@ export default function FeaturedListingCard({ listing }) {
   const vendor = listing.vendor || {};
   const categoryName = CATEGORIES.find((c) => c.id === listing.categoryId)?.name || listing.categoryId;
   const reviewCount = listing.reviewCount ?? 0;
+  const avgRating = listing.avgRating ?? listing.avg_rating;
   const features = Array.isArray(listing.features) ? listing.features : [];
   const cover = getListingCoverImageUrl(listing);
   const img =
@@ -76,10 +78,7 @@ export default function FeaturedListingCard({ listing }) {
               <MapPin className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate font-medium">{locationLine}</span>
             </div>
-            <div className="flex shrink-0 items-center gap-0.5 text-amber-500">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
-              <span className="text-xs font-semibold text-slate-600">({reviewCount})</span>
-            </div>
+            <StarRatingDisplay rating={avgRating} reviewCount={reviewCount} className="shrink-0 justify-end max-w-[50%]" />
           </div>
 
           <p className="mt-3 line-clamp-1 text-xs text-slate-500">{tagsLine}</p>

@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { adminAPI } from '../lib/api';
-import { Loader2, Megaphone, Settings } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { ADMIN_SECTIONS } from './admin/adminConfig';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminStatsSection } from './admin/AdminStatsSection';
-import { AdminPlaceholder } from './admin/AdminPlaceholder';
 import { AdminVendorsSection } from './admin/AdminVendorsSection';
 import { AdminListingsSection } from './admin/AdminListingsSection';
 import { AdminUsersSection } from './admin/AdminUsersSection';
@@ -14,6 +13,8 @@ import { AdminNewsSection } from './admin/AdminNewsSection';
 import { AdminCityImagesSection } from './admin/AdminCityImagesSection';
 import { AdminSupportSection } from './admin/AdminSupportSection';
 import { AdminMembershipsSection } from './admin/AdminMembershipsSection';
+import { AdminSettingsSection } from './admin/AdminSettingsSection';
+import { AdminMarketingSection } from './admin/AdminMarketingSection';
 import { ROUTES } from '../constants';
 
 export default function AdminDashboard() {
@@ -21,7 +22,8 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionParam = searchParams.get('section');
-  const normalizedSection = sectionParam === 'resources' ? 'news' : sectionParam;
+  const normalizedSection =
+    sectionParam === 'resources' ? 'news' : sectionParam === 'platform-reviews' ? 'general' : sectionParam;
   const validSection = ADMIN_SECTIONS.some((s) => s.id === normalizedSection) ? normalizedSection : 'statistics';
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,12 @@ export default function AdminDashboard() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (searchParams.get('section') === 'platform-reviews') {
+      setSearchParams({ section: 'general', tab: 'reviews' }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const refreshStats = () => {
     adminAPI.stats().then((r) => setStats(r.data)).catch(() => {});
@@ -76,13 +84,9 @@ export default function AdminDashboard() {
           {validSection === 'news' && <AdminNewsSection onUpdate={refreshStats} />}
           {validSection === 'support' && <AdminSupportSection onUpdate={refreshStats} />}
           {validSection === 'city-images' && <AdminCityImagesSection />}
-          {validSection === 'marketings' && (
-            <AdminPlaceholder icon={Megaphone} title="Marketings" description="Campaigns and promotions. Coming soon." />
-          )}
+          {validSection === 'marketings' && <AdminMarketingSection />}
           {validSection === 'memberships' && <AdminMembershipsSection onUpdate={refreshStats} />}
-          {validSection === 'general' && (
-            <AdminPlaceholder icon={Settings} title="General" description="Site settings and preferences. Coming soon." />
-          )}
+          {validSection === 'general' && <AdminSettingsSection onUpdate={refreshStats} />}
         </div>
       </main>
     </div>

@@ -21,53 +21,53 @@ const TIER_ICONS = {
   premium: Crown,
 };
 
-/** Visual theme per tier — free: spruce on white; standard: purple gradient + Best ribbon; gold: warm gradient. */
+/** Visual theme per tier — mid-depth gradients; white text stays readable. */
 function tierTheme(planId) {
   if (planId === 'free') {
     return {
-      card: 'border border-spruce-100 bg-white text-spruce-900 shadow-[0_10px_40px_-10px_rgba(15,76,58,0.12)]',
-      iconWrap: 'bg-spruce-50 text-spruce-700 ring-1 ring-spruce-200/90',
-      price: 'text-spruce-900',
-      freq: 'text-spruce-700',
-      altPrice: 'text-spruce-600/95',
-      rule: 'border-spruce-200',
-      planTitle: 'text-spruce-900',
-      desc: 'text-spruce-800',
-      feature: 'text-spruce-800',
-      checkBg: 'bg-spruce-100 text-spruce-800 ring-1 ring-spruce-200/80',
-      btnActive: '!rounded-full !bg-spruce-700 !text-white hover:!bg-spruce-800 !shadow-md !shadow-spruce-900/15',
-      btnCurrent: '!rounded-full !bg-spruce-100 !text-spruce-700 hover:!bg-spruce-100',
+      card: 'border-0 bg-gradient-to-b from-[#5f8f32] via-[#2dd4bf] to-[#0f766e] text-white shadow-[0_18px_50px_-14px_rgba(15,118,110,0.45)]',
+      iconWrap: 'bg-white/20 text-white ring-1 ring-white/45 backdrop-blur-sm',
+      price: 'text-white drop-shadow-sm',
+      freq: 'text-white',
+      altPrice: 'text-white/90',
+      rule: 'border-white/35',
+      planTitle: 'text-white drop-shadow-sm',
+      desc: 'text-white',
+      feature: 'text-white',
+      checkBg: 'bg-white/25 text-white ring-1 ring-white/40',
+      btnActive: '!rounded-full !bg-white !text-teal-900 hover:!bg-teal-50 !shadow-lg',
+      btnCurrent: '!rounded-full !bg-white/30 !text-white hover:!bg-white/35',
     };
   }
   if (planId === 'standard') {
     return {
-      card: 'border-0 bg-gradient-to-b from-[#c4b5fd] via-[#8b5cf6] to-[#5b21b6] text-white shadow-[0_14px_44px_-12px_rgba(91,33,182,0.55)]',
-      iconWrap: 'bg-white/15 text-white ring-1 ring-white/35 backdrop-blur-sm',
-      price: 'text-white',
-      freq: 'text-white/85',
-      altPrice: 'text-white/75',
-      rule: 'border-white/25',
-      planTitle: 'text-white',
-      desc: 'text-white/88',
-      feature: 'text-white/92',
-      checkBg: 'bg-white/20 text-white ring-white/30',
-      btnActive: '!rounded-full !bg-white !text-violet-700 hover:!bg-violet-50 !shadow-lg',
-      btnCurrent: '!rounded-full !bg-white/25 !text-white/80 hover:!bg-white/25',
+      card: 'border-0 bg-gradient-to-b from-[#8b5cf6] via-[#7c3aed] to-[#5b21b6] text-white shadow-[0_18px_48px_-12px_rgba(91,33,182,0.45)]',
+      iconWrap: 'bg-white/20 text-white ring-1 ring-white/40 backdrop-blur-sm',
+      price: 'text-white drop-shadow-sm',
+      freq: 'text-white',
+      altPrice: 'text-white/90',
+      rule: 'border-white/35',
+      planTitle: 'text-white drop-shadow-sm',
+      desc: 'text-white',
+      feature: 'text-white',
+      checkBg: 'bg-white/25 text-white ring-1 ring-white/40',
+      btnActive: '!rounded-full !bg-white !text-violet-800 hover:!bg-violet-50 !shadow-lg',
+      btnCurrent: '!rounded-full !bg-white/30 !text-white hover:!bg-white/35',
     };
   }
   return {
-    card: 'border-0 bg-gradient-to-b from-[#fb923c] via-[#f43f5e] to-[#9f1239] text-white shadow-[0_16px_48px_-12px_rgba(190,18,60,0.5)]',
-    iconWrap: 'bg-white/15 text-white ring-1 ring-white/35 backdrop-blur-sm',
-    price: 'text-white',
-    freq: 'text-white/85',
-    altPrice: 'text-white/75',
-    rule: 'border-white/25',
-    planTitle: 'text-white',
-    desc: 'text-white/88',
-    feature: 'text-white/92',
-    checkBg: 'bg-white/20 text-white ring-white/30',
-    btnActive: '!rounded-full !bg-white !text-rose-600 hover:!bg-rose-50 !shadow-lg',
-    btnCurrent: '!rounded-full !bg-white/25 !text-white/80 hover:!bg-white/25',
+    card: 'border-0 bg-gradient-to-b from-[#ea580c] via-[#e11d48] to-[#9f1239] text-white shadow-[0_18px_50px_-12px_rgba(159,18,57,0.45)]',
+    iconWrap: 'bg-white/20 text-white ring-1 ring-white/40 backdrop-blur-sm',
+    price: 'text-white drop-shadow-sm',
+    freq: 'text-white',
+    altPrice: 'text-white/90',
+    rule: 'border-white/35',
+    planTitle: 'text-white drop-shadow-sm',
+    desc: 'text-white',
+    feature: 'text-white',
+    checkBg: 'bg-white/25 text-white ring-1 ring-white/40',
+    btnActive: '!rounded-full !bg-white !text-rose-700 hover:!bg-rose-50 !shadow-lg',
+    btnCurrent: '!rounded-full !bg-white/30 !text-white hover:!bg-white/35',
   };
 }
 
@@ -393,7 +393,7 @@ export function MembershipTiersPreview({ form }) {
             </div>
           </div>
 
-          <div className="grid w-full gap-4 sm:gap-5 md:grid-cols-3 md:items-stretch md:gap-6 lg:gap-7">
+          <div className="mx-auto grid w-full max-w-6xl gap-4 sm:gap-5 md:grid-cols-3 md:items-stretch md:gap-6 lg:gap-7">
             {displayPlans.map((plan) => {
               const prices = getPlanPriceDisplay(plan, cadence);
               const isFeatured = plan.id === 'standard';

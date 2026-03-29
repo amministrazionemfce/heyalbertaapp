@@ -150,6 +150,8 @@ export const adminAPI = {
   updateSiteSettings: (data) => API.put('/admin/site-settings', data),
   contactMessages: (params) => API.get('/admin/contact-messages', { params }),
   markContactMessageRead: (id) => API.patch(`/admin/contact-messages/${id}/read`),
+  marketingRecipientPools: () => API.get('/admin/marketing/recipient-pools'),
+  sendMarketingEmail: (data) => API.post('/admin/marketing/send', data),
 };
 
 export default API;

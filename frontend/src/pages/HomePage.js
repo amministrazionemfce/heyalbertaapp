@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import FeaturedVendorsLogoGrid from '../components/FeaturedVendorsLogoGrid';
 import TestimonialsFlowSection from '../components/TestimonialsFlowSection';
-import CategoryBrowseCard from '../components/CategoryBrowseCard';
+import CategoryBrowseCarousel from '../components/CategoryBrowseCarousel';
 import CategoryBrowseToolbar from '../components/CategoryBrowseToolbar';
 import ExploreAlbertaCitiesSection from '../components/ExploreAlbertaCitiesSection';
 import FeaturedListingsSection from '../components/FeaturedListingsSection';
@@ -15,13 +15,10 @@ import HomePageHeroCarousel from '../components/HomePageHeroCarousel';
 import { CATEGORIES } from '../data/categories';
 import { directorySearchQuery } from '../constants';
 
-const INITIAL_CATEGORIES = 8;
-
 export default function HomePage() {
   const navigate = useNavigate();
   const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoriesExpanded, setCategoriesExpanded] = useState(false);
   const [listingCounts, setListingCounts] = useState({});
   const [cityCounts, setCityCounts] = useState({});
   const [categoryImageOverrides, setCategoryImageOverrides] = useState({});
@@ -70,8 +67,6 @@ export default function HomePage() {
     if (categoryOrder === 'review') return (a.name || '').localeCompare(b.name || '');
     return 0;
   });
-  const categoriesToShow = categoriesExpanded ? sortedCategories : sortedCategories.slice(0, INITIAL_CATEGORIES);
-
   return (
     <div data-testid="homepage">
       <HomePageHeroCarousel
@@ -82,7 +77,7 @@ export default function HomePage() {
         isMobile={isMobile}
       />
 
-      {/* Categories — eyebrow + grid (6 per row on xl) */}
+      {/* Categories — toolbar + horizontal carousel (same card size as former grid) */}
       <section className="pt-16 md:pt-24 pb-12 md:pb-20 bg-slate-50" data-testid="categories-section">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-10 md:mb-12 max-w-4xl mx-auto">
@@ -97,28 +92,13 @@ export default function HomePage() {
             onCategorySearchChange={setCategorySearch}
             categoryOrder={categoryOrder}
             onCategoryOrderChange={setCategoryOrder}
-            showExpandToggle={sortedCategories.length > INITIAL_CATEGORIES}
-            categoriesExpanded={categoriesExpanded}
-            onToggleCategoriesExpanded={() => setCategoriesExpanded((v) => !v)}
-            totalCategoriesShown={sortedCategories.length}
           />
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4 md:gap-5">
-            {categoriesToShow.map((cat) => {
-              const idx = CATEGORIES.findIndex((c) => c.id === cat.id);
-              const imageNum = idx >= 0 ? idx + 1 : 1;
-              const defaultImageSrc = `/services/${imageNum}.jpg`;
-              const imageSrc = categoryImageOverrides?.[cat.id] || defaultImageSrc;
-              return (
-                <CategoryBrowseCard
-                  key={cat.id}
-                  category={cat}
-                  listingCount={listingCounts[cat.id] ?? 0}
-                  imageSrc={imageSrc} 
-                />
-              );
-            })}
-          </div>
+          <CategoryBrowseCarousel
+            categories={sortedCategories}
+            listingCounts={listingCounts}
+            categoryImageOverrides={categoryImageOverrides}
+          />
         </div>
       </section>
 

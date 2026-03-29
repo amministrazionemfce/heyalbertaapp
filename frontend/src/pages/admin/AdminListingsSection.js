@@ -15,6 +15,11 @@ export function AdminListingsSection({ onUpdate }) {
     loading,
     statusFilter,
     setStatusFilter,
+    vendors,
+    vendorFilter,
+    setVendorFilter,
+    categoryFilter,
+    setCategoryFilter,
     search,
     setSearch,
     viewMode,
@@ -35,6 +40,11 @@ export function AdminListingsSection({ onUpdate }) {
         onSearchChange={setSearch}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
+        vendors={vendors}
+        vendorFilter={vendorFilter}
+        onVendorFilterChange={setVendorFilter}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
       />
@@ -48,9 +58,11 @@ export function AdminListingsSection({ onUpdate }) {
           <List className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-600 font-medium">No listings found</p>
           <p className="text-sm text-slate-500 mt-1">
-            {search ? 'Try a different search or clear filters.' : 'Change the status filter or wait for new listings.'}
+            {search || vendorFilter || categoryFilter
+              ? 'Try a different search, vendor, category, or clear filters.'
+              : 'Change the status filter or wait for new listings.'}
           </p>
-          {(search || statusFilter) && (
+          {(search || statusFilter || vendorFilter || categoryFilter) && (
             <Button variant="outline" className="mt-4" onClick={clearFilters}>
               Clear filters
             </Button>
@@ -63,11 +75,7 @@ export function AdminListingsSection({ onUpdate }) {
           onView={openDetail}
         />
       ) : (
-        <AdminListingsGrid
-          listings={filteredListings}
-          getCategoryName={getCategoryName}
-          onView={openDetail}
-        />
+        <AdminListingsGrid listings={filteredListings} onView={openDetail} />
       )}
 
       <AdminListingDetailDialog

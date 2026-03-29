@@ -46,6 +46,20 @@ const siteSettingsSchema = new mongoose.Schema(
     membershipFeaturesFree: { type: String, default: "" },
     membershipFeaturesStandard: { type: String, default: "" },
     membershipFeaturesPremium: { type: String, default: "" },
+    /** Home page testimonials (“What People Say About Us”) */
+    homeTestimonialsHeading: { type: String, default: "" },
+    homeTestimonials: {
+      type: [
+        {
+          id: { type: String, default: "" },
+          name: { type: String, default: "" },
+          time: { type: String, default: "" },
+          text: { type: String, default: "" },
+          rating: { type: Number, default: 5 },
+        },
+      ],
+      default: [],
+    },
   },
   { versionKey: false, timestamps: { createdAt: false, updatedAt: true } }
 );

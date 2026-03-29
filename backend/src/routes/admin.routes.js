@@ -13,6 +13,7 @@ import SiteSettings from "../models/SiteSettings.js";
 import ContactMessage from "../models/ContactMessage.js";
 import { matchReviewsByVendorId } from "../utils/reviewVendorQuery.js";
 import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
+import { sendMarketingBatch } from "../utils/mail.js";
 
 const router = express.Router();
 
@@ -292,11 +293,21 @@ router.get("/listings", requireAdmin, async (req, res) => {
 
     for (const list of listings) {
       const vendor = await Vendor.findById(list.vendorId);
+      const vendorLite = vendor
+        ? {
+            name: vendor.name ?? null,
+            city: vendor.city ?? null,
+            neighborhood: vendor.neighborhood ?? null,
+            images: Array.isArray(vendor.images) ? vendor.images : [],
+          }
+        : null;
+      const obj = list.toObject();
       result.push({
-        ...list.toObject(),
+        ...obj,
         id: list._id.toString(),
         vendorName: vendor?.name ?? null,
         vendorCity: vendor?.city ?? null,
+        vendor: vendorLite,
       });
     }
 
@@ -311,9 +322,25 @@ router.get("/listings", requireAdmin, async (req, res) => {
 ADMIN DASHBOARD STATS
 ------------------------------------------------
 */
+function adminMonthKeys(monthCount) {
+  const out = [];
+  const now = new Date();
+  for (let i = monthCount - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return out;
+}
+
+function docMonthKey(createdAt) {
+  if (createdAt == null || createdAt === "") return null;
+  const d = createdAt instanceof Date ? createdAt : new Date(createdAt);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 router.get("/stats", requireAdmin, async (req, res) => {
   try {
-
     const totalUsers = await User.countDocuments();
     const totalVendors = await Vendor.countDocuments();
     const pendingVendors = await Vendor.countDocuments({ status: "pending" });
@@ -321,6 +348,54 @@ router.get("/stats", requireAdmin, async (req, res) => {
     const totalReviews = await Review.countDocuments();
     const totalResources = await Resource.countDocuments();
     const unreadContactMessages = await ContactMessage.countDocuments({ read: false });
+
+    const usersByRole = {
+      admin: await User.countDocuments({ role: "admin" }),
+      vendor: await User.countDocuments({ role: "vendor" }),
+      user: await User.countDocuments({ role: "user" }),
+    };
+    const usersEmailVerified = await User.countDocuments({ emailVerified: true });
+    const usersEmailUnverified = Math.max(0, totalUsers - usersEmailVerified);
+
+    const vendorsFeatured = await Vendor.countDocuments({ featured: true });
+    const vendorsTierStandard = await Vendor.countDocuments({ tier: "standard" });
+    const vendorsTierPremium = await Vendor.countDocuments({ tier: "premium" });
+    const vendorsTierFree = Math.max(0, totalVendors - vendorsTierStandard - vendorsTierPremium);
+
+    const totalListings = await Listing.countDocuments();
+    const listingsPublished = await Listing.countDocuments({ status: "published" });
+    const listingsDraft = await Listing.countDocuments({ status: "draft" });
+    const listingsFeatured = await Listing.countDocuments({ featured: true });
+
+    const STANDARD_MRR_CAD = 15;
+    const PREMIUM_MRR_CAD = 20;
+    const estimatedMrrCad =
+      vendorsTierStandard * STANDARD_MRR_CAD + vendorsTierPremium * PREMIUM_MRR_CAD;
+
+    const monthKeys = adminMonthKeys(6);
+    const userDocs = await User.find({}, { createdAt: 1 }).lean();
+    const vendorDocs = await Vendor.find({}, { createdAt: 1 }).lean();
+    const listingDocs = await Listing.find({}, { createdAt: 1 }).lean();
+
+    const countInMonth = (docs, key) =>
+      docs.filter((d) => docMonthKey(d.createdAt) === key).length;
+
+    const trendLabels = monthKeys.map((k) => {
+      const [y, m] = k.split("-").map(Number);
+      return new Date(y, m - 1, 1).toLocaleString("en", { month: "short" });
+    });
+
+    const trends = {
+      labels: trendLabels,
+      newUsers: monthKeys.map((k) => countInMonth(userDocs, k)),
+      newVendors: monthKeys.map((k) => countInMonth(vendorDocs, k)),
+      newListings: monthKeys.map((k) => countInMonth(listingDocs, k)),
+    };
+
+    const stripeConnected = Boolean(
+      String(process.env.STRIPE_SECRET_KEY || "").trim() &&
+        !String(process.env.STRIPE_SECRET_KEY || "").startsWith("pk_")
+    );
 
     res.json({
       totalUsers,
@@ -330,8 +405,26 @@ router.get("/stats", requireAdmin, async (req, res) => {
       totalReviews,
       totalResources,
       unreadContactMessages,
+      usersByRole,
+      usersEmailVerified,
+      usersEmailUnverified,
+      vendorsFeatured,
+      vendorsByTier: {
+        free: vendorsTierFree,
+        standard: vendorsTierStandard,
+        premium: vendorsTierPremium,
+      },
+      totalListings,
+      listingsPublished,
+      listingsDraft,
+      listingsFeatured,
+      finance: {
+        estimatedMrrCad,
+        currency: "CAD",
+        stripeConnected,
+      },
+      trends,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -503,6 +596,7 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       "membershipFeaturesFree",
       "membershipFeaturesStandard",
       "membershipFeaturesPremium",
+      "homeTestimonialsHeading",
     ];
     for (const k of allowed) {
       if (req.body[k] !== undefined) s[k] = req.body[k];
@@ -524,6 +618,24 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       const raw = req.body.aboutMissionImages;
       s.aboutMissionImages = Array.isArray(raw)
         ? raw.map((x) => String(x ?? "").trim()).filter(Boolean)
+        : [];
+    }
+    if (req.body.homeTestimonials !== undefined) {
+      const raw = req.body.homeTestimonials;
+      s.homeTestimonials = Array.isArray(raw)
+        ? raw
+            .map((x, i) => {
+              const id = String(x?.id ?? "").trim() || `t-${i}`;
+              const rating = Math.min(5, Math.max(1, parseInt(String(x?.rating), 10) || 5));
+              return {
+                id,
+                name: String(x?.name ?? "").trim(),
+                time: String(x?.time ?? "").trim(),
+                text: String(x?.text ?? "").trim(),
+                rating,
+              };
+            })
+            .filter((x) => x.name && x.text)
         : [];
     }
     await s.save();
@@ -575,6 +687,108 @@ router.patch("/contact-messages/:id/read", requireAdmin, async (req, res) => {
     res.json(doc.toJSON());
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+});
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+function normalizeMarketingEmails(arr) {
+  const out = [];
+  const seen = new Set();
+  for (const x of arr || []) {
+    const e = String(x ?? "").trim().toLowerCase();
+    if (!EMAIL_RE.test(e) || seen.has(e)) continue;
+    seen.add(e);
+    out.push(e);
+  }
+  return out;
+}
+
+/*
+------------------------------------------------
+Marketing: recipient pools + send (SMTP via nodemailer)
+------------------------------------------------
+*/
+router.get("/marketing/recipient-pools", requireAdmin, async (req, res) => {
+  try {
+    const users = await User.find({}, { email: 1, role: 1, name: 1 }).lean();
+    const allUserEmails = [];
+    const vendorAccountEmails = [];
+    for (const u of users) {
+      const em = String(u.email || "").trim().toLowerCase();
+      if (!EMAIL_RE.test(em)) continue;
+      allUserEmails.push(em);
+      if (String(u.role || "").toLowerCase() === "vendor") {
+        vendorAccountEmails.push(em);
+      }
+    }
+
+    const vendors = await Vendor.find({}, { email: 1, name: 1 }).lean();
+    const vendorBusinessEmails = [];
+    for (const v of vendors) {
+      const em = String(v.email || "").trim().toLowerCase();
+      if (EMAIL_RE.test(em)) vendorBusinessEmails.push(em);
+    }
+
+    const uniq = (a) => [...new Set(a)].sort();
+
+    res.json({
+      allUsers: {
+        key: "allUsers",
+        label: "All registered users",
+        description: "Every account email in Users.",
+        emails: uniq(allUserEmails),
+      },
+      vendorBusinesses: {
+        key: "vendorBusinesses",
+        label: "All vendor business emails",
+        description: "Contact emails saved on vendor profiles.",
+        emails: uniq(vendorBusinessEmails),
+      },
+      vendorAccounts: {
+        key: "vendorAccounts",
+        label: "Vendor account logins",
+        description: "Users with the vendor role.",
+        emails: uniq(vendorAccountEmails),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/marketing/send", requireAdmin, async (req, res) => {
+  try {
+    const subject = String(req.body?.subject ?? "").trim();
+    const text = String(req.body?.body ?? req.body?.text ?? "").trim();
+    let recipients = normalizeMarketingEmails(req.body?.recipients);
+
+    if (!subject) {
+      return res.status(400).json({ message: "Subject is required." });
+    }
+    if (!text) {
+      return res.status(400).json({ message: "Message body is required." });
+    }
+    if (!recipients.length) {
+      return res.status(400).json({ message: "Select at least one recipient email." });
+    }
+    if (recipients.length > 500) {
+      return res.status(400).json({ message: "Maximum 500 recipients per send." });
+    }
+
+    const result = await sendMarketingBatch({ to: recipients, subject, text });
+    res.json({
+      message: `Sent ${result.sent} message(s).`,
+      ...result,
+    });
+  } catch (error) {
+    if (error.code === "MAIL_NOT_CONFIGURED") {
+      return res.status(503).json({
+        message:
+          "Email is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and MAIL_FROM on the server.",
+      });
+    }
+    res.status(500).json({ message: error.message || "Failed to send email." });
   }
 });
 

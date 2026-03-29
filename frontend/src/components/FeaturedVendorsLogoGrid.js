@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Star } from 'lucide-react';
+import { MapPin } from 'lucide-react';
+import StarRatingDisplay from './StarRatingDisplay';
 import { CATEGORIES, CATEGORY_IMAGES } from '../data/categories';
 import { ROUTES, vendorPath } from '../constants';
 import { vendorAPI } from '../lib/api';
@@ -27,6 +28,7 @@ function VendorCard({ vendor }) {
   const img = resolveVendorCardImage(vendor);
   const categoryName = CATEGORIES.find((c) => c.id === vendor.category)?.name || vendor.category;
   const reviewCount = vendor.review_count ?? 0;
+  const avgRating = vendor.avg_rating ?? vendor.avgRating;
   const locationLine = [vendor.city, 'Alberta'].filter(Boolean).join(', ') || 'Alberta';
   const subtitle = vendor.description?.trim()
     ? String(vendor.description).trim()
@@ -70,10 +72,7 @@ function VendorCard({ vendor }) {
               <MapPin className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate font-medium">{locationLine}</span>
             </div>
-            <div className="flex shrink-0 items-center gap-0.5 text-amber-500">
-              <Star className="h-4 w-4 fill-amber-400 text-amber-500" aria-hidden />
-              <span className="text-xs font-semibold text-slate-600">({reviewCount})</span>
-            </div>
+            <StarRatingDisplay rating={avgRating} reviewCount={reviewCount} className="shrink-0 justify-end max-w-[50%]" />
           </div>
 
           <p className="mt-3 line-clamp-1 text-xs text-slate-500">{subtitle}</p>
@@ -167,7 +166,7 @@ export default function FeaturedVendorsLogoGrid({ limit = 8 }) {
         <div className="mt-12 flex justify-center">
           <Link
             to={ROUTES.VENDORS}
-            className="inline-flex min-w-[200px] items-center justify-center rounded-full border-2 border-spruce-800 bg-white px-10 py-3 text-sm font-semibold text-spruce-900 shadow-sm transition hover:bg-spruce-900 hover:text-white"
+            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-spruce-900 via-spruce-800 to-spruce-700 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-800 hover:via-spruce-700 hover:to-spruce-600 hover:shadow-lg active:scale-[0.98]"
             data-testid="featured-vendors-view-more"
           >
             View more

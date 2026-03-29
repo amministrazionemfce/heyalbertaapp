@@ -1,11 +1,9 @@
 export const MEMBERSHIP_PLANS = Object.freeze([
   {
     id: 'free',
-    name: 'Free Vendor Listing',
-    tagline: 'Lead Generation',
+    name: 'Free',
     priceMonthlyLabel: '$0/month',
     priceYearlyLabel: null,
-    description: 'Seed supply, index vendors, and feed the upgrade funnel.',
     features: [
       '75-word description limit',
       'One image',
@@ -16,14 +14,12 @@ export const MEMBERSHIP_PLANS = Object.freeze([
   },
   {
     id: 'standard',
-    name: 'Standard Vendor Listing',
-    tagline: 'Conversion Focused',
+    name: 'Standard',
     /** Dual-currency amounts (Stripe may charge in one currency). */
     pricing: Object.freeze({
       monthly: Object.freeze({ cad: 15, usd: 11 }),
       yearly: Object.freeze({ cad: 160, usd: 118 }),
     }),
-    description: 'Core paid tier and default upgrade path for active vendors.',
     features: [
       'Expanded listing copy (unlimited text)',
       'Multiple images',
@@ -34,13 +30,11 @@ export const MEMBERSHIP_PLANS = Object.freeze([
   },
   {
     id: 'premium',
-    name: 'Gold Vendor Listing',
-    tagline: 'Demand Capture',
-    pricing: Object.freeze({
-      monthly: Object.freeze({ cad: 20, usd: 15 }),
-      yearly: Object.freeze({ cad: 200, usd: 150 }),
-    }),
-    description: 'Performance tier for vendors seeking volume and visibility.',
+    name: 'Gold',
+      pricing: Object.freeze({
+        monthly: Object.freeze({ cad: 20, usd: 15 }),
+        yearly: Object.freeze({ cad: 200, usd: 150 }),
+      }),
     features: [
       'Priority placement in category and city search results',
       'Highlighted placement in dynamic on-site ads',

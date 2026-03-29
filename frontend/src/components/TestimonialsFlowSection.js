@@ -1,51 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '../constants';
 import { Star } from 'lucide-react';
+import { siteAPI } from '../lib/api';
+import {
+  DEFAULT_HOME_TESTIMONIALS,
+  DEFAULT_TESTIMONIALS_HEADING,
+  formatTestimonialTimeLabel,
+  homeTestimonialsHeadingFromSettings,
+  mergeHomeTestimonialsFromSettings,
+} from '../data/homeTestimonials';
 
-/** Static testimonials — replace with API when available */
-const TESTIMONIALS = [
-  {
-    id: '1',
-    name: 'Priya K.',
-    time: '2 days ago',
-    text:
-      'Hey Alberta made finding a realtor and movers so simple. Everything was clear and the vendors actually responded!',
-    rating: 5,
-  },
-  {
-    id: '2',
-    name: 'Marcus T.',
-    time: '1 week ago',
-    text:
-      'We relocated from Ontario and used the guides plus the directory. Saved us hours of googling random companies.',
-    rating: 5,
-  },
-  {
-    id: '3',
-    name: 'Elena R.',
-    time: '2 weeks ago',
-    text:
-      'Loved how easy it was to compare childcare and healthcare providers for our family in one place.',
-    rating: 5,
-  },
-  {
-    id: '4',
-    name: 'James W.',
-    time: '3 weeks ago',
-    text:
-      'Clean layout, easy filters by city. Found a great home services company in Calgary within a day.',
-    rating: 5,
-  },
-];
-
-function TestimonialCard({ item }) {
-  const initials = item.name
+export function TestimonialCard({ item, disableReadMoreLink = false }) {
+  const initials = (item.name || 'U')
     .split(' ')
     .map((p) => p[0])
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const rating = Math.min(5, Math.max(0, Number(item.rating) || 0));
 
   return (
     <article
@@ -61,42 +35,49 @@ function TestimonialCard({ item }) {
         </div>
         <div className="min-w-0 flex-1 text-left">
           <p className="font-semibold text-slate-900">{item.name}</p>
-          <p className="text-xs text-slate-400">{item.time}</p>
+          <p className="text-xs text-slate-400">{formatTestimonialTimeLabel(item.time)}</p>
         </div>
       </div>
       <div className="mt-3 flex gap-0.5">
         {Array.from({ length: 5 }).map((_, i) => (
           <Star
             key={i}
-            className={`h-4 w-4 ${i < item.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
+            className={`h-4 w-4 ${i < rating ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
             aria-hidden
           />
         ))}
       </div>
       <p className="mt-3 text-left text-sm leading-relaxed text-slate-600 line-clamp-4">{item.text}</p>
-      <Link
-        to={ROUTES.ABOUT}
-        className="mt-2 inline-block text-sm font-semibold text-spruce-700 hover:text-spruce-800 hover:underline"
-      >
-        Read more
-      </Link>
+      {disableReadMoreLink ? (
+        <span className="mt-2 inline-block text-sm font-semibold text-slate-400">Read more</span>
+      ) : (
+        <Link
+          to={ROUTES.ABOUT}
+          className="mt-2 inline-block text-sm font-semibold text-spruce-700 hover:text-spruce-800 hover:underline"
+        >
+          Read more
+        </Link>
+      )}
     </article>
   );
 }
 
 /**
- * Auto-flowing horizontal marquee of testimonial cards + dot indicators synced to auto-rotate index.
+ * Same layout as the home page block.
  */
-export default function TestimonialsFlowSection() {
+export function TestimonialsFlowInner({ items, heading, disableReadMoreLink = false }) {
+  const list = items?.length ? items : DEFAULT_HOME_TESTIMONIALS.map((t) => ({ ...t }));
   const [active, setActive] = useState(0);
-  const loop = [...TESTIMONIALS, ...TESTIMONIALS];
+  const loop = [...list, ...list];
 
   useEffect(() => {
     const t = setInterval(() => {
-      setActive((i) => (i + 1) % TESTIMONIALS.length);
+      setActive((i) => (i + 1) % list.length);
     }, 5000);
     return () => clearInterval(t);
-  }, []);
+  }, [list.length]);
+
+  const title = heading?.trim() || DEFAULT_TESTIMONIALS_HEADING;
 
   return (
     <section
@@ -105,23 +86,25 @@ export default function TestimonialsFlowSection() {
     >
       <div className="container mx-auto max-w-7xl px-4 md:px-8">
         <h2 className="mb-10 text-center font-heading text-3xl font-bold text-slate-900 md:mb-12 md:text-4xl">
-          What People Say About Us
+          {title}
         </h2>
 
-        {/* Infinite marquee — duplicated list for seamless loop */}
         <div className="group relative overflow-hidden py-2">
           <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-slate-50 to-transparent md:w-20" />
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-white to-transparent md:w-20" />
           <div className="flex w-max animate-marquee gap-6 md:gap-8 group-hover:[animation-play-state:paused]">
             {loop.map((item, idx) => (
-              <TestimonialCard key={`${item.id}-${idx}`} item={item} />
+              <TestimonialCard
+                key={`${item.id}-${idx}`}
+                item={item}
+                disableReadMoreLink={disableReadMoreLink}
+              />
             ))}
           </div>
         </div>
 
-        {/* Dots — reflect auto-advance for visual feedback */}
         <div className="mt-8 flex justify-center gap-2" role="tablist" aria-label="Testimonial highlights">
-          {TESTIMONIALS.map((t, i) => (
+          {list.map((t, i) => (
             <button
               key={t.id}
               type="button"
@@ -138,4 +121,39 @@ export default function TestimonialsFlowSection() {
       </div>
     </section>
   );
+}
+
+export function TestimonialsFlowPreview({ items, heading, showPreviewBanner = true }) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl border border-slate-200 shadow-inner"
+      data-testid="testimonials-flow-preview"
+    >
+      <TestimonialsFlowInner items={items} heading={heading} disableReadMoreLink />
+    </div>
+  );
+}
+
+export default function TestimonialsFlowSection() {
+  const [siteSettings, setSiteSettings] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    siteAPI
+      .settings()
+      .then((r) => {
+        if (!cancelled) setSiteSettings(r.data || null);
+      })
+      .catch(() => {
+        if (!cancelled) setSiteSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const items = useMemo(() => mergeHomeTestimonialsFromSettings(siteSettings), [siteSettings]);
+  const heading = useMemo(() => homeTestimonialsHeadingFromSettings(siteSettings), [siteSettings]);
+
+  return <TestimonialsFlowInner items={items} heading={heading} />;
 }

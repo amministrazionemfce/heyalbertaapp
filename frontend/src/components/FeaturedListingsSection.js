@@ -94,7 +94,7 @@ export default function FeaturedListingsSection() {
         <div className="mt-12 flex justify-center">
           <Link
             to={viewMoreHref}
-            className="inline-flex min-w-[200px] items-center justify-center rounded-full border-2 border-spruce-800 bg-white px-10 py-3 text-sm font-semibold text-spruce-900 shadow-sm transition hover:bg-spruce-900 hover:text-white"
+            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-spruce-900 via-spruce-800 to-spruce-700 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-800 hover:via-spruce-700 hover:to-spruce-600 hover:shadow-lg active:scale-[0.98]"
             data-testid="featured-listings-view-more"
           >
             View more
