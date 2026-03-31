@@ -66,7 +66,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           <Link to={ROUTES.HOME} className="flex items-center gap-2 mb-6">
             <div className="w-25 h-16 flex items-center justify-center">
-              <img src="logo.png" alt="Hey Alberta Logo" className="w-full h-full object-cover" />
+              <img src={`${process.env.PUBLIC_URL || ''}/logo.png`} alt="Hey Alberta Logo" className="w-full h-full object-cover" />
             </div>
           </Link>
           <Link to={ROUTES.HOME} className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700 mb-8" data-testid="register-back-home">

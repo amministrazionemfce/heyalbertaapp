@@ -32,7 +32,9 @@ export function resolveMediaUrl(url) {
       if (sameOrigin || loopbackSamePort) {
         return `${apiBase}${u.pathname}${u.search}${u.hash}`;
       }
-      return trimmed;
+      // DB or older code may store full site URLs like https://heyalberta.com/uploads/...
+      // Files are always served by the API (Railway), not the static frontend host.
+      return `${apiBase}${u.pathname}${u.search}${u.hash}`;
     }
     if (trimmed.startsWith('/uploads')) {
       return `${apiBase}${trimmed}`;
