@@ -1,18 +1,18 @@
 node_modules
-backend/uploads
+# backend/uploads
 # Wrong path used before upload.routes fix — ignore if recreated
-backend/src/uploads
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-.env.development
-.env.test
-.env.production
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# backend/src/uploads
+# .env
+# .env.local
+# .env.development.local
+# .env.test.local
+# .env.production.local
+# .env.development
+# .env.test
+# .env.production
+# .env.local
+# .env.development.local
+# .env.test.local
+# .env.production.local
 
 *.deb
