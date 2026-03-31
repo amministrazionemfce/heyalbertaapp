@@ -22,7 +22,15 @@ const app = express();
 /** Comma-separated exact origins (no trailing slash). If unset, the cors package reflects the request Origin (fine for local dev). */
 const corsOrigin =
   process.env.CORS_ORIGINS?.trim()
-    ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean)
+    ? process.env.CORS_ORIGINS.split(",")
+        .map((s) =>
+          s
+            .trim()
+            // Railway / shells sometimes keep surrounding quotes: "https://example.com"
+            .replace(/^['"]+|['"]+$/g, "")
+            .replace(/\/$/, "")
+        )
+        .filter(Boolean)
     : true;
 
 const allowVercelPreview =
