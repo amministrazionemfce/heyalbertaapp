@@ -1,0 +1,1 @@
+{"indexes":[{"v":{"$numberInt":"2"},"key":{"_id":{"$numberInt":"1"}},"name":"_id_"},{"v":{"$numberInt":"2"},"key":{"cityName":{"$numberInt":"1"}},"name":"cityName_1","unique":true}],"uuid":"92264ccdb12b4b139d87936b41ad758a","collectionName":"cityimages","type":"collection"}
