@@ -9,10 +9,8 @@ import { stripeWebhookHandler } from "./routes/stripeWebhook.js";
 
 const __dirnameForEnv = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.join(__dirnameForEnv, "..");
-const repoRoot = path.join(__dirnameForEnv, "..", "..");
 
-// Root .env (e.g. MONGO_URL), then optional backend/.env and backend/.local.env (Stripe, etc.)
-dotenv.config({ path: path.join(repoRoot, ".env") });
+// Backend env only: backend/.env then backend/.local.env (Stripe, etc.)
 dotenv.config({ path: path.join(backendRoot, ".env") });
 dotenv.config({ path: path.join(backendRoot, ".local.env"), override: true });
 
