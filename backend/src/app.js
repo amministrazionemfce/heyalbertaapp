@@ -50,6 +50,8 @@ const corsOptions =
     : { origin: corsOrigin, credentials: true };
 
 app.use(cors(corsOptions));
+// Ensure preflight requests always get CORS headers (common when sending Authorization header).
+app.options("*", cors(corsOptions));
 
 app.use(
   "/uploads",
