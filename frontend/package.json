@@ -2,6 +2,7 @@
   "name": "frontend",
   "version": "1.0.0",
   "description": "",
+  "homepage": "https://heyalberta.com",
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
