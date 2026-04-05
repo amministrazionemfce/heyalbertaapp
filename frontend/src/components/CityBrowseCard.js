@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin } from 'lucide-react';
 import { directoryCityQuery } from '../constants';
@@ -8,6 +9,11 @@ import { directoryCityQuery } from '../constants';
 export default function CityBrowseCard({ cityName, listingCount = 0, imageSrc }) {
   const count = listingCount ?? 0;
   const slug = cityName.toLowerCase().replace(/\s+/g, '-');
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [imageSrc]);
 
   return (
     <Link
@@ -15,20 +21,20 @@ export default function CityBrowseCard({ cityName, listingCount = 0, imageSrc })
       className="group flex h-full w-full flex-col overflow-hidden rounded-2xl bg-slate-200 shadow-md ring-1 ring-black/5 transition-all duration-300 hover:shadow-xl hover:ring-black/10"
       data-testid={`city-card-${slug}`}
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden sm:aspect-[4/5]">
-        <img
-          src={imageSrc}
-          alt=""
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-          loading="lazy"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.style.display = 'none';
-            e.target.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
+      <div className="relative aspect-[1/1] w-full overflow-hidden sm:aspect-[5/6]">
+        {!imgFailed ? (
+          <img
+            src={imageSrc}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+          />
+        ) : null}
         <div
-          className="hidden absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-100 to-slate-200"
+          className={`absolute inset-0 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-slate-100 to-slate-200 ${
+            imgFailed ? '' : 'hidden'
+          }`}
           aria-hidden
         >
           <MapPin className="h-10 w-10 text-spruce-600/80" />

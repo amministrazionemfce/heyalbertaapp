@@ -29,6 +29,7 @@ const corsOrigin =
             // Railway / shells sometimes keep surrounding quotes: "https://example.com"
             .replace(/^['"]+|['"]+$/g, "")
             .replace(/\/$/, "")
+            .replace(/\r/g, "")
         )
         .filter(Boolean)
     : true;
@@ -36,30 +37,31 @@ const corsOrigin =
 const allowVercelPreview =
   process.env.CORS_ALLOW_VERCEL_PREVIEW === "1" || process.env.CORS_ALLOW_VERCEL_PREVIEW === "true";
 
-const corsOptions =
-  Array.isArray(corsOrigin) && allowVercelPreview
-    ? {
-        origin(origin, callback) {
-          if (!origin) return callback(null, true);
-          const normalized = origin.replace(/\/$/, "");
-          if (corsOrigin.includes(normalized)) return callback(null, true);
-          try {
-            const host = new URL(origin).hostname;
-            if (host === "vercel.app" || host.endsWith(".vercel.app")) {
-              return callback(null, true);
-            }
-          } catch {
-            /* ignore */
-          }
-          return callback(null, false);
-        },
-        credentials: true,
-      }
-    : { origin: corsOrigin, credentials: true };
+/**
+ * CRA / Vite often use http://localhost:PORT or http://127.0.0.1:PORT — different Origin strings.
+ * Use strings from CORS_ORIGINS plus RegExps here (cors supports both in one array). A dynamic
+ * `origin(origin, cb)` callback + Express 5 has led to preflight responses missing
+ * Access-Control-Allow-Origin while other CORS headers were still set.
+ */
+const loopbackHttpPatterns = [
+  /^http:\/\/localhost(?::\d+)?$/,
+  /^http:\/\/127\.0\.0\.1(?::\d+)?$/,
+  /^http:\/\/\[::1\](?::\d+)?$/,
+];
+
+const corsOptions = (() => {
+  if (!Array.isArray(corsOrigin)) {
+    return { origin: corsOrigin, credentials: true };
+  }
+  const matchers = [...corsOrigin, ...loopbackHttpPatterns];
+  if (allowVercelPreview) {
+    matchers.push(/^https:\/\/[\w.-]+\.vercel\.app$/);
+  }
+  return { origin: matchers, credentials: true };
+})();
 
 app.use(cors(corsOptions));
-// Ensure preflight requests always get CORS headers (common when sending Authorization header).
-app.options("*", cors(corsOptions));
+// Express 5 / path-to-regexp v8 rejects app.options('*', ...). `cors()` already handles OPTIONS preflight.
 
 app.use(
   "/uploads",

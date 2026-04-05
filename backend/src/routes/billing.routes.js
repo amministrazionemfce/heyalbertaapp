@@ -1,7 +1,9 @@
 import express from "express";
+import mongoose from "mongoose";
 import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.js";
-import Vendor from "../models/Vendor.js";
+import Listing from "../models/Listing.js";
+import User from "../models/User.js";
 import { planIdFromPriceId } from "../utils/stripePlan.js";
 import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
@@ -59,11 +61,14 @@ function priceIdFor(planId, cadence) {
 async function setVendorsTier(userId, tier) {
   const uid = String(userId || "");
   if (!uid) return;
+  const oid = mongoose.Types.ObjectId.isValid(uid) ? new mongoose.Types.ObjectId(uid) : uid;
   if (tier === "standard" || tier === "premium") {
-    await Vendor.updateMany({ userId: uid }, { $set: { tier } });
+    await Listing.updateMany({ userId: uid }, { $set: { tier } });
+    await User.updateOne({ _id: oid }, { $set: { billingTier: tier } });
     await setFeaturedForPaidUser(uid);
   } else {
-    await Vendor.updateMany({ userId: uid }, { $set: { tier: "free" } });
+    await Listing.updateMany({ userId: uid }, { $set: { tier: "free" } });
+    await User.updateOne({ _id: oid }, { $set: { billingTier: "free" } });
     await clearFeaturedForFreeUser(uid);
   }
 }
@@ -97,13 +102,29 @@ router.post("/checkout-session", requireAuth, async (req, res) => {
       });
     }
 
+    const email = String(req.user.email || "").trim();
+    let customerPayload = {};
+    if (email) {
+      const existing = await stripe.customers.list({ email, limit: 1 });
+      const cid = existing.data[0]?.id;
+      if (cid) customerPayload = { customer: cid };
+      else customerPayload = { customer_email: email };
+    }
+
     const session = await stripe.checkout.sessions.create({
       ui_mode: "embedded",
       mode: "subscription",
-      customer_email: req.user.email,
+      ...customerPayload,
       line_items: [{ price: priceId, quantity: 1 }],
       return_url: `${FRONTEND}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
       client_reference_id: req.user._id.toString(),
+      /** Restrict to cards (Link is a separate method in Dashboard; card-only reduces Link prompts). */
+      payment_method_types: ["card"],
+      consent_collection: {
+        payment_method_reuse_agreement: {
+          position: "hidden",
+        },
+      },
       metadata: {
         userId: req.user._id.toString(),
         planId,

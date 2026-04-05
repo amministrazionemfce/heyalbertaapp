@@ -1,3 +1,5 @@
+import { resolveMediaUrl } from '../lib/mediaUrl';
+
 /**
  * Hero-style images for Alberta city cards (Unsplash).
  */
@@ -41,6 +43,17 @@ export function getCityImageUrl(cityName, overrides) {
   const key = String(cityName || '').trim();
   const lower = key.toLowerCase();
   const o = overrides || {};
-  // Try exact, then try case-insensitive via lower-cased keys.
-  return o[key] || o[lower] || CITY_IMAGES[key] || FALLBACK;
+  const slugKey = lower.replace(/\s+/g, '-');
+  const pick = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return s || undefined;
+  };
+  // Overrides from API are lower-cased in ExploreAlbertaCitiesSection; also accept slug keys.
+  const raw =
+    pick(o[key]) ||
+    pick(o[lower]) ||
+    pick(o[slugKey]) ||
+    CITY_IMAGES[key] ||
+    FALLBACK;
+  return resolveMediaUrl(raw) || raw;
 }

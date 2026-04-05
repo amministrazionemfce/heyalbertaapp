@@ -8,6 +8,7 @@ import { Mountain, Loader2, ArrowLeft } from 'lucide-react';
 import { ROUTES } from '../constants';
 import { getApiErrorLines } from '../lib/formatApiError';
 import AuthFormError from '../components/AuthFormError';
+import { authAPI } from '../lib/api';
 
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -18,6 +19,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [apiErrorLines, setApiErrorLines] = useState([]);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState('');
 
   const clearApiError = () => setApiErrorLines([]);
 
@@ -28,6 +32,8 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setApiErrorLines([]);
+    setEmailNotVerified(false);
+    setResendMessage('');
     setLoading(true);
     try {
       const res = await login(email, password);
@@ -37,7 +43,12 @@ export default function LoginPage() {
       else if (res.user.role === 'vendor') navigate(ROUTES.DASHBOARD);
       else navigate(ROUTES.HOME);
     } catch (err) {
-      setApiErrorLines(getApiErrorLines(err));
+      if (err.isEmailNotVerified) {
+        setEmailNotVerified(true);
+        setApiErrorLines(getApiErrorLines(err));
+      } else {
+        setApiErrorLines(getApiErrorLines(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -96,6 +107,8 @@ export default function LoginPage() {
                 onChange={(e) => {
                   setEmail(e.target.value);
                   clearApiError();
+                  setEmailNotVerified(false);
+                  setResendMessage('');
                 }}
                 placeholder="you@example.com"
                 required
@@ -123,6 +136,34 @@ export default function LoginPage() {
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
               Log In
             </Button>
+            {emailNotVerified ? (
+              <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={resendLoading || !email.trim()}
+                  onClick={async () => {
+                    setResendMessage('');
+                    setResendLoading(true);
+                    try {
+                      const r = await authAPI.resendVerification({ email: email.trim() });
+                      setResendMessage(r.data?.message || 'Check your inbox.');
+                    } catch (e) {
+                      setResendMessage(
+                        e.response?.data?.message || 'Could not send email. Try again later.'
+                      );
+                    } finally {
+                      setResendLoading(false);
+                    }
+                  }}
+                >
+                  {resendLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Resend verification email
+                </Button>
+                {resendMessage ? <p className="text-center text-muted-foreground">{resendMessage}</p> : null}
+              </div>
+            ) : null}
           </form>
 
           <p className="text-xs text-muted-foreground text-center mt-6">

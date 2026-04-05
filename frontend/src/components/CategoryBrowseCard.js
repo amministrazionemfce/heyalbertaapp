@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getCategoryIcon } from '../data/categories';
 import { directoryCategoryQuery } from '../constants';
@@ -9,6 +10,11 @@ import { directoryCategoryQuery } from '../constants';
 export default function CategoryBrowseCard({ category, listingCount = 0, imageSrc }) {
   const Icon = getCategoryIcon(category.icon);
   const count = listingCount ?? 0;
+  const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [imageSrc]);
 
   return (
     <Link
@@ -17,19 +23,19 @@ export default function CategoryBrowseCard({ category, listingCount = 0, imageSr
       data-testid={`category-card-${category.id}`}
     >
       <div className="relative aspect-[3/4] w-full overflow-hidden sm:aspect-[4/5]">
-        <img
-          src={imageSrc}
-          alt=""
-          className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
-          loading="lazy"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.style.display = 'none';
-            e.target.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
+        {!imgFailed ? (
+          <img
+            src={imageSrc}
+            alt=""
+            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.04]"
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+          />
+        ) : null}
         <div
-          className="hidden absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200"
+          className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 ${
+            imgFailed ? '' : 'hidden'
+          }`}
           aria-hidden
         >
           <Icon className="h-12 w-12 text-spruce-600/80" />

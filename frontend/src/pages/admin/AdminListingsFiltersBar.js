@@ -140,9 +140,9 @@ export function AdminListingsFiltersBar({
               viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm border border-slate-200' : 'text-slate-600 hover:bg-white/80'
             }`}
             data-testid="listings-view-list"
-            title="Grid view"
+            title="Card view (same as directory)"
           >
-            <LayoutGrid className="w-4 h-4" /> List
+            <LayoutGrid className="w-4 h-4" /> Cards
           </button>
         </div>
       </div>

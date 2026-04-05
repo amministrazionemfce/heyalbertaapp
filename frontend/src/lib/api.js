@@ -56,6 +56,9 @@ export const authAPI = {
   login: (data) => API.post('/auth/login', data),
   me: () => API.get('/auth/me'),
   updateMe: (data) => API.patch('/auth/me', data),
+  verifyEmail: (token) =>
+    API.get('/auth/verify-email', { params: { token } }),
+  resendVerification: (body) => API.post('/auth/resend-verification', body),
 };
 
 /** Stripe: backend creates Checkout / Customer Portal sessions (requires auth). */
@@ -64,11 +67,11 @@ export const billingAPI = {
   getCheckoutSessionStatus: (sessionId) =>
     API.get('/billing/checkout-session-status', { params: { session_id: sessionId } }),
   createPortalSession: () => API.post('/billing/portal-session', {}),
-  /** Refresh Vendor.tier from Stripe (after checkout or if webhook missed). */
+  /** Refresh listing tiers from Stripe (after checkout or if webhook missed). */
   syncSubscription: () => API.post('/billing/sync-subscription', {}),
 };
 
-/** Upload a promotional video (auth required). Returns `{ url }` for storing on vendor.videoUrl. */
+/** Upload a promotional video (auth required). Returns `{ url }` for storing on listing.videoUrl. */
 function uploadHeaders(extra = {}) {
   const token = localStorage.getItem('hey_alberta_token');
   return {
@@ -104,29 +107,16 @@ export function uploadAdminImage(file) {
   });
 }
 
-// Vendors
-export const vendorAPI = {
-  list: (params) => API.get('/vendors', { params }),
-  count: () => API.get('/vendors/count'),
-  get: (id) => API.get(`/vendors/${id}`),
-  create: (data) => API.post('/vendors', data),
-  update: (id, data) => API.put(`/vendors/${id}`, data),
-  delete: (id) => API.delete(`/vendors/${id}`),
-  myVendors: () => API.get('/my-vendors'),
-};
-
-// Reviews (backend: /reviews/vendors/:vendorId)
+// Reviews (per listing)
 export const reviewAPI = {
-  list: (vendorId) => API.get(`/reviews/vendors/${vendorId}`),
-  create: (vendorId, data) => API.post(`/reviews/vendors/${vendorId}`, data),
+  list: (listingId) => API.get(`/reviews/listings/${listingId}`),
+  create: (listingId, data) => API.post(`/reviews/listings/${listingId}`, data),
   reply: (reviewId, data) => API.put(`/reviews/${reviewId}/reply`, data),
 };
 
-// Listings (per-vendor listings, not the Vendor/business)
 export const listingAPI = {
   get: (id) => API.get(`/listings/${id}`),
   myListings: () => API.get('/listings/my-listings'),
-  listByVendor: (vendorId) => API.get('/listings/listByVendor', { params: { vendorId } }),
   countsByCategory: () => API.get('/listings/counts-by-category'),
   countsByCity: () => API.get('/listings/counts-by-city'),
   cityImages: () => API.get('/listings/city-images'),
@@ -135,6 +125,7 @@ export const listingAPI = {
   create: (data) => API.post('/listings', data),
   update: (id, data) => API.put(`/listings/${id}`, data),
   delete: (id) => API.delete(`/listings/${id}`),
+  deleteMine: () => API.delete('/listings/mine'),
 };
 
 // Categories
@@ -160,18 +151,20 @@ export const contactAPI = {
   submit: (data) => API.post('/contact', data),
 };
 
+/** Public — subscribe email for new article notifications */
+export const newsSubscribeAPI = {
+  subscribe: (email) => API.post('/news-subscribe', { email }),
+};
+
 // Admin
 export const adminAPI = {
-  vendors: (params) => API.get('/admin/vendors', { params }),
-  getVendor: (id) => API.get(`/admin/vendors/${id}`),
-  updateVendor: (id, data) => API.put(`/admin/vendors/${id}`, data),
-  approveVendor: (id) => API.put(`/admin/vendors/${id}/approve`),
-  rejectVendor: (id) => API.put(`/admin/vendors/${id}/reject`),
-  /** Cascade: deletes all listings & reviews for this vendor, then the vendor. */
-  deleteVendor: (id, body) => API.delete(`/admin/vendors/${id}`, { data: body || {} }),
   listings: (params) => API.get('/admin/listings', { params }),
+  moderateListing: (listingId, body) => API.put(`/admin/listings/${listingId}/moderation`, body),
   stats: () => API.get('/admin/stats'),
-  users: () => API.get('/admin/users'),
+  /** @param {Record<string, string|number>} [params] — page, limit, q, roleFilter, membershipFilter, sort, order */
+  users: (params) => API.get('/admin/users', { params: params || {} }),
+  emailUsers: (body) => API.post('/admin/users/email', body),
+  bulkDeleteUsers: (body) => API.post('/admin/users/bulk-delete', body),
   cityImages: () => API.get('/admin/city-images'),
   updateCityImages: (cities) => API.put('/admin/city-images', { cities }),
   categoryImages: () => API.get('/admin/category-images'),
@@ -182,6 +175,7 @@ export const adminAPI = {
   markContactMessageRead: (id) => API.patch(`/admin/contact-messages/${id}/read`),
   marketingRecipientPools: () => API.get('/admin/marketing/recipient-pools'),
   sendMarketingEmail: (data) => API.post('/admin/marketing/send', data),
+  newsSubscribers: () => API.get('/admin/news-subscribers'),
 };
 
 export default API;

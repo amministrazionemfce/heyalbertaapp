@@ -29,7 +29,9 @@ const resourceSchema = new mongoose.Schema(
     sortOrder: { type: Number, default: 0 },
     linkUrl: { type: String, default: "" },
     publishedAt: { type: String, default: "" },
-    authorLabel: { type: String, default: "heyalberta" },
+    authorLabel: { type: String, default: "" },
+    /** When true, public news card shows only image, date, and Learn more (no title/excerpt). */
+    hideCardText: { type: Boolean, default: false },
 
     createdAt: {
       type: String,

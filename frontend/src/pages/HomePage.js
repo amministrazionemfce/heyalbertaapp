@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import FeaturedVendorsLogoGrid from '../components/FeaturedVendorsLogoGrid';
 import TestimonialsFlowSection from '../components/TestimonialsFlowSection';
 import CategoryBrowseCarousel from '../components/CategoryBrowseCarousel';
-import CategoryBrowseToolbar from '../components/CategoryBrowseToolbar';
 import ExploreAlbertaCitiesSection from '../components/ExploreAlbertaCitiesSection';
 import FeaturedListingsSection from '../components/FeaturedListingsSection';
 import HomeCtaSection from '../components/HomeCtaSection';
@@ -22,8 +20,6 @@ export default function HomePage() {
   const [listingCounts, setListingCounts] = useState({});
   const [cityCounts, setCityCounts] = useState({});
   const [categoryImageOverrides, setCategoryImageOverrides] = useState({});
-  const [categorySearch, setCategorySearch] = useState('');
-  const [categoryOrder, setCategoryOrder] = useState('listing'); // 'listing' | 'review' | 'popular'
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [siteSettings, setSiteSettings] = useState(null);
 
@@ -51,21 +47,10 @@ export default function HomePage() {
     }
   };
 
-  // Filter and sort categories for Browse section
-  const categoryFilterLower = categorySearch.trim().toLowerCase();
-  const filteredCategories = !categoryFilterLower
-    ? CATEGORIES
-    : CATEGORIES.filter(
-        (c) =>
-          c.name.toLowerCase().includes(categoryFilterLower) ||
-          (c.description && c.description.toLowerCase().includes(categoryFilterLower))
-      );
-  const sortedCategories = [...filteredCategories].sort((a, b) => {
+  const sortedCategories = [...CATEGORIES].sort((a, b) => {
     const countA = listingCounts[a.id] ?? 0;
     const countB = listingCounts[b.id] ?? 0;
-    if (categoryOrder === 'listing' || categoryOrder === 'popular') return countB - countA;
-    if (categoryOrder === 'review') return (a.name || '').localeCompare(b.name || '');
-    return 0;
+    return countB - countA;
   });
   return (
     <div data-testid="homepage">
@@ -77,7 +62,7 @@ export default function HomePage() {
         isMobile={isMobile}
       />
 
-      {/* Categories — toolbar + horizontal carousel (same card size as former grid) */}
+      {/* Categories — horizontal carousel */}
       <section className="pt-16 md:pt-24 pb-12 md:pb-20 bg-slate-50" data-testid="categories-section">
         <div className="container mx-auto px-4 md:px-8 max-w-7xl">
           <div className="text-center mb-10 md:mb-12 max-w-4xl mx-auto">
@@ -86,13 +71,6 @@ export default function HomePage() {
               Browse Top Categories.
             </h2>
           </div>
-
-          <CategoryBrowseToolbar
-            categorySearch={categorySearch}
-            onCategorySearchChange={setCategorySearch}
-            categoryOrder={categoryOrder}
-            onCategoryOrderChange={setCategoryOrder}
-          />
 
           <CategoryBrowseCarousel
             categories={sortedCategories}
@@ -103,8 +81,6 @@ export default function HomePage() {
       </section>
 
       <FeaturedListingsSection />
-
-      <FeaturedVendorsLogoGrid />
 
       <ExploreAlbertaCitiesSection cityCounts={cityCounts} />
 

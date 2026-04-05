@@ -53,7 +53,7 @@ export function AdminStatsSection({ stats }) {
           <SectorCardHeader
             icon={Store}
             iconBg="bg-emerald-600"
-            title="Vendors"
+            title="Sellers"
             total={stats?.totalVendors ?? 0}
           />
           <ul className="text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4 flex-1">
@@ -109,9 +109,8 @@ export function AdminStatsSection({ stats }) {
 
       <div>
         <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Growth (last 6 months)</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SimpleLineChart title="New users" labels={labels} values={trends.newUsers} color={CHART_COLOR} />
-          <SimpleLineChart title="New vendors" labels={labels} values={trends.newVendors} color={CHART_COLOR} />
           <SimpleLineChart title="New listings" labels={labels} values={trends.newListings} color={CHART_COLOR} />
         </div>
       </div>

@@ -113,7 +113,7 @@ export default function AboutPage() {
   }, []);
 
   const heroRaw = settings?.aboutHeroImage?.trim();
-  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : null;
+  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : '/about.jpeg';
 
   const handleListBusiness = () => {
     if (!user) {
@@ -130,15 +130,9 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen" data-testid="about-page">
       {/* Hero — all text centered */}
-      <section className="relative py-20 md:py-28 overflow-hidden">
-        {heroSrc ? (
-          <>
-            <img src={heroSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-spruce-900/82" aria-hidden />
-          </>
-        ) : (
-          <div className="absolute inset-0 bg-spruce-700" aria-hidden />
-        )}
+      <section className="relative overflow-hidden py-20 md:py-28">
+        <img src={heroSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-spruce-900/82" aria-hidden />
         <div className="relative z-10 container mx-auto px-4 md:px-8 max-w-7xl text-center">
           <div className="max-w-3xl mx-auto">
           

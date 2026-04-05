@@ -14,7 +14,7 @@ export const MAIN_NAV_LINKS = Object.freeze([
 
 /** Footer — “Quick Links” column */
 export const FOOTER_QUICK_LINKS = Object.freeze([
-  { to: ROUTES.LISTINGS, label: 'Vendor Directory' },
+  { to: ROUTES.LISTINGS, label: 'Browse listings' },
   { to: ROUTES.NEWS, label: 'News' },
   { to: ROUTES.ABOUT, label: 'About Us' },
   { to: ROUTES.CONTACT, label: 'Contact' },

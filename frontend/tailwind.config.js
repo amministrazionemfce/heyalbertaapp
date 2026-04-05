@@ -107,6 +107,17 @@ module.exports = {
         },
       },
       fontFamily: {
+        /** System UI stack — clean, native feel for dense UI (tables, pagination). */
+        ui: [
+          'system-ui',
+          '-apple-system',
+          'BlinkMacSystemFont',
+          '"Segoe UI"',
+          'Roboto',
+          '"Helvetica Neue"',
+          'Arial',
+          'sans-serif',
+        ],
         heading: ['"Outfit"', 'sans-serif'],
         body: ['"Inter"', 'sans-serif'],
         accent: ['"Playfair Display"', 'serif'],

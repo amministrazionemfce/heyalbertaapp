@@ -6,14 +6,16 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
 import DirectoryPage from './pages/DirectoryPage';
-import VendorsPage from './pages/VendorsPage';
-import VendorDetailPage from './pages/VendorDetailPage';
+import {
+  RedirectVendorsIndexToListings,
+  RedirectVendorDetailToListings,
+} from './components/VendorBrowseRedirects';
 import ListingDetailPage from './pages/ListingDetailPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
-import AdminVendorDetailPage from './pages/admin/AdminVendorDetailPage';
 import NewsPage from './pages/NewsPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
@@ -21,6 +23,7 @@ import ProfilePage from './pages/ProfilePage';
 import CheckoutContinuePage from './pages/CheckoutContinuePage';
 import CheckoutReturnPage from './pages/CheckoutReturnPage';
 import { CheckoutLoadingProvider } from './lib/checkoutLoadingContext';
+import { CookieConsentProvider } from './components/CookieConsentBanner';
 import { ROUTES, ROUTE_PATTERNS } from './constants';
 
 function Layout({ children, hideNav }) {
@@ -37,6 +40,7 @@ function App() {
   return (
     <AuthProvider>
       <CheckoutLoadingProvider>
+      <CookieConsentProvider>
       <BrowserRouter>
         <Toaster
           position="top-right"
@@ -61,25 +65,32 @@ function App() {
           {/* Auth pages without nav */}
           <Route path={ROUTES.LOGIN} element={<Layout hideNav><LoginPage /></Layout>} />
           <Route path={ROUTES.REGISTER} element={<Layout hideNav><RegisterPage /></Layout>} />
+          <Route path={ROUTES.VERIFY_EMAIL} element={<Layout hideNav><VerifyEmailPage /></Layout>} />
           <Route path={ROUTES.CHECKOUT} element={<Layout hideNav><CheckoutContinuePage /></Layout>} />
           <Route path={ROUTES.CHECKOUT_RETURN} element={<Layout hideNav><CheckoutReturnPage /></Layout>} />
 
           {/* Pages with nav */}
           <Route path={ROUTES.HOME} element={<Layout><HomePage /></Layout>} />
-          <Route path={ROUTES.VENDORS} element={<Layout><VendorsPage /></Layout>} />
-          <Route path={ROUTE_PATTERNS.VENDOR_DETAIL} element={<Layout><VendorDetailPage /></Layout>} />
+          <Route
+            path={ROUTES.VENDORS}
+            element={<Layout><RedirectVendorsIndexToListings /></Layout>}
+          />
+          <Route
+            path={ROUTE_PATTERNS.VENDOR_DETAIL}
+            element={<Layout><RedirectVendorDetailToListings /></Layout>}
+          />
           <Route path={ROUTE_PATTERNS.LISTING_DETAIL} element={<Layout><ListingDetailPage /></Layout>} />
           <Route path={ROUTES.LISTINGS} element={<Layout><DirectoryPage /></Layout>} />
           <Route path={ROUTES.PROFILE} element={<Layout><ProfilePage /></Layout>} />
           <Route path={ROUTES.DASHBOARD} element={<Layout><VendorDashboard /></Layout>} />
           <Route path={ROUTES.ADMIN} element={<Layout><AdminDashboard /></Layout>} />
-          <Route path={ROUTE_PATTERNS.ADMIN_VENDOR} element={<Layout><AdminVendorDetailPage /></Layout>} />
           <Route path={ROUTES.NEWS} element={<Layout><NewsPage /></Layout>} />
           <Route path={ROUTES.RESOURCES} element={<Navigate to={ROUTES.NEWS} replace />} />
           <Route path={ROUTES.ABOUT} element={<Layout><AboutPage /></Layout>} />
           <Route path={ROUTES.CONTACT} element={<Layout><ContactPage /></Layout>} />
         </Routes>
       </BrowserRouter>
+      </CookieConsentProvider>
       </CheckoutLoadingProvider>
     </AuthProvider>
   );

@@ -2,48 +2,46 @@ import mongoose from "mongoose";
 
 const reviewSchema = new mongoose.Schema(
   {
-    listingId: { type: String },
-    vendorId: {
+    listingId: {
       type: String,
-      required: true
+      required: true,
     },
     userId: {
       type: String,
-      required: true
+      required: true,
     },
 
     userName: {
       type: String,
-      required: true
+      required: true,
     },
 
     rating: {
       type: Number,
       min: 1,
       max: 5,
-      required: true
+      required: true,
     },
 
     comment: {
       type: String,
-      required: true
+      required: true,
     },
 
     reply: {
       type: String,
-      default: null
+      default: null,
     },
 
     createdAt: {
       type: String,
-      default: () => new Date().toISOString()
-    }
+      default: () => new Date().toISOString(),
+    },
   },
-  { versionKey: false }
+  { versionKey: false, strict: true }
 );
 
-/** One review per user per vendor (company). */
-reviewSchema.index({ vendorId: 1, userId: 1 }, { unique: true });
+reviewSchema.index({ listingId: 1, userId: 1 }, { unique: true });
 
 reviewSchema.virtual("id").get(function () {
   return this._id.toString();

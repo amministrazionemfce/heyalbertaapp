@@ -27,19 +27,33 @@ export function AuthProvider({ children }) {
 
   useEffect(() => { loadUser(); }, [loadUser]);
 
+  const applySession = useCallback((token, userObj) => {
+    if (token) localStorage.setItem('hey_alberta_token', token);
+    if (userObj) {
+      localStorage.setItem('hey_alberta_user', JSON.stringify(userObj));
+      setUser(userObj);
+    }
+  }, []);
+
   const login = async (email, password) => {
-    const res = await authAPI.login({ email, password });
-    localStorage.setItem('hey_alberta_token', res.data.token);
-    localStorage.setItem('hey_alberta_user', JSON.stringify(res.data.user));
-    setUser(res.data.user);
-    return res.data;
+    try {
+      const res = await authAPI.login({ email, password });
+      applySession(res.data.token, res.data.user);
+      return res.data;
+    } catch (e) {
+      if (e.response?.status === 403 && e.response?.data?.code === 'EMAIL_NOT_VERIFIED') {
+        e.isEmailNotVerified = true;
+      }
+      throw e;
+    }
   };
 
   const register = async (name, email, password, role = 'user') => {
     const res = await authAPI.register({ name, email, password, role });
-    localStorage.setItem('hey_alberta_token', res.data.token);
-    localStorage.setItem('hey_alberta_user', JSON.stringify(res.data.user));
-    setUser(res.data.user);
+    const { token, user: u } = res.data;
+    if (token) {
+      applySession(token, u);
+    }
     return res.data;
   };
 
@@ -66,7 +80,19 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, upgradeToVendor, updateProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        logout,
+        upgradeToVendor,
+        updateProfile,
+        refreshUser: loadUser,
+        applySession,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

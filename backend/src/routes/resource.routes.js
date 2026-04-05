@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import Resource from "../models/Resource.js";
 import { requireAdmin } from "../middleware/admin.js";
+import { notifyNewsSubscribersForArticle } from "../utils/notifyNewsSubscribers.js";
 
 const router = express.Router();
 
@@ -63,10 +64,8 @@ router.post("/", requireAdmin, async (req, res) => {
         body.publishedAt != null && String(body.publishedAt).trim() !== ""
           ? String(body.publishedAt).trim()
           : "",
-      authorLabel:
-        body.authorLabel != null && String(body.authorLabel).trim() !== ""
-          ? String(body.authorLabel).trim()
-          : "heyalberta",
+      authorLabel: body.authorLabel != null ? String(body.authorLabel).trim() : "",
+      hideCardText: Boolean(body.hideCardText),
       createdAt: new Date().toISOString()
     };
 
@@ -81,6 +80,10 @@ router.post("/", requireAdmin, async (req, res) => {
     }
 
     const resource = await Resource.create(payload);
+    if (payload.type === "article") {
+      const plain = resource.toObject ? resource.toObject({ virtuals: true }) : resource;
+      notifyNewsSubscribersForArticle(plain).catch(() => {});
+    }
     res.json(resource);
   } catch (err) {
     console.error("POST /resources", err);
@@ -114,6 +117,7 @@ router.put("/:id", requireAdmin, async (req, res) => {
     "linkUrl",
     "publishedAt",
     "authorLabel",
+    "hideCardText",
   ];
   const payload = {};
   for (const key of allowed) {

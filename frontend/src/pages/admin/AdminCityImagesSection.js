@@ -170,7 +170,7 @@ export function AdminCityImagesSection() {
   const aboutHeroPreview =
     (aboutHeroUrl && (resolveMediaUrl(aboutHeroUrl) || aboutHeroUrl)) || '';
   const contactHeroPreview =
-    (contactHeroUrl && (resolveMediaUrl(contactHeroUrl) || contactHeroUrl)) || '';
+    (contactHeroUrl && (resolveMediaUrl(contactHeroUrl) || contactHeroUrl)) || '/support.jpeg';
   const newsHeroPreview = (newsHeroUrl && (resolveMediaUrl(newsHeroUrl) || newsHeroUrl)) || '';
 
   const handlePageBannerUpload = async (which, e) => {
@@ -455,7 +455,10 @@ export function AdminCityImagesSection() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 md:gap-6">
             {CATEGORIES.map((cat) => {
               const currentInput = categoryValues?.[cat.id] ?? '';
-              const previewSrc = categoryValues?.[cat.id] ? currentInput : defaultCategoryImageSrc(cat.id);
+              const rawPreview = (categoryValues?.[cat.id] || '').trim()
+                ? currentInput
+                : defaultCategoryImageSrc(cat.id);
+              const previewSrc = resolveMediaUrl(rawPreview) || rawPreview;
 
               return (
                 <div key={cat.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-3">

@@ -12,6 +12,8 @@ export const ROUTES = Object.freeze({
   CONTACT: '/contact',
   REGISTER: '/register',
   LOGIN: '/login',
+  /** Email verification landing (query: token) */
+  VERIFY_EMAIL: '/verify-email',
   /** Pre-Stripe subscription review (split layout like login) */
   CHECKOUT: '/checkout',
   CHECKOUT_RETURN: '/checkout/return',
@@ -20,6 +22,7 @@ export const ROUTES = Object.freeze({
   ADMIN: '/admin',
   /** Base segments for dynamic paths */
   LISTINGS: '/listings',
+  /** @deprecated Public browse uses listings only; `/vendors` redirects to `/listings`. */
   VENDORS: '/vendors',
 });
 
@@ -27,7 +30,7 @@ export const ROUTES = Object.freeze({
 export const ROUTE_PATTERNS = Object.freeze({
   VENDOR_DETAIL: '/vendors/:id',
   LISTING_DETAIL: '/listings/:id',
-  /** Admin-only vendor management */
+  /** @deprecated Listings-only admin; use admin listings. Kept for old bookmarks. */
   ADMIN_VENDOR: '/admin/vendors/:vendorId',
 });
 
@@ -38,13 +41,15 @@ export function listingPath(id) {
   return `${ROUTES.LISTINGS}/${id}`;
 }
 
-export function vendorPath(id) {
-  return `${ROUTES.VENDORS}/${id}`;
+/** All public seller links go to the listings directory filtered by account (userId). */
+export function vendorPath(userId) {
+  if (userId == null || userId === '') return ROUTES.LISTINGS;
+  return `${ROUTES.LISTINGS}?userId=${encodeURIComponent(String(userId))}`;
 }
 
-/** Admin dashboard — single vendor review / actions */
-export function adminVendorPath(id) {
-  return `${ROUTES.ADMIN}/vendors/${id}`;
+/** @deprecated Vendors admin removed; opens admin home. */
+export function adminVendorPath(_userId) {
+  return ROUTES.ADMIN;
 }
 
 export function directoryCategoryQuery(categoryId) {

@@ -29,6 +29,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [validationError, setValidationError] = useState(initialValdationError);
   const [apiErrorLines, setApiErrorLines] = useState([]);
+  const [postRegisterMessage, setPostRegisterMessage] = useState('');
 
   useEffect(() => {
     if (user) navigate(ROUTES.HOME, { replace: true });
@@ -49,8 +50,12 @@ export default function RegisterPage() {
     }
     setLoading(true);
     try {
-      await register(name, email, password, role);
-      
+      setPostRegisterMessage('');
+      const data = await register(name, email, password, role);
+      if (data.requiresVerification && !data.token) {
+        setPostRegisterMessage(data.message || 'Check your email to verify your account, then log in.');
+        return;
+      }
       if (role === 'vendor') navigate(ROUTES.DASHBOARD);
       else navigate(ROUTES.HOME);
     } catch (err) {
@@ -81,6 +86,15 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">
             <AuthFormError lines={apiErrorLines} data-testid="register-api-error" />
+            {postRegisterMessage ? (
+              <p className="rounded-md border border-spruce-200 bg-spruce-50 px-3 py-2 text-sm text-spruce-900" role="status">
+                {postRegisterMessage}{' '}
+                <Link to={ROUTES.LOGIN} className="font-medium underline">
+                  Log in
+                </Link>{' '}
+                after you verify.
+              </p>
+            ) : null}
 
             <div>
               <Label htmlFor="name">Full Name</Label>

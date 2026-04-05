@@ -11,7 +11,7 @@ export function AdminListingsTable({ listings, getCategoryName, onView }) {
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
               <th className="text-left p-4 font-semibold text-slate-700">Title</th>
-              <th className="text-left p-4 font-semibold text-slate-700">Vendor</th>
+              <th className="text-left p-4 font-semibold text-slate-700">Seller</th>
               <th className="text-left p-4 font-semibold text-slate-700">Category</th>
               <th className="text-left p-4 font-semibold text-slate-700">Status</th>
               <th className="text-left p-4 font-semibold text-slate-700">Featured</th>
@@ -27,7 +27,7 @@ export function AdminListingsTable({ listings, getCategoryName, onView }) {
                 data-testid={`admin-listing-${l.id}`}
               >
                 <td className="p-4 font-medium text-slate-900 max-w-[200px] truncate" title={l.title}>{l.title}</td>
-                <td className="p-4 text-slate-600">{l.vendorName || '—'}</td>
+                <td className="p-4 text-slate-600">{l.sellerTitle || l.title || '—'}</td>
                 <td className="p-4 text-slate-600">{getCategoryName(l.categoryId) || '—'}</td>
                 <td className="p-4">
                   <Badge variant={l.status === 'published' ? 'default' : 'secondary'} className={l.status === 'published' ? 'bg-admin-600 border-0' : ''}>

@@ -3,14 +3,36 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Badge } from '../components/ui/badge';
 import { useAuth } from '../lib/auth';
-import { uploadAvatar } from '../lib/api';
+import { uploadAvatar, listingAPI } from '../lib/api';
 import { ROUTES } from '../constants';
 import { getApiErrorLines } from '../lib/formatApiError';
 import AuthFormError from '../components/AuthFormError';
 import { resolveMediaUrl } from '../lib/mediaUrl';
-import { Loader2, ArrowLeft, User } from 'lucide-react';
+import { membershipPlanTierFromUserAndListings } from '../lib/membershipTier';
+import { Loader2, ArrowLeft, User, Shield, Store, LayoutDashboard, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+
+const TIER_LABELS = { free: 'Free', standard: 'Standard', premium: 'Gold' };
+
+const TIER_HINTS = {
+  free: 'Browse and contact businesses; upgrade anytime to list.',
+  standard: 'Expanded listing features and better visibility.',
+  premium: 'Full listing tools and priority placement.',
+};
+
+function roleLabel(role) {
+  if (role === 'admin') return 'Administrator';
+  if (role === 'vendor') return 'Business';
+  return 'Member';
+}
+
+function RoleIcon({ role, className }) {
+  if (role === 'admin') return <Shield className={className} aria-hidden />;
+  if (role === 'vendor') return <Store className={className} aria-hidden />;
+  return <User className={className} aria-hidden />;
+}
 
 export default function ProfilePage() {
   const { user, loading: authLoading, updateProfile } = useAuth();
@@ -23,11 +45,37 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [apiErrorLines, setApiErrorLines] = useState([]);
   const [validationError, setValidationError] = useState({});
+  const [myListings, setMyListings] = useState([]);
+  const [listingsLoading, setListingsLoading] = useState(false);
   const previewRef = useRef(null);
 
   useEffect(() => {
     if (!authLoading && !user) navigate(ROUTES.LOGIN, { replace: true });
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'vendor') {
+      setMyListings([]);
+      setListingsLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setListingsLoading(true);
+    listingAPI
+      .myListings()
+      .then((res) => {
+        if (!cancelled) setMyListings(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setMyListings([]);
+      })
+      .finally(() => {
+        if (!cancelled) setListingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role]);
 
   useEffect(() => {
     if (user) {
@@ -127,15 +175,114 @@ export default function ProfilePage() {
 
   const displaySrc = previewUrl || (avatarUrl ? resolveMediaUrl(avatarUrl) || avatarUrl : null);
 
+  const planTier = membershipPlanTierFromUserAndListings(user, myListings);
+  const tierLabel = TIER_LABELS[planTier] || 'Free';
+  const tierHint = TIER_HINTS[planTier] || TIER_HINTS.free;
+
+  const totalListings = myListings.length;
+  const publishedCount = myListings.filter((l) => l.status === 'published').length;
+  const draftCount = myListings.filter((l) => l.status === 'draft').length;
+  const pendingReviewCount = myListings.filter(
+    (l) => l.status === 'published' && String(l.sellerStatus || '').toLowerCase() === 'pending'
+  ).length;
+
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4" data-testid="profile-page">
-      <div className="max-w-lg mx-auto">
-        <Link to={ROUTES.HOME} className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-spruce-700 mb-6">
-          <ArrowLeft className="w-4 h-4" /> Back to home
+    <div className="min-h-screen bg-slate-50/80 py-10 px-4" data-testid="profile-page">
+      <div className="mx-auto max-w-lg md:max-w-xl">
+        <Link
+          to={ROUTES.HOME}
+          className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-spruce-700"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to home
         </Link>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 md:p-8">
-          <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">Your profile</h1>
-          <p className="text-sm text-slate-600 mb-6">Update your name, email, and profile photo.</p>
+
+        <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-900/5 md:p-6">
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-spruce-50 text-spruce-800">
+              <RoleIcon role={user.role} className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-heading text-lg font-semibold text-slate-900">Account</h2>
+              <p className="mt-0.5 text-sm text-slate-500">Role and membership for this account.</p>
+            </div>
+          </div>
+
+          <dl className="mt-5 space-y-4 border-t border-slate-100 pt-5">
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Role</dt>
+              <dd>
+                <Badge variant={user.role === 'admin' ? 'default' : 'secondary'} className="text-xs">
+                  {roleLabel(user.role)}
+                </Badge>
+              </dd>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+              <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+                <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+                Membership
+              </dt>
+              <dd className="min-w-0 text-right sm:max-w-[65%]">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Badge
+                    variant={planTier === 'free' ? 'outline' : 'default'}
+                    className={planTier === 'free' ? 'border-spruce-200 text-spruce-800' : ''}
+                  >
+                    {tierLabel}
+                  </Badge>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-500 sm:text-right">{tierHint}</p>
+              </dd>
+            </div>
+          </dl>
+
+          {user.role === 'vendor' && (
+            <div className="mt-5 border-t border-slate-100 pt-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-800">Your listings</h3>
+                <Link
+                  to={ROUTES.DASHBOARD}
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-spruce-800 transition-colors hover:bg-spruce-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  Manage
+                </Link>
+              </div>
+              {listingsLoading ? (
+                <div className="flex justify-center py-6">
+                  <Loader2 className="h-7 w-7 animate-spin text-spruce-700" aria-label="Loading listings" />
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                      <p className="text-2xl font-semibold tabular-nums text-slate-900">{totalListings}</p>
+                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">Total</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                      <p className="text-2xl font-semibold tabular-nums text-spruce-800">{publishedCount}</p>
+                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">Published</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                      <p className="text-2xl font-semibold tabular-nums text-slate-700">{draftCount}</p>
+                      <p className="mt-0.5 text-[11px] font-medium text-slate-500">Drafts</p>
+                    </div>
+                  </div>
+                  {pendingReviewCount > 0 && (
+                    <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-center text-xs text-amber-900">
+                      {pendingReviewCount === 1
+                        ? '1 published listing is awaiting moderator approval.'
+                        : `${pendingReviewCount} published listings are awaiting moderator approval.`}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <h1 className="mb-2 font-heading text-2xl font-bold text-slate-900">Your profile</h1>
+          <p className="mb-6 text-sm text-slate-600">Update your name, email, and profile photo.</p>
           <form onSubmit={handleSubmit} className="space-y-5">
             <AuthFormError lines={apiErrorLines} data-testid="profile-api-error" />
 
@@ -150,7 +297,7 @@ export default function ProfilePage() {
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <label className="cursor-pointer">
                   <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="sr-only" onChange={handleFile} data-testid="profile-avatar-input" />
-                  <span className="inline-flex h-9 px-4 rounded-md border border-slate-200 bg-slate-50 text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  <span className="inline-flex h-9 px-4 rounded-md border border-slate-200 justify-center items-center text-sm font-medium hover:bg-slate-100">
                     Choose photo
                   </span>
                 </label>

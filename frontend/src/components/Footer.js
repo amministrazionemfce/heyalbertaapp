@@ -11,6 +11,22 @@ import {
   SITE_TAGLINE,
   SITE_LEGAL,
 } from '../constants';
+import { useCookieConsent } from './CookieConsentBanner';
+
+function FooterCookiePreferences() {
+  const cookie = useCookieConsent();
+  if (!cookie) return null;
+  return (
+    <button
+      type="button"
+      onClick={cookie.openManage}
+      className="hover:text-white transition-colors"
+      data-testid="footer-cookie-preferences"
+    >
+      Cookie preferences
+    </button>
+  );
+}
 
 export default function Footer() {
   const { pathname } = useLocation();
@@ -93,13 +109,14 @@ export default function Footer() {
           <p className="text-sm">
             {SITE_LEGAL.COPYRIGHT_LINE}
           </p>
-          <div className="flex gap-6 text-sm">
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm md:justify-end">
             <a href={SITE_LEGAL.PRIVACY_HREF} className="hover:text-white transition-colors">
               {SITE_LEGAL.PRIVACY_LABEL}
             </a>
             <a href={SITE_LEGAL.TERMS_HREF} className="hover:text-white transition-colors">
               {SITE_LEGAL.TERMS_LABEL}
             </a>
+            <FooterCookiePreferences />
           </div>
         </div>
       </div>

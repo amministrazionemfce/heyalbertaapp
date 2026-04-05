@@ -18,14 +18,21 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: "user"
   },
+  /** Stripe subscription tier (free | standard | premium). Mirrors listings after sync; used when user has no listings yet. */
+  billingTier: {
+    type: String,
+    enum: ["free", "standard", "premium"],
+    default: "free",
+  },
   avatar_url: { type: String },
   emailVerified: { type: Boolean, default: false },
   emailVerificationToken: { type: String },
   emailVerificationTokenExpires: { type: Date },
-  createdAt: String
+  createdAt: String,
+  /** Updated on login and when the client loads /auth/me */
+  lastActiveAt: { type: Date },
 });
 
-// Expose id for API responses (frontend expects user.id)
 userSchema.virtual("id").get(function () {
   return this._id.toString();
 });
@@ -33,6 +40,8 @@ userSchema.set("toJSON", {
   virtuals: true,
   transform: (doc, ret) => {
     delete ret.passwordHash;
+    delete ret.emailVerificationToken;
+    delete ret.emailVerificationTokenExpires;
     return ret;
   },
 });

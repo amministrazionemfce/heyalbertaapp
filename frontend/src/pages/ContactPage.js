@@ -46,8 +46,9 @@ export default function ContactPage() {
     };
   }, []);
 
+  const DEFAULT_CONTACT_HERO = '/team.jpg';
   const heroRaw = settings?.contactHeroImage?.trim();
-  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : null;
+  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : DEFAULT_CONTACT_HERO;
 
   const labels =
     inquiryType === 'business'
@@ -110,36 +111,9 @@ export default function ContactPage() {
 
   return (
     <div className="min-h-screen bg-slate-50" data-testid="contact-page">
-      <section
-        className={`relative overflow-hidden ${
-          heroSrc
-            ? 'min-h-[340px] md:min-h-[400px] lg:min-h-[460px] flex items-center'
-            : 'bg-gradient-to-b from-white to-slate-50 border-b border-slate-200'
-        }`}
-      >
-        {heroSrc ? (
-          <>
-            <img src={heroSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-slate-900/65" aria-hidden />
-          </>
-        ) : null}
-        <div className="relative z-10 container mx-auto px-4 md:px-8 max-w-7xl py-14 md:py-16">
-          <h1
-            className={`font-heading text-4xl md:text-5xl lg:text-[3.25rem] text-center font-bold mb-4 max-w-4xl mx-auto ${
-              heroSrc ? 'text-white' : 'text-slate-900'
-            } leading-[1.35] md:leading-[1.45] tracking-tight`}
-          >
-            Let’s Talk — We’re Here to Help You Settle and Succeed in Alberta.
-          </h1>
-          <p
-            className={`text-base md:text-lg text-center max-w-2xl mx-auto leading-relaxed ${
-              heroSrc ? 'text-white/90' : 'text-slate-600'
-            }`}
-          >
-            Whether you’re new to Alberta, looking for trusted companies, or ready to list your business, our local support
-            team is here to help.
-          </p>
-        </div>
+      <section className="relative flex min-h-[340px] items-center overflow-hidden md:min-h-[400px] lg:min-h-[460px]">
+        <img src={heroSrc} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        
       </section>
 
       <div className="container mx-auto px-4 md:px-8 max-w-7xl py-12 md:py-16">

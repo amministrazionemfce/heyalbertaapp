@@ -21,7 +21,7 @@ export default function ExploreAlbertaCitiesSection({ cityCounts = {} }) {
         const normalized = {};
         for (const [k, v] of Object.entries(raw)) {
           if (!k) continue;
-          normalized[String(k).toLowerCase()] = v;
+          normalized[String(k).toLowerCase()] = String(v ?? '').trim();
         }
         setCityImageOverrides(normalized);
       })
@@ -122,7 +122,7 @@ export default function ExploreAlbertaCitiesSection({ cityCounts = {} }) {
             {CITIES.map((city) => (
               <div
                 key={city}
-                className="w-[min(100%,calc(100vw-2.5rem))] shrink-0 snap-start sm:w-[calc((100%-1rem)/2)] lg:w-[calc((100%-3rem)/4)]"
+                className="w-[calc((100%-1rem)/2)] shrink-0 snap-start sm:w-[calc((100%-1.5rem)/3)] md:w-[calc((100%-2rem)/4)] lg:w-[calc((100%-2.5rem)/5)] xl:w-[calc((100%-3rem)/6)] 2xl:w-[calc((100%-3.5rem)/7)]"
               >
                 <CityBrowseCard
                   cityName={city}

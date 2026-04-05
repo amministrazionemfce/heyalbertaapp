@@ -1,13 +1,13 @@
 import express from "express";
 import mongoose from "mongoose";
 import Review from "../models/Review.js";
-import Vendor from "../models/Vendor.js";
+import Listing from "../models/Listing.js";
 import { requireAuth } from "../middleware/auth.js";
 import {
-  findReviewsForVendorSorted,
+  findReviewsForListingSorted,
   serializeReviewForApi,
   matchExistingReviewForUser,
-} from "../utils/reviewVendorQuery.js";
+} from "../utils/reviewListingQuery.js";
 import { vendorMayReplyToReviews } from "../utils/listingTierCaps.js";
 
 const router = express.Router();
@@ -16,30 +16,28 @@ function isValidObjectId(id) {
   return id && typeof id === "string" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id);
 }
 
-router.get("/vendors/:vendorId", async (req, res) => {
-  const rows = await findReviewsForVendorSorted(req.params.vendorId);
+router.get("/listings/:listingId", async (req, res) => {
+  const rows = await findReviewsForListingSorted(req.params.listingId);
   res.json(rows.map(serializeReviewForApi));
 });
 
-router.post("/vendors/:vendorId", requireAuth, async (req, res) => {
-  const { vendorId } = req.params;
-  let vendor;
+router.post("/listings/:listingId", requireAuth, async (req, res) => {
+  const { listingId } = req.params;
+  let listingDoc;
   try {
-    if (!isValidObjectId(vendorId))
-      return res.status(400).json({ message: "Invalid vendor id" });
+    if (!isValidObjectId(listingId)) return res.status(400).json({ message: "Invalid listing id" });
 
-    vendor = await Vendor.findById(vendorId);
-    if (!vendor)
-      return res.status(404).json({ message: "Vendor not found" });
+    listingDoc = await Listing.findById(listingId);
+    if (!listingDoc) return res.status(404).json({ message: "Listing not found" });
 
-    const ownerId = vendor.userId ? String(vendor.userId) : "";
+    const ownerId = listingDoc.userId ? String(listingDoc.userId) : "";
     if (ownerId && ownerId === req.user._id.toString()) {
       return res.status(403).json({
-        message: "You cannot review your own business.",
+        message: "You cannot review your own listing.",
       });
     }
 
-    const canonicalVendorId = vendor._id.toString();
+    const canonicalListingId = listingDoc._id.toString();
     const uid = req.user._id.toString();
 
     const { rating, comment } = req.body;
@@ -49,8 +47,7 @@ router.post("/vendors/:vendorId", requireAuth, async (req, res) => {
     }
     const ratingN = Math.max(1, Math.min(5, Number(rating) || 5));
 
-    /** One review per user per vendor: update in place instead of 409 (better UX). */
-    const existing = await Review.findOne(matchExistingReviewForUser(canonicalVendorId, uid));
+    const existing = await Review.findOne(matchExistingReviewForUser(canonicalListingId, uid));
     if (existing) {
       existing.rating = ratingN;
       existing.comment = commentTrim;
@@ -60,7 +57,7 @@ router.post("/vendors/:vendorId", requireAuth, async (req, res) => {
     }
 
     const review = await Review.create({
-      vendorId: canonicalVendorId,
+      listingId: canonicalListingId,
       userId: uid,
       userName: req.user.name,
       rating: ratingN,
@@ -70,8 +67,8 @@ router.post("/vendors/:vendorId", requireAuth, async (req, res) => {
     res.json(serializeReviewForApi(review));
   } catch (err) {
     if (err && err.code === 11000) {
-      const vid = vendor?._id?.toString?.() ?? String(vendorId || "").trim();
-      const dup = await Review.findOne(matchExistingReviewForUser(vid, req.user._id.toString()));
+      const lid = listingDoc?._id?.toString?.() ?? String(listingId || "").trim();
+      const dup = await Review.findOne(matchExistingReviewForUser(lid, req.user._id.toString()));
       if (dup) {
         const commentTrim = String(req.body?.comment ?? "").trim();
         if (!commentTrim) {
@@ -91,21 +88,19 @@ router.post("/vendors/:vendorId", requireAuth, async (req, res) => {
 
 router.put("/:reviewId/reply", requireAuth, async (req, res) => {
   const { reviewId } = req.params;
-  if (!isValidObjectId(reviewId))
-    return res.status(400).json({ message: "Invalid review id" });
+  if (!isValidObjectId(reviewId)) return res.status(400).json({ message: "Invalid review id" });
 
   const review = await Review.findById(reviewId);
-  if (!review)
-    return res.status(404).json({ message: "Review not found" });
+  if (!review) return res.status(404).json({ message: "Review not found" });
 
-  const vendor = await Vendor.findById(review.vendorId);
-  if (!vendor)
-    return res.status(404).json({ message: "Vendor not found" });
+  const listing = await Listing.findById(review.listingId);
+  if (!listing) return res.status(404).json({ message: "Listing not found" });
 
-  if (vendor.userId !== req.user._id.toString() && req.user.role !== "admin")
+  if (listing.userId !== req.user._id.toString() && req.user.role !== "admin") {
     return res.status(403).json({ message: "Not authorized" });
+  }
 
-  if (req.user.role !== "admin" && !vendorMayReplyToReviews(vendor.tier)) {
+  if (req.user.role !== "admin" && !vendorMayReplyToReviews(listing.tier)) {
     return res.status(403).json({ message: "Review replies require Standard or Gold membership." });
   }
 

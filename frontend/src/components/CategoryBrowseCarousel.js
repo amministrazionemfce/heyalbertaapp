@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import CategoryBrowseCard from './CategoryBrowseCard';
 import { CATEGORIES } from '../data/categories';
+import { resolveMediaUrl } from '../lib/mediaUrl';
 
 /**
  * Horizontal scroll strip with prev/next controls — same interaction as Explore Alberta Cities.
@@ -90,7 +91,10 @@ export default function CategoryBrowseCarousel({ categories, listingCounts = {},
           const idx = CATEGORIES.findIndex((c) => c.id === cat.id);
           const imageNum = idx >= 0 ? idx + 1 : 1;
           const defaultImageSrc = `/services/${imageNum}.jpg`;
-          const imageSrc = categoryImageOverrides?.[cat.id] || defaultImageSrc;
+          const override = categoryImageOverrides?.[cat.id];
+          const imageSrc = override?.trim()
+            ? resolveMediaUrl(override) || override
+            : defaultImageSrc;
           return (
             <div key={cat.id} className={itemClass}>
               <CategoryBrowseCard

@@ -5,6 +5,8 @@ import {
   descriptionHasBlockedContactPatterns,
 } from '../lib/listingTierRules';
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * @param {object} data - trimmed listing form fields
  * @param {'free'|'standard'|'premium'} [planTier] - from `membershipPlanTierFromVendors`
@@ -28,8 +30,45 @@ export function listingFormValidation(data, planTier = 'free') {
 
   if (!(data.categoryId || '').trim()) errors.categoryId = 'Please select a category';
 
+  if (!(data.city || '').trim()) errors.city = 'Please select a city';
+
+  const email = (data.email || '').trim();
+  if (email && !emailRegex.test(email)) errors.email = 'Enter a valid email address';
+
+  const website = (data.website || '').trim();
+  if (website && !/^https?:\/\/.+/.test(website)) {
+    errors.website = 'Website must start with http:// or https://';
+  }
+
+  const googleMapUrl = (data.googleMapUrl || '').trim();
+  if (googleMapUrl && !/^https?:\/\/.+/i.test(googleMapUrl)) {
+    errors.googleMapUrl = 'Google map URL must start with http:// or https://';
+  }
+
+  if (data.latitude !== '' && data.latitude !== undefined && data.latitude !== null) {
+    const lat = Number(data.latitude);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) {
+      errors.latitude = 'Latitude must be between -90 and 90';
+    }
+  }
+  if (data.longitude !== '' && data.longitude !== undefined && data.longitude !== null) {
+    const lng = Number(data.longitude);
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) {
+      errors.longitude = 'Longitude must be between -180 and 180';
+    }
+  }
+  if (
+    !googleMapUrl &&
+    (data.latitude === '' || data.latitude == null) !== (data.longitude === '' || data.longitude == null)
+  ) {
+    errors.longitude = errors.longitude || 'Provide both latitude and longitude, or leave both empty';
+  }
+
   const status = (data.status || '').trim();
   if (!status) errors.status = 'Please select a status';
+  else if (status !== 'draft' && status !== 'published') {
+    errors.status = 'Status must be Draft or Published';
+  }
 
   const price = (data.price != null ? String(data.price) : '').trim();
   if (!price) errors.price = 'Price is required (e.g. $99, From $50/hr, or Contact for quote)';

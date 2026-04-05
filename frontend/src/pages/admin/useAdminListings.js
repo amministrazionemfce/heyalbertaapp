@@ -1,19 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminAPI } from '../../lib/api';
 import { CATEGORIES } from '../../data/categories';
 
-function vendorIdFromDoc(v) {
-  if (!v) return '';
-  const raw = v._id ?? v.id;
-  return typeof raw === 'object' && raw?.toString ? raw.toString() : String(raw || '');
-}
-
 export function useAdminListings({ onUpdate } = {}) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const userIdFromUrl = searchParams.get('userId');
   const [listings, setListings] = useState([]);
-  const [vendors, setVendors] = useState([]);
+  const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
-  const [vendorFilter, setVendorFilter] = useState('');
+  const [sellerFilter, setSellerFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'table' | 'list'
@@ -24,9 +21,23 @@ export function useAdminListings({ onUpdate } = {}) {
     try {
       const params = statusFilter ? { status: statusFilter } : {};
       const res = await adminAPI.listings(params);
-      setListings(Array.isArray(res.data) ? res.data : []);
+      const rows = Array.isArray(res.data) ? res.data : [];
+      setListings(rows);
+      const byUser = new Map();
+      for (const l of rows) {
+        const uid = String(l.userId || '').trim();
+        if (!uid) continue;
+        const label = (l.sellerTitle || l.title || '').trim() || 'Unnamed listing';
+        if (!byUser.has(uid)) byUser.set(uid, label);
+      }
+      setSellers(
+        [...byUser.entries()]
+          .map(([id, name]) => ({ id, name }))
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
+      );
     } catch {
       setListings([]);
+      setSellers([]);
     } finally {
       setLoading(false);
     }
@@ -37,32 +48,13 @@ export function useAdminListings({ onUpdate } = {}) {
   }, [fetchListings]);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await adminAPI.vendors();
-        const rows = Array.isArray(res.data) ? res.data : [];
-        if (!cancelled) {
-          setVendors(
-            rows
-              .map((v) => ({ id: vendorIdFromDoc(v), name: (v.name || '').trim() || 'Unnamed vendor' }))
-              .filter((v) => v.id)
-              .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }))
-          );
-        }
-      } catch {
-        if (!cancelled) setVendors([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (userIdFromUrl) setSellerFilter(userIdFromUrl);
+  }, [userIdFromUrl]);
 
   const filteredListings = useMemo(() => {
     let rows = listings;
-    if (vendorFilter) {
-      rows = rows.filter((l) => String(l.vendorId || '') === vendorFilter);
+    if (sellerFilter) {
+      rows = rows.filter((l) => String(l.userId || '') === sellerFilter);
     }
     if (categoryFilter) {
       rows = rows.filter((l) => String(l.categoryId || '') === categoryFilter);
@@ -72,11 +64,11 @@ export function useAdminListings({ onUpdate } = {}) {
     return rows.filter((l) => {
       const title = (l.title || '').toLowerCase();
       const desc = (l.description || '').toLowerCase();
-      const vendorName = (l.vendorName || '').toLowerCase();
+      const sellerTitle = (l.sellerTitle || l.title || '').toLowerCase();
       const categoryName = (CATEGORIES.find((c) => c.id === l.categoryId)?.name || '').toLowerCase();
-      return title.includes(q) || desc.includes(q) || vendorName.includes(q) || categoryName.includes(q);
+      return title.includes(q) || desc.includes(q) || sellerTitle.includes(q) || categoryName.includes(q);
     });
-  }, [listings, search, vendorFilter, categoryFilter]);
+  }, [listings, search, sellerFilter, categoryFilter]);
 
   const openDetail = useCallback((l) => setDetailListing(l), []);
   const closeDetail = useCallback(() => setDetailListing(null), []);
@@ -84,19 +76,29 @@ export function useAdminListings({ onUpdate } = {}) {
   const clearFilters = useCallback(() => {
     setSearch('');
     setStatusFilter('');
-    setVendorFilter('');
+    setSellerFilter('');
     setCategoryFilter('');
+    if (userIdFromUrl) {
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.delete('userId');
+          return p;
+        },
+        { replace: true }
+      );
+    }
     fetchListings();
-  }, [fetchListings]);
+  }, [fetchListings, userIdFromUrl, setSearchParams]);
 
   return {
     listings,
-    vendors,
+    vendors: sellers,
     loading,
     statusFilter,
     setStatusFilter,
-    vendorFilter,
-    setVendorFilter,
+    vendorFilter: sellerFilter,
+    setVendorFilter: setSellerFilter,
     categoryFilter,
     setCategoryFilter,
     search,

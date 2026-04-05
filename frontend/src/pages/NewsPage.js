@@ -11,10 +11,12 @@ export default function NewsPage() {
   const [articles, setArticles] = useState([]);
   const [listingCounts, setListingCounts] = useState({});
   const [categoryImageOverrides, setCategoryImageOverrides] = useState({});
+  const [pageLoading, setPageLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
+      setPageLoading(true);
       try {
         const [siteRes, catRes, artRes, countsRes, imgRes] = await Promise.all([
           siteAPI.settings(),
@@ -35,6 +37,8 @@ export default function NewsPage() {
           setNewsCategories([]);
           setArticles([]);
         }
+      } finally {
+        if (!cancelled) setPageLoading(false);
       }
     };
     run();
@@ -48,7 +52,7 @@ export default function NewsPage() {
   return (
     <div className="min-h-screen bg-white" data-testid="news-page">
       <NewsPageHero settings={settings} />
-      <NewsArticlesSection articles={articleSlice} />
+      <NewsArticlesSection articles={articleSlice} loading={pageLoading} />
       <NewsCategoriesSection
         managedItems={newsCategories}
         listingCounts={listingCounts}

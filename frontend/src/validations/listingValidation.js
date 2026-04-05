@@ -2,14 +2,22 @@ const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function listingValidation(data) {
   const errors = {};
+  const ls = String(data.listingStatus || 'published').trim();
+  if (ls !== 'draft' && ls !== 'published') {
+    errors.listingStatus = 'Choose Draft or Published';
+  }
   if (!data.name || (data.name && data.name.trim().length < 2))
-    errors.name = 'Business name must be at least 2 characters';
+    errors.name = 'Listing title must be at least 2 characters';
   if (!data.description || (data.description && data.description.trim().length < 10))
     errors.description = 'Description must be at least 10 characters';
   if (!data.category)
     errors.category = 'Please select a category';
   if (!data.city)
     errors.city = 'Please select a city';
+  const price = (data.price != null ? String(data.price) : '').trim();
+  if (!price) {
+    errors.price = 'Price is required (e.g. $99, From $50/hr, or Contact for quote)';
+  }
   if (data.email && data.email.trim() && !emailRegex.test(data.email.trim()))
     errors.email = 'Enter a valid email address';
   if (data.website && data.website.trim() && !/^https?:\/\/.+/.test(data.website.trim()))

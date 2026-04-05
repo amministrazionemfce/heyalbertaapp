@@ -1,5 +1,7 @@
+import mongoose from "mongoose";
 import Stripe from "stripe";
-import Vendor from "../models/Vendor.js";
+import Listing from "../models/Listing.js";
+import User from "../models/User.js";
 import { planIdFromPriceId } from "../utils/stripePlan.js";
 import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
@@ -16,14 +18,18 @@ function getStripe() {
 async function applyPaidTier(userId, planId) {
   if (!userId || (planId !== "standard" && planId !== "premium")) return;
   const uid = String(userId);
-  await Vendor.updateMany({ userId: uid }, { $set: { tier: planId } });
+  const oid = mongoose.Types.ObjectId.isValid(uid) ? new mongoose.Types.ObjectId(uid) : uid;
+  await Listing.updateMany({ userId: uid }, { $set: { tier: planId } });
+  await User.updateOne({ _id: oid }, { $set: { billingTier: planId } });
   await setFeaturedForPaidUser(uid);
 }
 
 async function applyFreeTier(userId) {
   if (!userId) return;
   const uid = String(userId);
-  await Vendor.updateMany({ userId: uid }, { $set: { tier: "free" } });
+  const oid = mongoose.Types.ObjectId.isValid(uid) ? new mongoose.Types.ObjectId(uid) : uid;
+  await Listing.updateMany({ userId: uid }, { $set: { tier: "free" } });
+  await User.updateOne({ _id: oid }, { $set: { billingTier: "free" } });
   await clearFeaturedForFreeUser(uid);
 }
 

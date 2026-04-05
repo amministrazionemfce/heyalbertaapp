@@ -2,18 +2,41 @@ import express from "express";
 import mongoose from "mongoose";
 import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import Listing from "../models/Listing.js";
-import Vendor from "../models/Vendor.js";
+import User from "../models/User.js";
+import Review from "../models/Review.js";
 import CityImage from "../models/CityImage.js";
 import CategoryImage from "../models/CategoryImage.js";
-import { validateListingForVendorTier } from "../utils/listingTierCaps.js";
+import { validateListingForVendorTier, vendorMaySetPublicContactFields } from "../utils/listingTierCaps.js";
+import { matchReviewsByListingId } from "../utils/reviewListingQuery.js";
+import { listingsFeaturedForBillingTier } from "../utils/membershipFeatured.js";
 
 const router = express.Router();
+
+/** Published listings visible on the public directory (not drafts). */
+const DIRECTORY_PUBLIC_BASE = {
+  status: "published",
+  $or: [{ sellerStatus: "approved" }, { featured: true, sellerStatus: "pending" }],
+};
+
+const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Case-insensitive unique title across all listings (excluding optional ObjectId). */
+function normalizeOpeningHours(raw) {
+  if (!raw || typeof raw !== "object") return {};
+  const out = {};
+  for (const d of WEEK_DAYS) {
+    const v = raw[d];
+    if (v == null) continue;
+    const s = String(v).trim();
+    if (!s) continue;
+    out[d] = s.slice(0, 120);
+  }
+  return out;
+}
+
 async function findListingByTitleCaseInsensitive(title, excludeId) {
   const tit = String(title || "").trim();
   if (!tit) return null;
@@ -37,15 +60,60 @@ function normalizeCoverIndex(coverImageIndex, imageCount) {
   return Math.min(Math.max(0, idx), imageCount - 1);
 }
 
+async function resolveSellerStatusForCreate() {
+  return "approved";
+}
 
+function tierRankForDefault(raw) {
+  const t = String(raw || "").toLowerCase();
+  if (t === "premium" || t === "gold") return 2;
+  if (t === "standard") return 1;
+  return 0;
+}
 
-// Public: directory listings from LISTINGS collection
-// Query: page, limit, city, vendorId, categoryId/category, search, featured, myLikings+favoriteIds, myListings (auth), minPrice, maxPrice (parsed from listing.price string)
-// Response: listings include reviewCount, avgRating, price
+async function defaultTierForUser(userId) {
+  const uid = String(userId);
+  const [first, userDoc] = await Promise.all([
+    Listing.findOne({ userId: uid }).sort({ createdAt: 1 }).lean(),
+    User.findById(uid).select("billingTier").lean(),
+  ]);
+  const rList = tierRankForDefault(first?.tier || "free");
+  const rBill = tierRankForDefault(userDoc?.billingTier || "free");
+  const r = Math.max(rList, rBill);
+  if (r >= 2) return "premium";
+  if (r >= 1) return "standard";
+  return "free";
+}
+
+/** Public JSON snapshot for cards / detail (not a separate collection). */
+function buildSellerShapeFromListing(listing) {
+  const o = typeof listing.toObject === "function" ? listing.toObject() : listing;
+  const uid = String(o.userId || "");
+  return {
+    userId: uid,
+    /** @deprecated use userId — kept for older clients */
+    id: uid,
+    title: o.title,
+    name: o.title,
+    description: o.description,
+    city: o.city,
+    neighborhood: o.neighborhood,
+    phone: o.phone,
+    email: o.email,
+    website: o.website,
+    images: Array.isArray(o.images) ? o.images : [],
+    tier: o.tier,
+    googleMapUrl: o.googleMapUrl,
+    latitude: o.latitude,
+    longitude: o.longitude,
+    openingHours: o.openingHours || {},
+  };
+}
+
 router.get("/", optionalAuth, async (req, res) => {
   try {
     const categoryId = (req.query.categoryId || req.query.category || "").trim();
-    const vendorIdParam = (req.query.vendorId || "").trim();
+    const userIdParam = (req.query.userId || "").trim();
     const city = (req.query.city || "").trim();
     const search = (req.query.search || "").trim();
     const featuredOnly = req.query.featured === "true" || req.query.featured === true;
@@ -57,70 +125,54 @@ router.get("/", optionalAuth, async (req, res) => {
     const hasMinPrice = Number.isFinite(minPriceQ);
     const hasMaxPrice = Number.isFinite(maxPriceQ);
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(24, Math.max(1, parseInt(req.query.limit, 10) || 12));
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
-    const matchListing = { status: "published" };
-    if (categoryId) matchListing.categoryId = categoryId;
-    if (featuredOnly) matchListing.featured = true;
+    let matchListing;
 
-    if (myLikings) {
-      const ids = favoriteIdsParam
-        ? favoriteIdsParam.split(",").map((s) => s.trim()).filter(Boolean)
-        : [];
-      if (ids.length === 0) {
-        return res.json({ listings: [], total: 0, pages: 1, page });
-      }
-      const objectIds = ids
-        .filter((id) => mongoose.Types.ObjectId.isValid(id))
-        .map((id) => new mongoose.Types.ObjectId(id));
-      if (objectIds.length === 0) {
-        return res.json({ listings: [], total: 0, pages: 1, page });
-      }
-      matchListing._id = { $in: objectIds };
-    } else if (myListings) {
+    if (myListings) {
       if (!req.user) {
         return res.status(401).json({ message: "Sign in to see your listings" });
       }
-      const vendors = await Vendor.find({ userId: req.user._id.toString() }).select("_id");
-      const vendorIds = vendors.map((v) => v._id.toString());
-      if (vendorIds.length === 0) {
-        return res.json({ listings: [], total: 0, pages: 1, page });
+      matchListing = { status: "published", userId: req.user._id.toString() };
+      if (categoryId) matchListing.categoryId = categoryId;
+      if (featuredOnly) matchListing.featured = true;
+    } else {
+      matchListing = { ...DIRECTORY_PUBLIC_BASE };
+      if (categoryId) matchListing.categoryId = categoryId;
+      if (featuredOnly) matchListing.featured = true;
+
+      if (myLikings) {
+        const ids = favoriteIdsParam
+          ? favoriteIdsParam.split(",").map((s) => s.trim()).filter(Boolean)
+          : [];
+        if (ids.length === 0) {
+          return res.json({ listings: [], total: 0, pages: 1, page });
+        }
+        const objectIds = ids
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+          .map((id) => new mongoose.Types.ObjectId(id));
+        if (objectIds.length === 0) {
+          return res.json({ listings: [], total: 0, pages: 1, page });
+        }
+        matchListing._id = { $in: objectIds };
+      } else if (userIdParam) {
+        matchListing.userId = userIdParam;
       }
-      matchListing.vendorId = { $in: vendorIds };
-    } else if (vendorIdParam) {
-      matchListing.vendorId = vendorIdParam;
     }
 
     const pipeline = [
       { $match: matchListing },
       {
         $lookup: {
-          from: "vendors",
-          let: { vid: "$vendorId" },
-          pipeline: [
-            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
-          ],
-          as: "vendorDoc",
-        },
-      },
-      { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
-      { $match: { "vendorDoc.status": "approved" } },
-      {
-        $lookup: {
           from: "reviews",
-          let: { vid: { $toString: { $ifNull: ["$vendorId", ""] } } },
+          let: { lid: { $toString: "$_id" } },
           pipeline: [
             {
               $match: {
-                $or: [
-                  {
-                    $expr: {
-                      $eq: [{ $toString: { $ifNull: ["$vendorId", ""] } }, "$$vid"],
-                    },
-                  },
-                  { $expr: { $eq: ["$vendorId", "$$vid"] } },
-                ],
+                $expr: {
+                  $eq: [{ $toString: { $ifNull: ["$listingId", ""] } }, "$$lid"],
+                },
               },
             },
           ],
@@ -175,19 +227,12 @@ router.get("/", optionalAuth, async (req, res) => {
       { $project: { _reviewDocs: 0 } },
     ];
 
-    // Category filter is already applied via matchListing.categoryId (listing document).
-    // Do not also require vendorDoc.category — it can differ from listing.categoryId and
-    // would hide listings that homepage counts-by-category still includes.
-    if (city) pipeline.push({ $match: { "vendorDoc.city": new RegExp(city, "i") } });
+    if (city) pipeline.push({ $match: { city: new RegExp(escapeRegex(city), "i") } });
     if (search) {
-      const searchRegex = new RegExp(search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      const searchRegex = new RegExp(escapeRegex(search), "i");
       pipeline.push({
         $match: {
-          $or: [
-            { title: searchRegex },
-            { description: searchRegex },
-            { "vendorDoc.name": searchRegex },
-          ],
+          $or: [{ title: searchRegex }, { description: searchRegex }],
         },
       });
     }
@@ -197,14 +242,14 @@ router.get("/", optionalAuth, async (req, res) => {
     pipeline.push(
       {
         $addFields: {
-          _vendorSearchBoost: {
+          _tierBoost: {
             $cond: [
               {
                 $or: [
-                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "premium"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "gold"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "platinum"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$vendorDoc.tier", ""] } }, "enterprise"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "premium"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "gold"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "platinum"] },
+                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "enterprise"] },
                 ],
               },
               1,
@@ -213,7 +258,7 @@ router.get("/", optionalAuth, async (req, res) => {
           },
         },
       },
-      { $sort: { _vendorSearchBoost: -1, featured: -1, createdAt: -1 } },
+      { $sort: { _tierBoost: -1, featured: -1, createdAt: -1 } },
       {
         $facet: {
           total: [{ $count: "n" }],
@@ -227,7 +272,8 @@ router.get("/", optionalAuth, async (req, res) => {
                 description: 1,
                 categoryId: 1,
                 status: 1,
-                vendorId: 1,
+                sellerStatus: 1,
+                userId: 1,
                 featured: 1,
                 features: { $ifNull: ["$features", []] },
                 images: { $ifNull: ["$images", []] },
@@ -237,13 +283,18 @@ router.get("/", optionalAuth, async (req, res) => {
                 reviewCount: 1,
                 avgRating: 1,
                 createdAt: 1,
-                vendor: {
-                  id: { $toString: "$vendorDoc._id" },
-                  name: "$vendorDoc.name",
-                  city: "$vendorDoc.city",
-                  neighborhood: "$vendorDoc.neighborhood",
-                  images: "$vendorDoc.images",
-                  description: "$vendorDoc.description",
+                city: 1,
+                neighborhood: 1,
+                tier: 1,
+                seller: {
+                  userId: { $toString: { $ifNull: ["$userId", ""] } },
+                  id: { $toString: { $ifNull: ["$userId", ""] } },
+                  title: "$title",
+                  name: "$title",
+                  city: "$city",
+                  neighborhood: "$neighborhood",
+                  images: "$images",
+                  description: "$description",
                 },
               },
             },
@@ -263,14 +314,14 @@ router.get("/", optionalAuth, async (req, res) => {
   }
 });
 
-// Public: city images (used by homepage city carousel)
-// Returns mapping: { [cityName]: imageUrl }
 router.get("/city-images", async (req, res) => {
   try {
     const docs = await CityImage.find({}, { cityName: 1, imageUrl: 1 }).lean();
     const out = {};
     for (const d of docs) {
-      if (d?.cityName) out[d.cityName] = d.imageUrl || "";
+      if (d?.cityName) {
+        out[String(d.cityName).toLowerCase()] = String(d.imageUrl || "").trim();
+      }
     }
     res.json(out);
   } catch (err) {
@@ -278,8 +329,6 @@ router.get("/city-images", async (req, res) => {
   }
 });
 
-// Public: category images (used by homepage category cards)
-// Returns mapping: { [categoryId]: imageUrl }
 router.get("/category-images", async (req, res) => {
   try {
     const docs = await CategoryImage.find({}, { categoryId: 1, imageUrl: 1 }).lean();
@@ -293,25 +342,10 @@ router.get("/category-images", async (req, res) => {
   }
 });
 
-
-// Public: get published listing counts by category (for homepage)
-// Only count listings whose vendor is approved, to match directory results
 router.get("/counts-by-category", async (req, res) => {
   try {
     const counts = await Listing.aggregate([
-      { $match: { status: "published" } },
-      {
-        $lookup: {
-          from: "vendors",
-          let: { vid: "$vendorId" },
-          pipeline: [
-            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
-          ],
-          as: "vendorDoc",
-        },
-      },
-      { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
-      { $match: { "vendorDoc.status": "approved" } },
+      { $match: { ...DIRECTORY_PUBLIC_BASE } },
       { $group: { _id: "$categoryId", count: { $sum: 1 } } },
     ]);
     const byCategory = {};
@@ -324,27 +358,18 @@ router.get("/counts-by-category", async (req, res) => {
   }
 });
 
-// Public: published listing counts by vendor city (lowercase keys, for homepage city cards)
 router.get("/counts-by-city", async (req, res) => {
   try {
     const counts = await Listing.aggregate([
-      { $match: { status: "published" } },
       {
-        $lookup: {
-          from: "vendors",
-          let: { vid: "$vendorId" },
-          pipeline: [
-            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$vid"] } } },
-          ],
-          as: "vendorDoc",
+        $match: {
+          ...DIRECTORY_PUBLIC_BASE,
+          city: { $exists: true, $nin: [null, ""] },
         },
       },
-      { $unwind: { path: "$vendorDoc", preserveNullAndEmptyArrays: false } },
-      { $match: { "vendorDoc.status": "approved" } },
-      { $match: { "vendorDoc.city": { $exists: true, $nin: [null, ""] } } },
       {
         $group: {
-          _id: { $toLower: "$vendorDoc.city" },
+          _id: { $toLower: "$city" },
           count: { $sum: 1 },
         },
       },
@@ -359,106 +384,118 @@ router.get("/counts-by-city", async (req, res) => {
   }
 });
 
-// Get listings for current user's vendors
 router.get("/my-listings", requireAuth, async (req, res) => {
   try {
-    const vendors = await Vendor.find({ userId: req.user._id.toString() }).select("_id");
-    const vendorIds = vendors.map((v) => v._id.toString());
-    const listings = await Listing.find({ vendorId: { $in: vendorIds } }).sort({ createdAt: -1 });
+    const listings = await Listing.find({ userId: req.user._id.toString() }).sort({ createdAt: -1 });
     res.json(listings);
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch listings" });
   }
 });
 
-router.get("/listByVendor", requireAuth, async (req, res) => {
-  const { vendorId } = req.query;
-  if (!vendorId) return res.status(400).json({ message: "vendorId required" });
-  const vendor = await Vendor.findOne({ _id: vendorId, userId: req.user._id.toString() });
-  if (!vendor) return res.status(403).json({ message: "Not authorized" });
-  const listings = await Listing.find({ vendorId }).sort({ createdAt: -1 });
-  res.json(listings);
-});
-
-// Public: get single listing by id (published only, with vendor)
-router.get("/:id", async (req, res) => {
+router.delete("/mine", requireAuth, async (req, res) => {
   try {
-    const { id } = req.params;
-    if (id === "my-listings" || id === "listByVendor") 
-      return res.status(404).json({ message: "Not found" });
-
-    const listing = await Listing.findOne({ _id: id, status: "published" });
-    if (!listing) return res.status(404).json({ message: "Listing not found" });
-    const vendor = await Vendor.findOne({ _id: listing.vendorId, status: "approved" });
-    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
-    const listingObj = listing.toObject();
-    listingObj.id = listing._id.toString();
-    listingObj.vendor = {
-      id: vendor._id.toString(),
-      userId: vendor.userId || null,
-      name: vendor.name,
-      description: vendor.description,
-      city: vendor.city,
-      neighborhood: vendor.neighborhood,
-      phone: vendor.phone,
-      email: vendor.email,
-      website: vendor.website,
-      images: vendor.images,
-      tier: vendor.tier,
-    };
-    res.json(listingObj);
+    const uid = req.user._id.toString();
+    const listings = await Listing.find({ userId: uid }).select("_id");
+    for (const l of listings) {
+      await Review.deleteMany(matchReviewsByListingId(l._id.toString()));
+    }
+    await Listing.deleteMany({ userId: uid });
+    res.json({ ok: true });
   } catch (err) {
-    res.status(500).json({ message: "Failed to fetch listing" });
+    res.status(500).json({ message: "Failed to delete listings" });
   }
 });
 
-
 router.post("/", requireAuth, async (req, res) => {
   const body = req.body || {};
-  const { vendorId, categoryId, title, description, status, features, videoUrl, price } = body;
-  const vendor = await Vendor.findOne({ _id: vendorId, userId: req.user._id.toString() });
-  if (!vendor) return res.status(403).json({ message: "Not authorized" });
-  const cat = categoryId != null ? String(categoryId).trim() : "";
-  const desc = description != null ? String(description).trim() : "";
-  const tit = title != null ? String(title).trim() : "";
+  const uid = req.user._id.toString();
+  const tier = await defaultTierForUser(uid);
+
+  const cat = body.categoryId != null ? String(body.categoryId).trim() : "";
+  const desc = body.description != null ? String(body.description).trim() : "";
+  const tit = body.title != null ? String(body.title).trim() : "";
   const images = normalizeListingImages(body);
-  const stat = status && String(status).trim() ? String(status).trim() : "";
+  const stat = body.status && String(body.status).trim() ? String(body.status).trim() : "";
+  const priceStr = body.price != null ? String(body.price).trim() : "";
+
   if (!cat) return res.status(400).json({ message: "Category is required" });
   if (!tit) return res.status(400).json({ message: "Title is required" });
   if (!desc) return res.status(400).json({ message: "Description is required" });
   if (!stat) return res.status(400).json({ message: "Status is required" });
   if (images.length === 0) return res.status(400).json({ message: "At least one image is required" });
-  const priceStr = price != null ? String(price).trim() : "";
   if (!priceStr) return res.status(400).json({ message: "Price is required" });
-  const tierCheck = validateListingForVendorTier(vendor.tier, {
+
+  if (!vendorMaySetPublicContactFields(tier)) {
+    if (String(body.phone || "").trim()) {
+      return res.status(400).json({ message: "Phone is available on Standard and Gold plans." });
+    }
+    if (String(body.email || "").trim()) {
+      return res.status(400).json({ message: "Email is available on Standard and Gold plans." });
+    }
+    if (String(body.website || "").trim()) {
+      return res.status(400).json({ message: "Website is available on Standard and Gold plans." });
+    }
+  }
+
+  const tierCheck = validateListingForVendorTier(tier, {
     description: desc,
     images,
-    videoUrl: videoUrl != null ? String(videoUrl).trim() : "",
+    videoUrl: body.videoUrl != null ? String(body.videoUrl).trim() : "",
   });
   if (!tierCheck.ok) return res.status(400).json({ message: tierCheck.message });
+
   const dup = await findListingByTitleCaseInsensitive(tit);
   if (dup) return res.status(400).json({ message: "A listing with this title already exists. Choose a different title." });
+
   const coverImageIndex = normalizeCoverIndex(body.coverImageIndex, images.length);
   let vid = "";
-  if (videoUrl != null && String(videoUrl).trim()) {
-    const u = String(videoUrl).trim();
+  if (body.videoUrl != null && String(body.videoUrl).trim()) {
+    const u = String(body.videoUrl).trim();
     if (!/^https?:\/\//i.test(u) && !u.startsWith("/uploads")) {
       return res.status(400).json({ message: "Video must be a valid URL (https://) or an uploaded file path." });
     }
     vid = u;
   }
+
+  const latitude =
+    body.latitude === "" || body.latitude === undefined || body.latitude === null
+      ? undefined
+      : Number(body.latitude);
+  const longitude =
+    body.longitude === "" || body.longitude === undefined || body.longitude === null
+      ? undefined
+      : Number(body.longitude);
+
+  const sellerStatus = await resolveSellerStatusForCreate();
+  const ownerBilling = await User.findById(uid).select("billingTier").lean();
+  const featured = listingsFeaturedForBillingTier(ownerBilling?.billingTier);
+
   try {
     const listing = await Listing.create({
-      vendorId: vendor._id.toString(),
+      userId: uid,
       categoryId: cat,
       title: tit,
       description: desc,
       status: stat,
-      features: Array.isArray(features) ? features : [],
+      sellerStatus,
+      tier,
+      featured,
+      features: Array.isArray(body.features) ? body.features : [],
       images,
       coverImageIndex,
       videoUrl: vid,
       price: priceStr,
+      city: String(body.city || "").trim(),
+      neighborhood: String(body.neighborhood || "").trim(),
+      phone: String(body.phone || "").trim(),
+      email: String(body.email || "").trim(),
+      website: String(body.website || "").trim(),
+      googleMapUrl: String(body.googleMapUrl || "").trim(),
+      latitude: Number.isFinite(latitude) ? latitude : undefined,
+      longitude: Number.isFinite(longitude) ? longitude : undefined,
+      openingHours: normalizeOpeningHours(body.openingHours),
+      showOpeningHours: body.showOpeningHours === false ? false : true,
     });
     return res.status(201).json(listing);
   } catch (err) {
@@ -473,10 +510,32 @@ router.post("/", requireAuth, async (req, res) => {
 router.put("/:id", requireAuth, async (req, res) => {
   const listing = await Listing.findById(req.params.id);
   if (!listing) return res.status(404).json({ message: "Listing not found" });
-  const vendor = await Vendor.findOne({ _id: listing.vendorId, userId: req.user._id.toString() });
-  if (!vendor) return res.status(403).json({ message: "Not authorized" });
+  if (listing.userId !== req.user._id.toString()) {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+
   const body = req.body || {};
-  const allowed = ["categoryId", "title", "description", "status", "features", "images", "coverImageIndex", "videoUrl", "price"];
+  const allowed = [
+    "categoryId",
+    "title",
+    "description",
+    "status",
+    "features",
+    "images",
+    "coverImageIndex",
+    "videoUrl",
+    "price",
+    "city",
+    "neighborhood",
+    "phone",
+    "email",
+    "website",
+    "googleMapUrl",
+    "latitude",
+    "longitude",
+    "openingHours",
+    "showOpeningHours",
+  ];
   const payload = {};
   for (const key of allowed) {
     if (body[key] === undefined) continue;
@@ -501,14 +560,52 @@ router.put("/:id", requireAuth, async (req, res) => {
       payload[key] = body[key] != null ? String(body[key]).trim() : "";
       continue;
     }
+    if (key === "openingHours") {
+      payload[key] = normalizeOpeningHours(body[key]);
+      continue;
+    }
+    if (key === "showOpeningHours") {
+      payload[key] = Boolean(body[key]);
+      continue;
+    }
+    if (key === "latitude" || key === "longitude") {
+      const v = body[key];
+      if (v === "" || v === undefined || v === null) {
+        payload[key] = undefined;
+      } else {
+        const n = Number(v);
+        payload[key] = Number.isFinite(n) ? n : undefined;
+      }
+      continue;
+    }
     const v = body[key] != null ? String(body[key]).trim() : "";
     if (key === "status") payload[key] = v || "draft";
     else if ((key === "categoryId" || key === "title" || key === "description") && !v) continue;
     else payload[key] = v;
   }
-  if (payload.categoryId !== undefined && !payload.categoryId) return res.status(400).json({ message: "Category is required" });
-  if (payload.description !== undefined && !payload.description) return res.status(400).json({ message: "Description is required" });
-  if (payload.title !== undefined && !payload.title) return res.status(400).json({ message: "Title is required" });
+
+  const tier = listing.tier || "free";
+  if (!vendorMaySetPublicContactFields(tier)) {
+    if (payload.phone !== undefined && String(payload.phone || "").trim()) {
+      return res.status(400).json({ message: "Phone is available on Standard and Gold plans." });
+    }
+    if (payload.email !== undefined && String(payload.email || "").trim()) {
+      return res.status(400).json({ message: "Email is available on Standard and Gold plans." });
+    }
+    if (payload.website !== undefined && String(payload.website || "").trim()) {
+      return res.status(400).json({ message: "Website is available on Standard and Gold plans." });
+    }
+  }
+
+  if (payload.categoryId !== undefined && !payload.categoryId) {
+    return res.status(400).json({ message: "Category is required" });
+  }
+  if (payload.description !== undefined && !payload.description) {
+    return res.status(400).json({ message: "Description is required" });
+  }
+  if (payload.title !== undefined && !payload.title) {
+    return res.status(400).json({ message: "Title is required" });
+  }
   if (payload.price !== undefined && !String(payload.price).trim()) {
     return res.status(400).json({ message: "Price is required" });
   }
@@ -538,7 +635,7 @@ router.put("/:id", requireAuth, async (req, res) => {
     payload.description !== undefined ? String(payload.description || "").trim() : String(listing.description || "").trim();
   const mergedVideo =
     payload.videoUrl !== undefined ? String(payload.videoUrl || "").trim() : String(listing.videoUrl || "").trim();
-  const tierCheckPut = validateListingForVendorTier(vendor.tier, {
+  const tierCheckPut = validateListingForVendorTier(tier, {
     description: mergedDesc,
     images: mergedImages,
     videoUrl: mergedVideo,
@@ -564,11 +661,31 @@ router.put("/:id", requireAuth, async (req, res) => {
 router.delete("/:id", requireAuth, async (req, res) => {
   const listing = await Listing.findById(req.params.id);
   if (!listing) return res.status(404).json({ message: "Listing not found" });
-  const vendor = await Vendor.findOne({ _id: listing.vendorId, userId: req.user._id.toString() });
-  if (!vendor) return res.status(403).json({ message: "Not authorized" });
+  if (listing.userId !== req.user._id.toString()) {
+    return res.status(403).json({ message: "Not authorized" });
+  }
+  await Review.deleteMany(matchReviewsByListingId(listing._id.toString()));
   await Listing.findByIdAndDelete(req.params.id);
   res.json({ ok: true });
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (id === "my-listings" || id === "mine") return res.status(404).json({ message: "Not found" });
+
+    const listing = await Listing.findOne({
+      _id: id,
+      ...DIRECTORY_PUBLIC_BASE,
+    });
+    if (!listing) return res.status(404).json({ message: "Listing not found" });
+    const listingObj = listing.toObject();
+    listingObj.id = listing._id.toString();
+    listingObj.seller = buildSellerShapeFromListing(listing);
+    res.json(listingObj);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch listing" });
+  }
+});
 
 export default router;

@@ -13,14 +13,19 @@ import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useAddListingClick } from '../hooks/useAddListingClick';
 import UpgradeToVendorModal from './UpgradeToVendorModal';
 
+function navLinkIsActive(pathname, linkTo) {
+  if (linkTo === ROUTES.HOME) return pathname === ROUTES.HOME;
+  return pathname === linkTo || pathname.startsWith(`${linkTo}/`);
+}
+
 export default function Navbar() {
   const { pathname } = useLocation();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const isHome = pathname === ROUTES.HOME;
   const { handleAddListingClick, upgradeModalProps } = useAddListingClick();
 
+  const hasActiveMainNav = MAIN_NAV_LINKS.some((link) => navLinkIsActive(pathname, link.to));
 
   const handleLogout = () => {
     logout();
@@ -30,11 +35,11 @@ export default function Navbar() {
   return (
     <nav className="z-50 bg-white/95 backdrop-blur-md border-b border-slate-200" data-testid="navbar">
       <div className="container mx-auto max-w-7xl px-3 sm:px-4 md:px-5">
-        <div className="flex min-h-[3.25rem] items-center justify-between gap-2 py-1 md:min-h-16 md:py-1">
+        <div className="relative flex min-h-[3.25rem] items-center justify-between gap-2 py-1 md:min-h-16 md:py-1">
           {/* Invalid Tailwind w-25 was ignored; object-contain avoids cropping the asset */}
           <Link
             to={ROUTES.HOME}
-            className="group flex shrink-0 items-center"
+            className="relative z-10 group flex shrink-0 items-center"
             data-testid="navbar-logo"
           >
             <img
@@ -44,19 +49,24 @@ export default function Navbar() {
             />
           </Link>
 
-          {/* Desktop Nav */}
-          <div className="hidden md:flex items-center  gap-8">
+          {/* Desktop Nav — centered in the bar when no link is active; otherwise in normal flow */}
+          <div
+            className={
+              hasActiveMainNav
+                ? 'hidden md:flex items-end gap-2 md:gap-4 lg:gap-6'
+                : 'pointer-events-none hidden md:absolute md:inset-x-0 md:top-0 md:bottom-0 md:flex md:items-end md:justify-center md:gap-2 md:gap-4 lg:gap-6 md:[&_a]:pointer-events-auto'
+            }
+          >
             {MAIN_NAV_LINKS.map((link) => {
-              const isActive =
-                link.to === ROUTES.HOME
-                  ? pathname === ROUTES.HOME
-                  : pathname === link.to || pathname.startsWith(`${link.to}/`);
+              const isActive = navLinkIsActive(pathname, link.to);
               return (
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`text-sm font-medium transition-colors ${
-                    isActive ? 'text-red-700 font-bold' : 'text-slate-600 hover:text-spruce-600'
+                  className={`border-b-2 px-2 pb-3 text-sm font-medium transition-colors -mb-px lg:px-3 ${
+                    isActive
+                      ? 'border-spruce-800 text-spruce-900'
+                      : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-spruce-700'
                   }`}
                   data-testid={`nav-${link.label.toLowerCase()}`}
                 >
@@ -67,7 +77,7 @@ export default function Navbar() {
           </div>
 
           {/* Auth + Add Listings (desktop): action sits immediately left of login / user menu */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="relative z-10 hidden md:flex shrink-0 items-center gap-3">
             <Button
               type="button"
               onClick={handleAddListingClick}
@@ -141,14 +151,18 @@ export default function Navbar() {
               </Button>
             </SheetTrigger>
             <SheetContent side="right" className="w-72 min-h-screen h-screen flex flex-col">
-              <div className="flex flex-col gap-6 pt-6 px-4 pb-8 flex-1 overflow-auto">
+              <div className="flex flex-col items-center text-center gap-6 pt-6 px-4 pb-8 flex-1 overflow-auto">
                 {MAIN_NAV_LINKS.map((link) => {
-                  const isActive = pathname === link.to;
+                  const isActive = navLinkIsActive(pathname, link.to);
                   return (
                     <Link
                       key={link.to}
                       to={link.to}
-                      className={`text-lg font-medium hover:text-red-900 ${isActive ? 'text-red-900 font-bold' : 'text-slate-700 hover:text-red-800'}`}
+                      className={`w-full max-w-[16rem] border-b-2 pb-2 text-lg font-medium transition-colors ${
+                        isActive
+                          ? 'border-spruce-800 text-spruce-900'
+                          : 'border-transparent text-slate-700 hover:border-slate-200 hover:text-spruce-800'
+                      }`}
                       onClick={() => setOpen(false)}
                     >
                       {link.label}
@@ -158,7 +172,7 @@ export default function Navbar() {
                 <Button
                   type="button"
                   className={
-                    'w-full justify-center gap-2 bg-spruce-700 hover:bg-spruce-800 text-white shadow-sm'
+                    'w-full max-w-[16rem] justify-center gap-2 bg-spruce-700 hover:bg-spruce-800 text-white shadow-sm'
                   }
                   onClick={() => {
                     handleAddListingClick();
@@ -169,30 +183,52 @@ export default function Navbar() {
                   <Plus className="w-4 h-4 shrink-0" />
                   Add Listings
                 </Button>
-                <hr className="border-slate-200" />
+                <hr className="w-full max-w-[16rem] border-slate-200" />
                 {user ? (
                   <>
                     <p className="text-sm text-muted-foreground">Signed in as {user.name}</p>
-                    <Link to={ROUTES.PROFILE} className="text-lg font-medium" onClick={() => setOpen(false)}>
+                    <Link
+                      to={ROUTES.PROFILE}
+                      className="text-lg font-medium w-full max-w-[16rem]"
+                      onClick={() => setOpen(false)}
+                    >
                       Profile
                     </Link>
                     {(user.role === 'vendor' || user.role === 'admin') && (
-                      <Link to={ROUTES.DASHBOARD} className="text-lg font-medium" onClick={() => setOpen(false)}>Dashboard</Link>
+                      <Link
+                        to={ROUTES.DASHBOARD}
+                        className="text-lg font-medium w-full max-w-[16rem]"
+                        onClick={() => setOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
                     )}
                     {user.role === 'admin' && (
                       <Link
                         to={ROUTES.ADMIN}
-                        className={`text-lg font-medium ${pathname.startsWith(ROUTES.ADMIN) ? 'text-admin-700' : ''}`}
+                        className={`text-lg font-medium w-full max-w-[16rem] ${pathname.startsWith(ROUTES.ADMIN) ? 'text-admin-700' : ''}`}
                         onClick={() => setOpen(false)}
                       >
                         Admin Panel
                       </Link>
                     )}
-                    <Button variant="outline" onClick={() => { handleLogout(); setOpen(false); }}>Logout</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full max-w-[16rem]"
+                      onClick={() => { handleLogout(); setOpen(false); }}
+                    >
+                      Logout
+                    </Button>
                   </>
                 ) : (
                   <>
-                    <Button variant="outline" onClick={() => { navigate(ROUTES.LOGIN); setOpen(false); }}>Log In</Button>
+                    <Button
+                      variant="outline"
+                      className="w-full max-w-[16rem]"
+                      onClick={() => { navigate(ROUTES.LOGIN); setOpen(false); }}
+                    >
+                      Log In
+                    </Button>
                   </>
                 )}
               </div>

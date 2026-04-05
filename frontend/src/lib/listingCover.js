@@ -1,5 +1,5 @@
 /**
- * Cover image for cards and detail hero: listing images + coverImageIndex, else vendor fallback.
+ * Cover image for cards and detail hero: listing images + coverImageIndex, else seller snapshot fallback.
  */
 export function getListingCoverImageUrl(listing) {
   const imgs = Array.isArray(listing?.images) ? listing.images : [];
@@ -10,8 +10,8 @@ export function getListingCoverImageUrl(listing) {
       : 0;
     return imgs[idx] || imgs[0];
   }
-  const v = listing?.vendor || {};
-  return v.images?.[0] || '';
+  const s = listing?.seller || {};
+  return s.images?.[0] || '';
 }
 
 /** Gallery order: cover image first, then remaining images (no duplicate). */

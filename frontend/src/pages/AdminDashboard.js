@@ -6,7 +6,6 @@ import { Loader2 } from 'lucide-react';
 import { ADMIN_SECTIONS } from './admin/adminConfig';
 import { AdminSidebar } from './admin/AdminSidebar';
 import { AdminStatsSection } from './admin/AdminStatsSection';
-import { AdminVendorsSection } from './admin/AdminVendorsSection';
 import { AdminListingsSection } from './admin/AdminListingsSection';
 import { AdminUsersSection } from './admin/AdminUsersSection';
 import { AdminNewsSection } from './admin/AdminNewsSection';
@@ -61,9 +60,9 @@ export default function AdminDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-admin-50 flex items-center justify-center" data-testid="admin-dashboard">
+      <div className="min-h-screen flex items-center justify-center" data-testid="admin-dashboard">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-admin-600 mx-auto mb-4" />
+          <Loader2 className="w-10 h-10 animate-spin text-spruce-800 mx-auto mb-4" />
           <p className="text-slate-500">Loading dashboard…</p>
         </div>
       </div>
@@ -71,7 +70,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-admin-50" data-testid="admin-dashboard">
+    <div className="min-h-screen flex flex-col lg:flex-row" data-testid="admin-dashboard">
       <AdminSidebar stats={stats} activeSectionId={activeSectionId} onSelectSection={setSection} />
 
       {/* Main content */}
@@ -79,7 +78,6 @@ export default function AdminDashboard() {
         <div className="w-full max-w-none">
           {validSection === 'statistics' && <AdminStatsSection stats={stats} />}
           {validSection === 'users' && <AdminUsersSection />}
-          {validSection === 'vendors' && <AdminVendorsSection onUpdate={refreshStats} />}
           {validSection === 'listings' && <AdminListingsSection onUpdate={refreshStats} />}
           {validSection === 'news' && <AdminNewsSection onUpdate={refreshStats} />}
           {validSection === 'support' && <AdminSupportSection onUpdate={refreshStats} />}

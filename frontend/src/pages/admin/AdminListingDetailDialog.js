@@ -31,7 +31,7 @@ export function AdminListingDetailDialog({ listing, onClose, getCategoryName, on
               )}
 
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-slate-500">Vendor</span><p className="font-medium">{listing.vendorName || '—'}</p></div>
+                <div><span className="text-slate-500">Seller (listing)</span><p className="font-medium">{listing.sellerTitle || listing.title || '—'}</p></div>
                 <div><span className="text-slate-500">Category</span><p className="font-medium">{getCategoryName(listing.categoryId) || listing.categoryId || '—'}</p></div>
                 <div>
                   <span className="text-slate-500">Registered</span>
@@ -41,7 +41,7 @@ export function AdminListingDetailDialog({ listing, onClose, getCategoryName, on
                 <div>
                   <span className="text-slate-500">Featured</span>
                   <p className="font-medium">{listing.featured ? 'Yes' : 'No'}</p>
-                  <p className="mt-1 text-xs text-slate-500">Set automatically when the vendor has a Standard or Gold membership.</p>
+                  <p className="mt-1 text-xs text-slate-500">Set automatically when the seller has a Standard or Gold membership.</p>
                 </div>
               </div>
 

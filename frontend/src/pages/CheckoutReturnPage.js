@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ROUTES } from '../constants';
 import { billingAPI } from '../lib/api';
+import { useAuth } from '../lib/auth';
 
 export default function CheckoutReturnPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { refreshUser } = useAuth();
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -25,6 +27,11 @@ export default function CheckoutReturnPage() {
         if (data?.status === 'complete') {
           try {
             await billingAPI.syncSubscription();
+          } catch {
+            /* non-fatal */
+          }
+          try {
+            await refreshUser();
           } catch {
             /* non-fatal */
           }
@@ -49,7 +56,7 @@ export default function CheckoutReturnPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, navigate]);
+  }, [searchParams, navigate, refreshUser]);
 
   if (error) {
     return (

@@ -9,7 +9,7 @@ export const MEMBERSHIP_PLANS = Object.freeze([
       'One image',
       'No video links',
       'No direct contact links',
-      'No ability to reply to reviews',
+      'No Review Display',
     ],
   },
   {
@@ -25,7 +25,7 @@ export const MEMBERSHIP_PLANS = Object.freeze([
       'Multiple images',
       'Embedded YouTube video introduction',
       'Direct contact options (phone, email, website)',
-      'Ability to reply to reviews',
+      'Ability to display reviews',
     ],
   },
   {
@@ -49,12 +49,9 @@ export function getPlanById(planId) {
   return MEMBERSHIP_PLANS.find((p) => p.id === planId) || MEMBERSHIP_PLANS[0];
 }
 
-function formatDual({ cad, usd }) {
-  return `$${cad} CAD · $${usd} USD`;
-}
-
 /**
- * @returns {{ primary: string, secondary: string | null, alternate: string | null }}
+ * Display USD amounts only (no CAD line, no “Or monthly/yearly” alternates).
+ * @returns {{ primary: string, secondary: string | null, alternate: null }}
  */
 export function getPlanPriceDisplay(plan, cadence) {
   if (plan.id === 'free') {
@@ -68,15 +65,11 @@ export function getPlanPriceDisplay(plan, cadence) {
 
   const isYearly = cadence === 'yearly';
   const current = isYearly ? pricing.yearly : pricing.monthly;
-  const other = isYearly ? pricing.monthly : pricing.yearly;
+  const usd = current?.usd ?? current?.cad;
 
   return {
-    primary: formatDual(current),
+    primary: usd != null ? `$${usd}` : '',
     secondary: isYearly ? 'per year' : 'per month',
-    alternate: other
-      ? isYearly
-        ? `Or monthly: ${formatDual(other)}`
-        : `Or yearly: ${formatDual(other)}`
-      : null,
+    alternate: null,
   };
 }

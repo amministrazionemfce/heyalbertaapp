@@ -81,7 +81,7 @@ export function getMembershipEntitlementsCopy(plan) {
         'Listing video or video links',
         'URLs or email addresses inside listing descriptions',
         'Phone, email, and website on your public profile (upgrade to show them)',
-        'Replying to customer reviews',
+        'Review display on your public listing',
       ],
     };
   }
@@ -93,7 +93,7 @@ export function getMembershipEntitlementsCopy(plan) {
         'Multiple images per listing',
         'Embedded video (YouTube links, uploads, and other supported players)',
         'Phone, email, and website on your public profile',
-        'Reply to reviews from your dashboard',
+        'Ability to display reviews',
       ],
       notIncluded: ['Priority ordering in category and city search results (Gold)'],
     };

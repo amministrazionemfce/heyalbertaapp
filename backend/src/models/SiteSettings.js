@@ -4,8 +4,8 @@ const siteSettingsSchema = new mongoose.Schema(
   {
     _id: { type: String, default: "default" },
     newsHeroImage: { type: String, default: "" },
-    aboutHeroImage: { type: String, default: "" },
-    contactHeroImage: { type: String, default: "" },
+    aboutHeroImage: { type: String, default: "/about.jpeg" },
+    contactHeroImage: { type: String, default: "/support.jpeg" },
     /** About page — images shown in the Mission section (between copy and checkmarks) */
     aboutMissionImages: {
       type: [String],
@@ -32,8 +32,9 @@ const siteSettingsSchema = new mongoose.Schema(
       default:
         "Your trusted source for moving tips, local stories, business highlights, and events across Alberta.",
     },
-    newsCtaPrimaryText: { type: String, default: "Subscribe for weekly updates" },
-    newsCtaPrimaryLink: { type: String, default: "/register" },
+    newsCtaPrimaryText: { type: String, default: "Subscribe for news" },
+    /** Use "__subscribe__" to open the email subscribe modal on the News page (recommended). */
+    newsCtaPrimaryLink: { type: String, default: "__subscribe__" },
     newsCtaSecondaryText: { type: String, default: "List your business" },
     newsCtaSecondaryLink: { type: String, default: "/register" },
     /** Admin-editable copy for public membership tiers section */

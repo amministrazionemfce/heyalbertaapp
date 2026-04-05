@@ -8,6 +8,7 @@ import { SITE_CONTACT } from '../constants/site';
 import { useAuth } from '../lib/auth';
 import { getPlanById, getPlanPriceDisplay } from '../data/membershipPlans';
 import { BACKEND_URL, BACKEND_EXTRA_FETCH_HEADERS } from '../lib/api';
+import BrandLoadingOverlay from '../components/BrandLoadingOverlay';
 
 const STORAGE_KEY = 'hey_alberta_checkout_payload';
 
@@ -142,128 +143,144 @@ export default function CheckoutContinuePage() {
   }, [navigate]);
 
   if (!payload || !plan) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="text-sm text-slate-500">Loading…</p>
-      </div>
-    );
+    return <BrandLoadingOverlay open label="Preparing checkout…" />;
   }
 
   const cadenceLabel = payload.cadence === 'yearly' ? 'Yearly billing' : 'Monthly billing';
 
-  return (
-    <div className="flex min-h-screen bg-slate-200/90" data-testid="checkout-continue-page">
-      <div className="relative hidden min-h-screen lg:flex lg:w-1/2">
-        <img src={`${process.env.PUBLIC_URL}/background.jpeg`} alt="" className="h-full w-full object-cover" />
-        <div className="absolute inset-0 bg-slate-900/65" aria-hidden />
-        <div className="absolute inset-0 flex items-center justify-center p-8 sm:p-12">
-          <div className="max-w-lg text-center">
-            <div className="mx-auto mb-6 flex justify-center">
-              <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 ring-2 ring-white/30">
-                <Lock className="h-7 w-7 text-white" aria-hidden />
-              </span>
-            </div>
-            <h2 className="mb-4 font-heading text-3xl font-bold text-white drop-shadow-md sm:text-4xl">
-              Secure checkout
-            </h2>
-            <p className="text-lg leading-relaxed text-white/95 drop-shadow-sm">
-              {useEmbedded
-                ? 'Complete payment below using Stripe’s secure form. We never store your card on our servers.'
-                : 'You’ll finish payment on Stripe’s encrypted page. We never store your card on our servers.'}
-            </p>
-          </div>
-        </div>
-      </div>
+  const paymentPanelScroll =
+    'min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden';
 
-      <div className="flex max-h-screen flex-1 flex-col overflow-y-auto bg-slate-100 p-6 sm:p-8 lg:max-h-none">
-        <div className="mx-auto w-full max-w-lg pb-10">
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-white"
+      data-testid="checkout-continue-page"
+    >
+      <div className="mx-auto flex h-full min-h-0 w-full max-w-[92rem] flex-1 flex-col px-4 py-3 sm:px-6 sm:py-4">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 pb-3">
           <Link
             to={ROUTES.HOME}
-            className="mb-4 flex items-center gap-2"
+            className="flex h-9 w-24 items-center justify-center sm:h-10 sm:w-28"
             onClick={() => sessionStorage.removeItem(STORAGE_KEY)}
           >
-            <div className="flex h-14 w-24 items-center justify-center sm:h-16 sm:w-28">
-              <img src={`${process.env.PUBLIC_URL}/logo.png`} alt="Hey Alberta" className="h-full w-full object-contain" />
-            </div>
+            <img
+              src={`${process.env.PUBLIC_URL}/logo.png`}
+              alt="Hey Alberta"
+              className="h-full w-full object-contain object-left"
+            />
           </Link>
           <button
             type="button"
             onClick={handleCancel}
-            className="mb-6 inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-spruce-700"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:text-spruce-800 sm:text-sm"
             data-testid="checkout-back-home"
           >
-            <ArrowLeft className="h-4 w-4" /> Cancel and return home
+            <ArrowLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Cancel
           </button>
+        </header>
 
-          <h1 className="mb-2 font-heading text-2xl font-bold text-slate-900">Review your plan</h1>
-          <p className="mb-6 text-sm text-slate-600">{cadenceLabel}</p>
-
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-6 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-spruce-700">Selected plan</p>
-            <h2 className="mt-1 font-heading text-xl font-bold text-slate-900">{plan.name}</h2>
-            <p className="mt-2 text-sm text-slate-600">{plan.description}</p>
-
-            <div className="mt-6 border-t border-slate-100 pt-6">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Price</p>
-              <p className="mt-1 font-heading text-xl font-bold leading-snug text-spruce-800 sm:text-2xl">
-                {prices.primary}
-              </p>
-              {prices.secondary && (
-                <p className="mt-1 text-sm font-medium text-slate-600">{prices.secondary}</p>
-              )}
-              {prices.alternate && (
-                <p className="mt-2 text-xs leading-relaxed text-slate-500">{prices.alternate}</p>
-              )}
+        <div
+          className={`mt-3 grid min-h-0 flex-1 grid-cols-1 gap-4 md:gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] 2xl:gap-8 ${
+            useEmbedded ? 'grid-rows-[auto_minmax(0,1fr)] lg:grid-rows-1' : ''
+          }`}
+        >
+          <section className="flex shrink-0 flex-col gap-3 lg:min-h-0">
+            <div className="shrink-0">
+              <h1 className="font-heading text-lg font-bold text-slate-900 sm:text-xl">
+                Review &amp; pay
+              </h1>
+              <p className="text-xs text-slate-600 sm:text-sm">{cadenceLabel}</p>
             </div>
 
-            <div className="mt-8 border-t border-slate-100 pt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</p>
-              <p className="mt-2 text-sm text-slate-700">
-                Signed in as <span className="font-medium text-slate-900">{user?.email || 'your account'}</span>
+            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-spruce-700">
+                Selected plan
               </p>
-              <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                Questions before you pay?{' '}
-                <a href={`mailto:${SITE_CONTACT.email}`} className="font-semibold text-spruce-700 hover:underline">
-                  {SITE_CONTACT.email}
-                </a>{' '}
-                or{' '}
-                <Link to={ROUTES.CONTACT} className="font-semibold text-spruce-700 hover:underline">
-                  contact form
-                </Link>
-                .
+              <div className="mt-1 flex items-start justify-between gap-2">
+                <h2 className="font-heading text-lg font-bold leading-tight text-slate-900 sm:text-xl">
+                  {plan.name}
+                </h2>
+                <div className="shrink-0 text-right">
+                  <p className="font-heading text-lg font-bold tabular-nums text-spruce-800 sm:text-xl">
+                    {prices.primary}
+                  </p>
+                  {prices.secondary ? (
+                    <p className="text-[11px] font-medium text-slate-500">{prices.secondary}</p>
+                  ) : null}
+                </div>
+              </div>
+              {plan.description ? (
+                <p className="mt-1.5 line-clamp-2 text-[11px] leading-snug text-slate-600 sm:text-xs">
+                  {plan.description}
+                </p>
+              ) : null}
+              <div className="mt-3 border-t border-slate-100 pt-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Signed in as
+                </p>
+                <p className="truncate text-xs font-medium text-slate-800" title={user?.email || ''}>
+                  {user?.email || 'your account'}
+                </p>
+                <p className="mt-1.5 text-[10px] leading-snug text-slate-500">
+                  Questions?{' '}
+                  <a href={`mailto:${SITE_CONTACT.email}`} className="font-semibold text-spruce-700 hover:underline">
+                    Email
+                  </a>{' '}
+                  ·{' '}
+                  <Link to={ROUTES.CONTACT} className="font-semibold text-spruce-700 hover:underline">
+                    Contact
+                  </Link>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-spruce-50 text-spruce-800">
+                <Lock className="h-4 w-4" aria-hidden />
+              </span>
+              <p className="text-[11px] leading-snug text-slate-600 sm:text-xs">
+                {useEmbedded
+                  ? 'Pay securely with Stripe below. We never store your card.'
+                  : 'You’ll finish on Stripe’s encrypted page.'}
               </p>
             </div>
-          </div>
 
-          {useEmbedded && (
-            <div className="mt-6">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Payment</p>
+            {useHostedUrl ? (
+              <div className="shrink-0">
+                <Button
+                  type="button"
+                  onClick={handleContinue}
+                  className="h-10 w-full rounded-xl bg-spruce-700 text-sm font-semibold text-white hover:bg-spruce-800"
+                  data-testid="checkout-continue-stripe"
+                >
+                  Continue to secure payment
+                </Button>
+              </div>
+            ) : null}
+
+            <p className="shrink-0 text-center text-[10px] text-slate-500 lg:mt-auto">
+              Secured by Stripe · Cancel anytime from billing portal
+            </p>
+          </section>
+
+          {useEmbedded ? (
+            <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+              <p className="mb-2 shrink-0 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Payment
+              </p>
               {embedError ? (
-                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{embedError}</p>
+                <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+                  {embedError}
+                </p>
               ) : (
                 <div
                   ref={embedMountRef}
-                  className="min-h-[420px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                  className={`rounded-xl border border-slate-200 bg-white shadow-sm ${paymentPanelScroll}`}
                   data-testid="checkout-embedded-mount"
                 />
               )}
-            </div>
-          )}
-
-          {useHostedUrl && (
-            <Button
-              type="button"
-              onClick={handleContinue}
-              className="mt-8 h-12 w-full rounded-xl bg-spruce-700 text-base font-semibold text-white hover:bg-spruce-800"
-              data-testid="checkout-continue-stripe"
-            >
-              Continue to secure payment
-            </Button>
-          )}
-
-          <p className="mt-4 text-center text-xs text-slate-500">
-            Secured by Stripe · Cancel anytime from your billing portal
-          </p>
+            </section>
+          ) : null}
         </div>
       </div>
     </div>

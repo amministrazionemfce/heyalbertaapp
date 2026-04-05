@@ -70,7 +70,10 @@ export default function NewsCategoriesSection({ managedItems, listingCounts, cat
         const idx = CATEGORIES.findIndex((c) => c.id === cat.id);
         const imageNum = idx >= 0 ? idx + 1 : 1;
         const defaultImageSrc = `/services/${imageNum}.jpg`;
-        const imageSrc = categoryImageOverrides?.[cat.id] || defaultImageSrc;
+        const override = categoryImageOverrides?.[cat.id];
+        const imageSrc = override?.trim()
+          ? resolveMediaUrl(override) || override
+          : defaultImageSrc;
         const count = listingCounts?.[cat.id] ?? 0;
         return {
           key: cat.id,

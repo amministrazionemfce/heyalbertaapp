@@ -54,7 +54,7 @@ export default function FeaturedListingsSection() {
         <div className="mb-10 text-center md:mb-12">
           <h2 className="font-heading text-3xl font-bold text-slate-900 md:text-4xl">Featured Listings</h2>
           <p className="mx-auto mt-3 max-w-2xl text-base text-slate-600 md:text-lg">
-            Hand-picked services from Alberta vendors across the province.
+            Hand-picked listings from Alberta businesses across the province.
           </p>
         </div>
 
@@ -67,12 +67,21 @@ export default function FeaturedListingsSection() {
             {Array.from({ length: PAGE_SIZE }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse overflow-hidden rounded-2xl border border-slate-100 bg-slate-100"
+                className="animate-pulse overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
               >
                 <div className="aspect-[4/3] bg-slate-200" />
-                <div className="space-y-3 p-4">
-                  <div className="h-4 rounded bg-slate-200" />
-                  <div className="h-3 w-2/3 rounded bg-slate-200" />
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 shrink-0 rounded bg-slate-200" />
+                    <div className="h-6 w-16 rounded-md bg-slate-200" />
+                  </div>
+                  <div className="h-9 w-9 shrink-0 rounded-full bg-slate-200" />
+                </div>
+                <div className="space-y-2 p-4 pt-3.5">
+                  <div className="h-5 w-full rounded bg-slate-200" />
+                  <div className="h-4 w-[85%] rounded bg-slate-200" />
+                  <div className="h-3.5 w-32 rounded bg-slate-200" />
+                  <div className="h-3.5 w-28 rounded bg-slate-200" />
                 </div>
               </div>
             ))}
@@ -94,7 +103,7 @@ export default function FeaturedListingsSection() {
         <div className="mt-12 flex justify-center">
           <Link
             to={viewMoreHref}
-            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-spruce-900 via-spruce-800 to-spruce-700 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-800 hover:via-spruce-700 hover:to-spruce-600 hover:shadow-lg active:scale-[0.98]"
+            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-spruce-800 hover:bg-spruce-900 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-800 hover:via-spruce-700 hover:to-spruce-600 hover:shadow-lg active:scale-[0.98]"
             data-testid="featured-listings-view-more"
           >
             View more

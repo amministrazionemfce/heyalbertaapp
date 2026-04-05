@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { useParams, useNavigate, Link, NavLink } from 'react-router-dom';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
-import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 
 import { StarRating, StarInput } from '../components/StarRating';
@@ -16,6 +15,8 @@ import { getListingCoverImageUrl, getListingGalleryImageUrls } from '../lib/list
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { getVendorVideoKind } from '../lib/vendorVideoEmbed';
 import { listingPlanFromVendorTier } from '../lib/listingTierRules';
+import { OPENING_DAY_ORDER, OPENING_DAY_LABELS } from '../lib/vendorOpeningHours';
+import { ListingDetailPageSkeleton } from '../components/ListingPageSkeletons';
 import {
   ArrowLeft,
   MapPin,
@@ -28,12 +29,14 @@ import {
   Clock,
   ChevronLeft,
   ChevronRight,
-  Heart,
+  ThumbsUp,
   Share2,
   Shield,
   Star,
   Sparkles,
   Calendar,
+  Copy,
+  Play,
 } from 'lucide-react';
 
 const FAV_KEY = 'hey_alberta_favorite_listings';
@@ -57,12 +60,33 @@ function toggleFavoriteId(listingId) {
   return i < 0;
 }
 
-function ListingVideoInline({ url }) {
+/**
+ * @param {{ url: string, className?: string, variant?: 'default' | 'fill' }} props
+ * `fill` — absolutely fills a parent with fixed aspect (e.g. gallery stage); same footprint as cover images.
+ */
+function ListingVideoInline({ url, className = '', variant = 'default' }) {
   const k = getVendorVideoKind(url);
   if (k.kind === 'empty') return null;
+
   if (k.kind === 'embed') {
+    if (variant === 'fill') {
+      return (
+        <div className={`absolute inset-0 bg-black ${className}`.trim()}>
+          <iframe
+            title="Listing video"
+            src={k.embedSrc}
+            className="h-full w-full border-0"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            loading="lazy"
+          />
+        </div>
+      );
+    }
     return (
-      <div className="w-full max-w-3xl overflow-hidden rounded-xl border border-slate-200/80 bg-slate-100 aspect-video shadow-inner">
+      <div
+        className={`aspect-video w-full overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-inner ${className}`.trim()}
+      >
         <iframe
           title="Listing video"
           src={k.embedSrc}
@@ -74,18 +98,46 @@ function ListingVideoInline({ url }) {
       </div>
     );
   }
+
   if (k.kind === 'file') {
     const src = resolveMediaUrl(url) || url;
+    if (variant === 'fill') {
+      return (
+        <video
+          src={src}
+          controls
+          playsInline
+          preload="metadata"
+          className={`absolute inset-0 h-full w-full bg-black object-cover ${className}`.trim()}
+        />
+      );
+    }
     return (
       <video
         src={src}
         controls
         playsInline
         preload="metadata"
-        className="w-full max-w-3xl rounded-xl border border-slate-200/80 bg-black max-h-[480px] shadow-sm"
+        className={`aspect-video w-full rounded-xl border border-slate-200/80 bg-black object-cover shadow-sm ${className}`.trim()}
       />
     );
   }
+
+  if (variant === 'fill') {
+    return (
+      <div className={`absolute inset-0 flex items-center justify-center bg-white p-4 ${className}`.trim()}>
+        <a
+          href={k.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-center text-sm font-medium text-spruce-700 underline"
+        >
+          Open video link
+        </a>
+      </div>
+    );
+  }
+
   return (
     <a
       href={k.href}
@@ -100,74 +152,143 @@ function ListingVideoInline({ url }) {
 
 const FEATURE_ICONS = [Sparkles, Star, MapPin, Globe];
 
-function ListingImageCarousel({ images, alt }) {
+const PLACEHOLDER_IMG =
+  'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&q=80';
+
+/**
+ * Product-style gallery: vertical thumbnail rail (left on md+), main stage on the right.
+ * Optional listing video appears as the first thumbnail when `videoUrl` is set.
+ */
+function ListingImageGallery({ images, alt, videoUrl }) {
+  const galleryRootRef = useRef(null);
   const resolved = useMemo(
     () => images.map((src) => resolveMediaUrl(src) || src).filter(Boolean),
     [images]
   );
+  const vid = videoUrl != null ? String(videoUrl).trim() : '';
+  const hasVideo = Boolean(vid);
+  const total = hasVideo ? resolved.length + 1 : resolved.length;
+
   const [idx, setIdx] = useState(0);
-  const n = resolved.length;
-  const safeIdx = n > 0 ? Math.min(idx, n - 1) : 0;
-  const current = n > 0 ? resolved[safeIdx] : '';
+  const safeIdx = total > 0 ? Math.min(idx, total - 1) : 0;
+  const isVideoSlide = hasVideo && safeIdx === 0;
+  const currentImageSrc =
+    hasVideo && safeIdx > 0 ? resolved[safeIdx - 1] : !hasVideo ? resolved[safeIdx] : null;
 
   useEffect(() => {
     setIdx(0);
-  }, [images]);
+  }, [images, videoUrl]);
+
+  useEffect(() => {
+    const root = galleryRootRef.current;
+    if (!root) return;
+    const el = root.querySelector(`[data-gallery-thumb="${safeIdx}"]`);
+    el?.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  }, [safeIdx]);
 
   const go = (d) => {
-    if (n <= 1) return;
-    setIdx((i) => (i + d + n) % n);
+    if (total <= 1) return;
+    setIdx((i) => (i + d + total) % total);
   };
 
-  if (n === 0) {
+  if (total === 0) {
     return (
-      <div className="relative aspect-[21/9] min-h-[220px] md:min-h-[320px] rounded-2xl overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
-        <img
-          src="https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=1200&q=80"
-          alt=""
-          className="w-full h-full object-cover opacity-90"
-        />
+      <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+        <img src={PLACEHOLDER_IMG} alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
       </div>
     );
   }
 
   return (
-    <div className="relative group rounded-2xl overflow-hidden bg-slate-900 shadow-lg ring-1 ring-slate-200/60">
-      <div className="aspect-[21/9] min-h-[220px] md:min-h-[340px]">
-        <img src={current} alt={alt} className="w-full h-full object-cover" />
+    <div
+      ref={galleryRootRef}
+      className="group relative flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-sm ring-1 ring-slate-100 md:flex-row md:gap-4 md:p-3"
+      data-testid="listing-image-gallery"
+    >
+      {/* Thumbnails: horizontal strip on mobile, vertical rail on md+ */}
+      <div
+        className="order-2 flex max-h-none flex-row gap-2 overflow-x-auto overflow-y-hidden pb-1 [-ms-overflow-style:none] [scrollbar-width:thin] md:order-1 md:w-[4.75rem] md:max-h-[min(70vh,560px)] md:flex-col md:overflow-y-auto md:overflow-x-hidden md:pb-0 md:pr-0.5 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300"
+        role="tablist"
+        aria-label="Gallery thumbnails"
+      >
+        {hasVideo ? (
+          <button
+            type="button"
+            data-gallery-thumb="0"
+            role="tab"
+            aria-selected={safeIdx === 0}
+            aria-label="Video"
+            onClick={() => setIdx(0)}
+            className={`relative aspect-square w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors md:w-full ${
+              safeIdx === 0
+                ? 'border-spruce-600 ring-2 ring-spruce-500/25'
+                : 'border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <span className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-slate-700 to-slate-900 text-white">
+              <Play className="h-6 w-6 fill-white text-white" aria-hidden />
+              <span className="text-[9px] font-semibold uppercase tracking-wide">Video</span>
+            </span>
+          </button>
+        ) : null}
+        {resolved.map((src, i) => {
+          const thumbIndex = hasVideo ? i + 1 : i;
+          return (
+            <button
+              key={`${thumbIndex}-${src.slice(0, 32)}`}
+              type="button"
+              data-gallery-thumb={thumbIndex}
+              role="tab"
+              aria-selected={safeIdx === thumbIndex}
+              aria-label={`Photo ${i + 1}`}
+              onClick={() => setIdx(thumbIndex)}
+              className={`aspect-square w-16 shrink-0 overflow-hidden rounded-xl border-2 transition-colors md:w-full ${
+                safeIdx === thumbIndex
+                  ? 'border-spruce-600 ring-2 ring-spruce-500/25'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+            </button>
+          );
+        })}
       </div>
-      {n > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={() => go(-1)}
-            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-slate-800 hover:bg-white transition-colors opacity-90 md:opacity-0 md:group-hover:opacity-100"
-            aria-label="Previous image"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            type="button"
-            onClick={() => go(1)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/95 shadow-md flex items-center justify-center text-slate-800 hover:bg-white transition-colors opacity-90 md:opacity-0 md:group-hover:opacity-100"
-            aria-label="Next image"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5">
-            {resolved.map((_, i) => (
+
+      {/* Main stage: fixed 16:9 box — same size for image and video; white backdrop */}
+      <div className="relative order-1 min-w-0 flex-1 md:order-2">
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-white ring-1 ring-slate-200/60">
+          {isVideoSlide ? (
+            <ListingVideoInline url={vid} variant="fill" />
+          ) : currentImageSrc ? (
+            <img
+              src={currentImageSrc}
+              alt={alt}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : null}
+
+          {total > 1 ? (
+            <>
               <button
-                key={i}
                 type="button"
-                onClick={() => setIdx(i)}
-                className={`h-2 rounded-full transition-all ${i === safeIdx ? 'w-8 bg-white' : 'w-2 bg-white/50 hover:bg-white/70'
-                  }`}
-                aria-label={`Photo ${i + 1}`}
-              />
-            ))}
-          </div>
-        </>
-      )}
+                onClick={() => go(-1)}
+                className="absolute left-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-800 shadow-md transition-colors hover:bg-white md:left-3 md:opacity-90 md:transition-opacity md:group-hover:opacity-100"
+                aria-label="Previous"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => go(1)}
+                className="absolute right-2 top-1/2 z-10 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 text-slate-800 shadow-md transition-colors hover:bg-white md:right-3 md:opacity-90 md:transition-opacity md:group-hover:opacity-100"
+                aria-label="Next"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -184,8 +305,6 @@ export default function ListingDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [favorited, setFavorited] = useState(false);
   const [similar, setSimilar] = useState([]);
-  const [meeting, setMeeting] = useState({ date: '', name: '', phone: '', email: '', message: '' });
-  const [meetingSending, setMeetingSending] = useState(false);
 
   const fetchListing = async () => {
     try {
@@ -199,10 +318,10 @@ export default function ListingDetailPage() {
     }
   };
 
-  const fetchReviews = async (vendorId) => {
-    if (!vendorId) return;
+  const fetchReviews = async (listingId) => {
+    if (!listingId) return;
     try {
-      const res = await reviewAPI.list(vendorId);
+      const res = await reviewAPI.list(listingId);
       setReviews(Array.isArray(res.data) ? res.data : []);
     } catch {
       setReviews([]);
@@ -214,8 +333,8 @@ export default function ListingDetailPage() {
   }, [id]);
 
   useEffect(() => {
-    if (listing?.vendor?.id) fetchReviews(listing.vendor.id);
-  }, [listing?.vendor?.id]);
+    if (listing?.id) fetchReviews(listing.id);
+  }, [listing?.id]);
 
   useEffect(() => {
     if (!listing?.id) return;
@@ -246,14 +365,14 @@ export default function ListingDetailPage() {
       navigate(ROUTES.LOGIN);
       return;
     }
-    if (!listing?.vendor?.id) return;
+    if (!listing?.id) return;
     setSubmitting(true);
     try {
-      await reviewAPI.create(listing.vendor.id, { rating: reviewRating, comment: reviewComment });
+      await reviewAPI.create(listing.id, { rating: reviewRating, comment: reviewComment });
       toast.success('Review submitted!');
       setReviewComment('');
       setReviewRating(5);
-      fetchReviews(listing.vendor.id);
+      fetchReviews(listing.id);
     } catch (err) {
       const lines = getApiErrorLines(err);
       toast.error(lines[0] || 'Failed to submit review');
@@ -285,22 +404,19 @@ export default function ListingDetailPage() {
     if (!listing?.id) return;
     const now = toggleFavoriteId(listing.id);
     setFavorited(now);
-    toast.success(now ? 'Saved to favorites' : 'Removed from favorites');
+    toast.success(now ? 'Saved to My likings' : 'Removed from My likings');
   };
 
-  const handleMeetingSubmit = (e) => {
-    e.preventDefault();
-    if (!meeting.name.trim() || !meeting.email.trim()) {
-      toast.error('Please enter your name and email');
-      return;
+  const handleCopyContact = useCallback(async (text, successLabel) => {
+    const t = String(text || '').trim();
+    if (!t) return;
+    try {
+      await navigator.clipboard.writeText(t);
+      toast.success(`${successLabel} copied to clipboard`);
+    } catch {
+      toast.error('Could not copy');
     }
-    setMeetingSending(true);
-    setTimeout(() => {
-      toast.success('Thanks! Your request was sent. The business may reach out using the details you provided.');
-      setMeeting({ date: '', name: '', phone: '', email: '', message: '' });
-      setMeetingSending(false);
-    }, 400);
-  };
+  }, []);
 
   const gallerySources = useMemo(() => {
     if (!listing) return [];
@@ -308,37 +424,41 @@ export default function ListingDetailPage() {
   }, [listing]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-spruce-700" />
-      </div>
-    );
+    return <ListingDetailPageSkeleton />;
   }
 
   if (!listing) return null;
 
-  const vendor = listing.vendor || {};
+  const seller = listing.seller || {};
   const uid = user ? String(user.id ?? user._id ?? '') : '';
-  const isVendorOwner = Boolean(uid && vendor.userId && String(vendor.userId) === uid);
+  const isVendorOwner = Boolean(uid && seller.userId && String(seller.userId) === uid);
   const hasUserReviewed = Boolean(
     uid && reviews.some((r) => String(r.userId ?? r.user_id ?? '') === uid)
   );
 
   const categoryName = CATEGORIES.find((c) => c.id === listing.categoryId)?.name || listing.categoryId;
-  const mapQuery = [vendor.name, vendor.city, vendor.neighborhood, 'Alberta'].filter(Boolean).join(', ');
+  const mapQuery = [seller.name, seller.city, seller.neighborhood, 'Alberta'].filter(Boolean).join(', ');
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
-  // Always render a map inside the page.
-  // Prefer the API-key embed (more reliable). If the key is missing, fall back to the no-key embed URL.
-  const googleMapsKey = process.env.REACT_APP_GOOGLE_MAPS_API_KEY;
+  // Prefer Maps Embed API when the env key looks valid (Google keys start with "AIzaSy"; "AlzaSy" is a common typo).
+  // Invalid keys would show Google's error iframe — fall back to legacy no-key embed instead.
+  const rawMapsKey = (process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '').trim();
+  const googleMapsKey =
+    rawMapsKey.startsWith('AIzaSy') && rawMapsKey.length >= 35 ? rawMapsKey : '';
   const mapEmbedUrl =
-    mapQuery &&
-      googleMapsKey
+    mapQuery && googleMapsKey
       ? `https://www.google.com/maps/embed/v1/search?key=${encodeURIComponent(googleMapsKey)}&q=${encodeURIComponent(
-        mapQuery
-      )}`
+          mapQuery
+        )}`
       : mapQuery
         ? `https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed`
         : null;
+
+  const sellerWebsiteRaw = seller.website != null ? String(seller.website).trim() : '';
+  const sellerWebsiteHref = sellerWebsiteRaw
+    ? sellerWebsiteRaw.startsWith('http')
+      ? sellerWebsiteRaw
+      : `https://${sellerWebsiteRaw}`
+    : '';
 
   const avgRating =
     reviews.length > 0
@@ -355,9 +475,12 @@ export default function ListingDetailPage() {
       : null;
 
   const features = Array.isArray(listing.features) ? listing.features : [];
+  const openingHours = listing.openingHours || {};
+  const showHoursPublic = listing.showOpeningHours !== false;
+  const hasAnyOpeningHour = OPENING_DAY_ORDER.some((d) => String(openingHours[d] || '').trim());
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white" data-testid="listing-detail-page">
+    <div className="min-h-screen" data-testid="listing-detail-page">
       <div className="container mx-auto px-4 md:px-8 max-w-6xl py-6 md:py-10">
         {/* Breadcrumbs */}
         <nav className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-500 mb-4">
@@ -381,7 +504,7 @@ export default function ListingDetailPage() {
             {/* One row above image: category title | price | 3 actions */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Alberta directory</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Category</p>
                 <p className="text-xl md:text-2xl font-semibold text-spruce-900 font-heading truncate">{categoryName}</p>
               </div>
               <div className="flex flex-row flex-nowrap items-center gap-4 sm:gap-6 sm:shrink-0 sm:ml-auto">
@@ -402,12 +525,12 @@ export default function ListingDetailPage() {
                     type="button"
                     onClick={handleFavorite}
                     className={`inline-flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${favorited
-                        ? 'border-red-200 bg-red-50 text-red-500'
+                        ? 'border-spruce-200 bg-spruce-50 text-spruce-700'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-spruce-300 hover:text-spruce-700'
                       }`}
-                    aria-label={favorited ? 'Remove from favorites' : 'Save to favorites'}
+                    aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
                   >
-                    <Heart className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
+                    <ThumbsUp className={`w-4 h-4 ${favorited ? 'fill-current' : ''}`} />
                   </button>
                   <button
                     type="button"
@@ -431,11 +554,15 @@ export default function ListingDetailPage() {
               </div>
             </div>
 
-            <ListingImageCarousel images={gallerySources} alt={listing.title} />
+            <ListingImageGallery
+              images={gallerySources}
+              alt={listing.title}
+              videoUrl={listing.videoUrl?.trim() || ''}
+            />
 
             <div className="rounded-2xl border border-slate-100 bg-white p-6 md:p-8 shadow-sm">
               <div className="flex flex-wrap items-start gap-3 mb-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-spruce-100 text-spruce-800">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-spruce-800">
                   <Shield className="w-6 h-6" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -445,22 +572,22 @@ export default function ListingDetailPage() {
                   >
                     {listing.title}
                   </h1>
-                  {vendor.name && (
+                  {seller.name && (
                     <Link
-                      to={vendorPath(vendor.id)}
+                      to={vendorPath(seller.userId || seller.id)}
                       className="mt-1 inline-block text-spruce-700 hover:underline font-medium text-sm md:text-base"
                     >
-                      {vendor.name}
+                      {seller.name}
                     </Link>
                   )}
                 </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600 pb-6 border-b border-slate-100">
-                {(vendor.city || vendor.neighborhood) && (
+                {(seller.city || seller.neighborhood) && (
                   <span className="inline-flex items-center gap-1.5">
                     <MapPin className="w-4 h-4 text-spruce-600 shrink-0" />
-                    {[vendor.city, vendor.neighborhood].filter(Boolean).join(', ')}
+                    {[seller.city, seller.neighborhood].filter(Boolean).join(', ')}
                   </span>
                 )}
                 <span className="inline-flex items-center gap-1.5">
@@ -499,17 +626,35 @@ export default function ListingDetailPage() {
                 </div>
               )}
 
+              {showHoursPublic && hasAnyOpeningHour && (
+                <div className="py-5 border-b border-slate-100">
+                  <h2 className="font-heading text-lg font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-spruce-600 shrink-0" aria-hidden />
+                    Hours of operation
+                  </h2>
+                  <div className="rounded-xl border border-slate-200 overflow-hidden max-w-lg">
+                    {OPENING_DAY_ORDER.map((day, i) => {
+                      const line = openingHours[day];
+                      const text = String(line || '').trim() || '—';
+                      return (
+                        <div
+                          key={day}
+                          className={`flex justify-between gap-4 px-4 py-2.5 text-sm ${i > 0 ? 'border-t border-slate-100' : ''}`}
+                        >
+                          <span className="text-slate-600 font-medium">{OPENING_DAY_LABELS[day]}</span>
+                          <span className="text-slate-900 text-right tabular-nums">{text}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-6">
                 <h2 className="font-heading text-lg font-semibold text-slate-900 mb-3">Description</h2>
                 <p className="text-base leading-relaxed text-slate-600 whitespace-pre-wrap">{listing.description}</p>
               </div>
 
-              {listing.videoUrl?.trim() ? (
-                <div className="mt-8 pt-8 border-t border-slate-100">
-                  <h2 className="font-heading text-lg font-semibold text-slate-900 mb-4">Video</h2>
-                  <ListingVideoInline url={listing.videoUrl} />
-                </div>
-              ) : null}
             </div>
 
             {/* Reviews */}
@@ -608,7 +753,7 @@ export default function ListingDetailPage() {
                 <h3 className="font-heading font-semibold text-slate-900 mb-4">More in this category</h3>
                 <div className="space-y-4">
                   {similar.map((s) => {
-                    const v = s.vendor || {};
+                    const v = s.seller || {};
                     const thumb = resolveMediaUrl(getListingCoverImageUrl(s)) || getListingCoverImageUrl(s) || v.images?.[0];
                     return (
                       <Link
@@ -639,89 +784,10 @@ export default function ListingDetailPage() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-slate-100 bg-white p-5 md:p-6 shadow-sm">
-              <h3 className="font-heading font-semibold text-lg text-slate-900 mb-1">Book a meeting</h3>
-              <p className="text-xs text-slate-500 mb-4">Share your details and the vendor can follow up.</p>
-              <form onSubmit={handleMeetingSubmit} className="space-y-3">
-                <div>
-                  <Label htmlFor="meet-date" className="text-xs text-slate-600">
-                    Preferred date
-                  </Label>
-                  <div className="relative mt-1">
-                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    <Input
-                      id="meet-date"
-                      type="date"
-                      value={meeting.date}
-                      onChange={(e) => setMeeting((m) => ({ ...m, date: e.target.value }))}
-                      className="pl-10 h-10 rounded-xl border-slate-200"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="meet-name" className="text-xs text-slate-600">
-                    Name *
-                  </Label>
-                  <Input
-                    id="meet-name"
-                    value={meeting.name}
-                    onChange={(e) => setMeeting((m) => ({ ...m, name: e.target.value }))}
-                    className="mt-1 rounded-xl border-slate-200 h-10"
-                    placeholder="Your name"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="meet-phone" className="text-xs text-slate-600">
-                    Phone
-                  </Label>
-                  <Input
-                    id="meet-phone"
-                    value={meeting.phone}
-                    onChange={(e) => setMeeting((m) => ({ ...m, phone: e.target.value }))}
-                    className="mt-1 rounded-xl border-slate-200 h-10"
-                    placeholder="(403) 555-0100"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="meet-email" className="text-xs text-slate-600">
-                    Email *
-                  </Label>
-                  <Input
-                    id="meet-email"
-                    type="email"
-                    value={meeting.email}
-                    onChange={(e) => setMeeting((m) => ({ ...m, email: e.target.value }))}
-                    className="mt-1 rounded-xl border-slate-200 h-10"
-                    placeholder="you@example.com"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="meet-msg" className="text-xs text-slate-600">
-                    Message
-                  </Label>
-                  <Textarea
-                    id="meet-msg"
-                    value={meeting.message}
-                    onChange={(e) => setMeeting((m) => ({ ...m, message: e.target.value }))}
-                    rows={3}
-                    className="mt-1 rounded-xl border-slate-200 resize-y"
-                    placeholder="What would you like to discuss?"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={meetingSending}
-                  className="w-full bg-spruce-700 hover:bg-spruce-800 text-white rounded-xl h-11"
-                >
-                  {meetingSending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send request'}
-                </Button>
-              </form>
-            </div>
-
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm" data-testid="listing-contact-card">
               <h3 className="font-heading font-semibold text-lg mb-4 text-slate-900">Contact &amp; location</h3>
 
-              {listingPlanFromVendorTier(vendor.tier) === 'free' ? (
+              {listingPlanFromVendorTier(seller.tier) === 'free' ? (
                 <p className="text-sm text-slate-500 mb-4">
                   Contact info available for upgraded listings.
                   <Link to={ROUTES.ABOUT} className="text-spruce-700 hover:underline ml-1 font-medium">
@@ -730,37 +796,74 @@ export default function ListingDetailPage() {
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {vendor.phone && (
-                    <a href={`tel:${vendor.phone}`} className="flex items-center gap-3 text-sm text-slate-700 hover:text-spruce-800 transition-colors">
-                      <div className="w-10 h-10 rounded-xl bg-spruce-50 flex items-center justify-center shrink-0">
-                        <Phone className="w-4 h-4 text-spruce-700" />
-                      </div>
-                      <span>{vendor.phone}</span>
-                    </a>
+                  {seller.phone && (
+                    <div className="flex items-stretch gap-1">
+                      <a
+                        href={`tel:${seller.phone}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-0.5 pr-1 text-sm text-slate-700 transition-colors hover:text-spruce-800"
+                      >
+                        <div className="w-10 h-10 shrink-0 rounded-xl flex items-center justify-center">
+                          <Phone className="w-4 h-4 text-spruce-700" />
+                        </div>
+                        <span className="min-w-0 truncate font-medium">{seller.phone}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyContact(seller.phone, 'Phone number')}
+                        className="shrink-0 self-center rounded-lg p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-spruce-800"
+                        aria-label="Copy phone number"
+                      >
+                        <Copy className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
                   )}
-                  {vendor.email && (
-                    <a href={`mailto:${vendor.email}`} className="flex items-center gap-3 text-sm text-slate-700 hover:text-spruce-800 transition-colors">
-                      <div className="w-10 h-10 rounded-xl bg-spruce-50 flex items-center justify-center shrink-0">
-                        <Mail className="w-4 h-4 text-spruce-700" />
-                      </div>
-                      <span>{vendor.email}</span>
-                    </a>
+                  {seller.email && (
+                    <div className="flex items-stretch gap-1">
+                      <a
+                        href={`mailto:${seller.email}`}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-0.5 pr-1 text-sm text-slate-700 transition-colors hover:text-spruce-800"
+                      >
+                        <div className="w-10 h-10 shrink-0 rounded-xl bg-spruce-50 flex items-center justify-center">
+                          <Mail className="w-4 h-4 text-spruce-700" />
+                        </div>
+                        <span className="min-w-0 truncate font-medium">{seller.email}</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyContact(seller.email, 'Email')}
+                        className="shrink-0 self-center rounded-lg p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-spruce-800"
+                        aria-label="Copy email address"
+                      >
+                        <Copy className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
                   )}
-                  {vendor.website && (
-                    <a
-                      href={vendor.website.startsWith('http') ? vendor.website : `https://${vendor.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 text-sm text-slate-700 hover:text-spruce-800 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-xl bg-spruce-50 flex items-center justify-center shrink-0">
-                        <Globe className="w-4 h-4 text-spruce-700" />
-                      </div>
-                      <span className="flex items-center gap-1">
-                        Website <ExternalLink className="w-3 h-3" />
-                      </span>
-                    </a>
-                  )}
+                  {sellerWebsiteHref ? (
+                    <div className="flex items-stretch gap-1">
+                      <a
+                        href={sellerWebsiteHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-0.5 pr-1 text-sm text-slate-700 transition-colors hover:text-spruce-800"
+                      >
+                        <div className="w-10 h-10 shrink-0 rounded-xl bg-spruce-50 flex items-center justify-center">
+                          <Globe className="w-4 h-4 text-spruce-700" />
+                        </div>
+                        <span className="flex min-w-0 items-center gap-1.5 truncate font-medium">
+                          <span className="truncate">{sellerWebsiteRaw}</span>
+                          <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        </span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyContact(sellerWebsiteHref, 'Website URL')}
+                        className="shrink-0 self-center rounded-lg p-2.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-spruce-800"
+                        aria-label="Copy website URL"
+                      >
+                        <Copy className="h-4 w-4" aria-hidden />
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
@@ -805,10 +908,10 @@ export default function ListingDetailPage() {
                   asChild
                 >
                   <Link
-                    to={vendorPath(vendor.id)}
+                    to={vendorPath(seller.userId || seller.id)}
                     className="inline-flex w-full items-center justify-center gap-2 whitespace-nowrap"
                   >
-                    <span>Full vendor profile</span>
+                    <span>All listings from this business</span>
                     <ExternalLink className="h-3.5 w-3.5 shrink-0" />
                   </Link>
                 </Button>

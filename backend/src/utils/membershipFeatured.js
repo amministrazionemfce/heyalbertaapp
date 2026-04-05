@@ -1,31 +1,37 @@
-import Vendor from "../models/Vendor.js";
 import Listing from "../models/Listing.js";
+import User from "../models/User.js";
 
 /**
- * When a user has a paid membership (standard / gold), feature their vendor(s)
- * and every listing tied to those vendors.
+ * Ensure every listing owned by a premium subscriber uses the premium tier and is featured (fixes drift / legacy data).
+ */
+export async function syncUserListingTiersFromBilling(userId) {
+  const uid = String(userId || "");
+  if (!uid) return;
+  const u = await User.findById(uid).select("billingTier").lean();
+  if (!u || u.billingTier !== "premium") return;
+  await Listing.updateMany({ userId: uid }, { $set: { tier: "premium", featured: true } });
+}
+
+/** New listings for paid plans should match webhook `setFeaturedForPaidUser` behavior. */
+export function listingsFeaturedForBillingTier(billingTier) {
+  const t = String(billingTier || "").toLowerCase();
+  return t === "standard" || t === "premium";
+}
+
+/**
+ * When a user has a paid membership (standard / gold), feature their listings.
  */
 export async function setFeaturedForPaidUser(userId) {
   const uid = String(userId || "");
   if (!uid) return;
-  const vendors = await Vendor.find({ userId: uid }).select("_id");
-  const vendorIds = vendors.map((v) => v._id.toString());
-  await Vendor.updateMany({ userId: uid }, { $set: { featured: true } });
-  if (vendorIds.length > 0) {
-    await Listing.updateMany({ vendorId: { $in: vendorIds } }, { $set: { featured: true } });
-  }
+  await Listing.updateMany({ userId: uid }, { $set: { featured: true } });
 }
 
 /**
- * When membership returns to free, remove featured flags for that user's vendors and listings.
+ * When membership returns to free, remove featured flags for that user's listings.
  */
 export async function clearFeaturedForFreeUser(userId) {
   const uid = String(userId || "");
   if (!uid) return;
-  const vendors = await Vendor.find({ userId: uid }).select("_id");
-  const vendorIds = vendors.map((v) => v._id.toString());
-  await Vendor.updateMany({ userId: uid }, { $set: { featured: false } });
-  if (vendorIds.length > 0) {
-    await Listing.updateMany({ vendorId: { $in: vendorIds } }, { $set: { featured: false } });
-  }
+  await Listing.updateMany({ userId: uid }, { $set: { featured: false } });
 }

@@ -11,6 +11,7 @@ import {
   BookOpen,
   ChevronDown,
   Image,
+  Mail,
 } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -37,7 +38,7 @@ const emptyArticleForm = {
   linkUrl: '',
   featured: false,
   publishedAt: '',
-  authorLabel: 'heyalberta',
+  hideCardText: false,
 };
 
 /** Lean JSON from Mongo omits `id` virtual; use `id` or `_id` for API paths. */
@@ -71,7 +72,9 @@ export function AdminNewsSection({ onUpdate }) {
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [mainTab, setMainTab] = useState('banner'); // 'banner' | 'articles' | 'categories'
+  const [mainTab, setMainTab] = useState('banner'); // 'banner' | 'articles' | 'categories' | 'subscribers'
+  const [newsSubscribers, setNewsSubscribers] = useState([]);
+  const [subscribersLoading, setSubscribersLoading] = useState(false);
   const [newsHeroUrl, setNewsHeroUrl] = useState('');
   const [heroUploading, setHeroUploading] = useState(false);
 
@@ -94,6 +97,29 @@ export function AdminNewsSection({ onUpdate }) {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (mainTab !== 'subscribers') return undefined;
+    let cancelled = false;
+    setSubscribersLoading(true);
+    adminAPI
+      .newsSubscribers()
+      .then((res) => {
+        if (!cancelled) setNewsSubscribers(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setNewsSubscribers([]);
+          toast.error('Could not load subscribers');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setSubscribersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mainTab]);
 
   const pageForm = useMemo(
     () => ({
@@ -248,7 +274,7 @@ export function AdminNewsSection({ onUpdate }) {
       linkUrl: r.linkUrl || '',
       featured: !!r.featured,
       publishedAt: pub,
-      authorLabel: r.authorLabel || 'heyalberta',
+      hideCardText: !!r.hideCardText,
     });
     setArtEditorOpen(true);
   };
@@ -280,7 +306,8 @@ export function AdminNewsSection({ onUpdate }) {
         linkUrl: (artForm.linkUrl || '').trim(),
         featured: !!artForm.featured,
         publishedAt,
-        authorLabel: (artForm.authorLabel || 'heyalberta').trim(),
+        authorLabel: '',
+        hideCardText: !!artForm.hideCardText,
         sortOrder: 0,
       };
       if (artEditId) {
@@ -397,7 +424,7 @@ export function AdminNewsSection({ onUpdate }) {
               Manage News page
             </h2>
             <p className="text-sm text-slate-600 mt-1">
-              Banner, articles carousel, and browse categories — switch tabs to edit each section.
+              Banner, articles, category cards, and news email subscribers — switch tabs below.
             </p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -427,6 +454,16 @@ export function AdminNewsSection({ onUpdate }) {
             >
               <LayoutGrid className="w-4 h-4 mr-1.5" />
               Category cards
+            </Button>
+            <Button
+              type="button"
+              variant={mainTab === 'subscribers' ? 'default' : 'outline'}
+              className={mainTab === 'subscribers' ? 'bg-spruce-700 hover:bg-spruce-800 text-white' : 'border-slate-200'}
+              onClick={() => setMainTab('subscribers')}
+              data-testid="admin-news-subscribers-tab"
+            >
+              <Mail className="w-4 h-4 mr-1.5" />
+              Subscribers
             </Button>
           </div>
         </div>
@@ -504,7 +541,7 @@ export function AdminNewsSection({ onUpdate }) {
                         value={pageFields.newsCtaPrimaryLink}
                         onChange={(e) => setPageFields((p) => ({ ...p, newsCtaPrimaryLink: e.target.value }))}
                         className="mt-1"
-                        placeholder="/register or https://..."
+                        placeholder="__subscribe__ (email modal) or /path or https://..."
                       />
                     </div>
                     <div>
@@ -653,26 +690,15 @@ export function AdminNewsSection({ onUpdate }) {
                           placeholder="https://..."
                         />
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <Label htmlFor="art-author">Author label</Label>
-                          <Input
-                            id="art-author"
-                            value={artForm.authorLabel}
-                            onChange={(e) => setArtForm((f) => ({ ...f, authorLabel: e.target.value }))}
-                            className="mt-1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="art-pub">Published</Label>
-                          <Input
-                            id="art-pub"
-                            type="datetime-local"
-                            value={artForm.publishedAt}
-                            onChange={(e) => setArtForm((f) => ({ ...f, publishedAt: e.target.value }))}
-                            className="mt-1"
-                          />
-                        </div>
+                      <div>
+                        <Label htmlFor="art-pub">Published</Label>
+                        <Input
+                          id="art-pub"
+                          type="datetime-local"
+                          value={artForm.publishedAt}
+                          onChange={(e) => setArtForm((f) => ({ ...f, publishedAt: e.target.value }))}
+                          className="mt-1"
+                        />
                       </div>
                       <label className="flex items-center gap-2 text-sm">
                         <input
@@ -681,6 +707,20 @@ export function AdminNewsSection({ onUpdate }) {
                           onChange={(e) => setArtForm((f) => ({ ...f, featured: e.target.checked }))}
                         />
                         Featured (sorts first)
+                      </label>
+                      <label className="flex items-start gap-2 text-sm leading-snug">
+                        <input
+                          type="checkbox"
+                          checked={!!artForm.hideCardText}
+                          onChange={(e) => setArtForm((f) => ({ ...f, hideCardText: e.target.checked }))}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className="font-medium text-slate-800">Image + button only</span>
+                          <span className="block text-slate-500">
+                            Hide title and excerpt on the public card (e.g. visual-only tile with Learn more).
+                          </span>
+                        </span>
                       </label>
                       <div className="flex flex-wrap justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={closeArticleEditor}>
@@ -754,6 +794,47 @@ export function AdminNewsSection({ onUpdate }) {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {mainTab === 'subscribers' && (
+            <div className="space-y-4" data-testid="admin-news-subscribers-panel">
+              <h3 className="font-heading flex items-center gap-2 font-semibold text-slate-900">
+                <Mail className="h-5 w-5 text-spruce-700" />
+                News email subscribers
+              </h3>
+              <p className="text-sm text-slate-600">
+                Addresses from the News page subscribe flow. When you publish a new article, these emails are notified if SMTP
+                is configured on the server.
+              </p>
+              {subscribersLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-spruce-600" />
+                </div>
+              ) : newsSubscribers.length === 0 ? (
+                <p className="rounded-xl border border-dashed py-8 text-center text-sm text-slate-500">No subscribers yet.</p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50 text-left">
+                        <th className="px-4 py-3 font-semibold text-slate-700">Email</th>
+                        <th className="px-4 py-3 font-semibold text-slate-700">Subscribed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newsSubscribers.map((row, i) => (
+                        <tr key={`${row.email}-${i}`} className="border-b border-slate-100 last:border-0">
+                          <td className="px-4 py-2.5 text-slate-900">{row.email}</td>
+                          <td className="px-4 py-2.5 tabular-nums text-slate-600">
+                            {row.createdAt ? new Date(row.createdAt).toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>
