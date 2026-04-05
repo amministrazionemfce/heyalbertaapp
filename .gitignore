@@ -1,0 +1,4 @@
+# Local environment files with secrets — never commit (use *.env.example templates).
+backend/.env
+backend/.local.env
+frontend/.env
