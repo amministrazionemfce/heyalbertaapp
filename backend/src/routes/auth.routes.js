@@ -3,6 +3,7 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 import User from "../models/User.js";
+import SiteSettings from "../models/SiteSettings.js";
 import { createToken } from "../utils/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
 import { verificationEmailEnabled, sendTransactionalMail } from "../utils/mail.js";
@@ -16,6 +17,31 @@ function getFrontendBase() {
     u = `http://${u.replace(/^\/+/, "")}`;
   }
   return u.replace(/\/$/, "");
+}
+
+async function getOrCreateSiteSettings() {
+  let doc = await SiteSettings.findById("default");
+  if (!doc) doc = await SiteSettings.create({ _id: "default" });
+  return doc;
+}
+
+function applyTemplate(raw, vars) {
+  let out = String(raw || "");
+  for (const [k, v] of Object.entries(vars || {})) {
+    out = out.split(`{{${k}}}`).join(String(v ?? ""));
+  }
+  return out;
+}
+
+async function buildVerificationEmail({ userName, verifyUrl }) {
+  const s = await getOrCreateSiteSettings();
+  const subject =
+    String(s.emailVerificationEmailSubject || "").trim() || "Verify your Hey Alberta email";
+  const bodyRaw =
+    String(s.emailVerificationEmailBody || "").trim() ||
+    "Hi {{name}},\n\nPlease verify your email for Hey Alberta:\n{{verifyUrl}}\n\nThis link expires in 48 hours.\n";
+  const text = applyTemplate(bodyRaw, { name: userName, verifyUrl });
+  return { subject, text };
 }
 
 router.post("/register", async (req, res) => {
@@ -44,11 +70,11 @@ router.post("/register", async (req, res) => {
     if (needVerify) {
       const base = getFrontendBase();
       const verifyUrl = `${base}/verify-email?token=${encodeURIComponent(verifyToken)}`;
-      const text = `Hi ${name},\n\nPlease verify your email for Hey Alberta:\n${verifyUrl}\n\nThis link expires in 48 hours.\n`;
       try {
+        const { subject, text } = await buildVerificationEmail({ userName: name, verifyUrl });
         await sendTransactionalMail({
           to: user.email,
-          subject: "Verify your Hey Alberta email",
+          subject,
           text,
         });
       } catch (e) {
@@ -138,13 +164,9 @@ router.post("/resend-verification", async (req, res) => {
 
     const base = getFrontendBase();
     const verifyUrl = `${base}/verify-email?token=${encodeURIComponent(verifyToken)}`;
-    const text = `Hi ${user.name},\n\nVerify your Hey Alberta email:\n${verifyUrl}\n\nExpires in 48 hours.\n`;
 
-    await sendTransactionalMail({
-      to: user.email,
-      subject: "Verify your Hey Alberta email",
-      text,
-    });
+    const { subject, text } = await buildVerificationEmail({ userName: user.name, verifyUrl });
+    await sendTransactionalMail({ to: user.email, subject, text });
 
     return res.json({ message: "If an account exists for that email, we sent a verification link." });
   } catch (err) {
@@ -158,11 +180,11 @@ router.post("/login", async (req, res) => {
 
   const user = await User.findOne({ email: String(email || "").trim().toLowerCase() });
 
-  if (!user) return res.status(401).json({ message: "Invalid credentials" });
+  if (!user) return res.status(404).json({ message: "No account found for that email." });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
 
-  if (!valid) return res.status(401).json({ message: "Invalid credentials" });
+  if (!valid) return res.status(401).json({ message: "Incorrect password." });
 
   if (verificationEmailEnabled() && !user.emailVerified) {
     return res.status(403).json({
@@ -241,10 +263,11 @@ router.patch("/me", requireAuth, async (req, res) => {
       const base = getFrontendBase();
       const verifyUrl = `${base}/verify-email?token=${encodeURIComponent(user.emailVerificationToken)}`;
       try {
+        const { subject, text } = await buildVerificationEmail({ userName: user.name, verifyUrl });
         await sendTransactionalMail({
           to: user.email,
-          subject: "Confirm your new Hey Alberta email",
-          text: `Hi ${user.name},\n\nConfirm this address:\n${verifyUrl}\n`,
+          subject,
+          text,
         });
       } catch (e) {
         console.error("email change verification:", e?.message || e);

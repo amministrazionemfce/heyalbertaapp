@@ -6,7 +6,11 @@ import User from "../models/User.js";
 import Review from "../models/Review.js";
 import CityImage from "../models/CityImage.js";
 import CategoryImage from "../models/CategoryImage.js";
-import { validateListingForVendorTier, vendorMaySetPublicContactFields } from "../utils/listingTierCaps.js";
+import {
+  validateListingForVendorTier,
+  vendorMaySetPublicContactFields,
+  maxListingsForPlanTier,
+} from "../utils/listingTierCaps.js";
 import { matchReviewsByListingId } from "../utils/reviewListingQuery.js";
 import { listingsFeaturedForBillingTier } from "../utils/membershipFeatured.js";
 
@@ -22,6 +26,13 @@ const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "satu
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Express / qs may return a string or duplicate-key array. */
+function firstQueryString(val) {
+  if (val == null) return "";
+  const s = Array.isArray(val) ? val[0] : val;
+  return String(s).trim().toLowerCase();
 }
 
 function normalizeOpeningHours(raw) {
@@ -89,12 +100,15 @@ async function defaultTierForUser(userId) {
 function buildSellerShapeFromListing(listing) {
   const o = typeof listing.toObject === "function" ? listing.toObject() : listing;
   const uid = String(o.userId || "");
+  const business = String(o.businessName || "").trim();
+  const displayName = business || o.title;
   return {
     userId: uid,
     /** @deprecated use userId — kept for older clients */
     id: uid,
     title: o.title,
-    name: o.title,
+    businessName: business,
+    name: displayName,
     description: o.description,
     city: o.city,
     neighborhood: o.neighborhood,
@@ -127,6 +141,12 @@ router.get("/", optionalAuth, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
+    const reviewSortRaw =
+      firstQueryString(req.query.reviewSort) ||
+      firstQueryString(req.query.review_sort) ||
+      firstQueryString(req.get("x-directory-review-sort"));
+
+    const reviewsCollName = Review.collection?.collectionName || "reviews";
 
     let matchListing;
 
@@ -165,7 +185,7 @@ router.get("/", optionalAuth, async (req, res) => {
       { $match: matchListing },
       {
         $lookup: {
-          from: "reviews",
+          from: reviewsCollName,
           let: { lid: { $toString: "$_id" } },
           pipeline: [
             {
@@ -181,7 +201,23 @@ router.get("/", optionalAuth, async (req, res) => {
       },
       {
         $addFields: {
-          reviewCount: { $size: { $ifNull: ["$_reviewDocs", []] } },
+          /** Prefer live review rows; merge with stored `reviewCount` on the listing doc (Compass / denormalized). */
+          reviewCount: {
+            $let: {
+              vars: {
+                stored: {
+                  $convert: {
+                    input: { $ifNull: ["$reviewCount", 0] },
+                    to: "long",
+                    onError: 0,
+                    onNull: 0,
+                  },
+                },
+                live: { $size: { $ifNull: ["$_reviewDocs", []] } },
+              },
+              in: { $max: ["$$stored", "$$live"] },
+            },
+          },
           avgRating: {
             $cond: [
               { $gt: [{ $size: { $ifNull: ["$_reviewDocs", []] } }, 0] },
@@ -239,26 +275,47 @@ router.get("/", optionalAuth, async (req, res) => {
     if (hasMinPrice) pipeline.push({ $match: { priceNumeric: { $gte: minPriceQ } } });
     if (hasMaxPrice) pipeline.push({ $match: { priceNumeric: { $lte: maxPriceQ } } });
 
-    pipeline.push(
-      {
-        $addFields: {
-          _tierBoost: {
-            $cond: [
-              {
-                $or: [
-                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "premium"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "gold"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "platinum"] },
-                  { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "enterprise"] },
-                ],
-              },
-              1,
-              0,
+    /** Default browse: tier first. Review-sorted browse: review count first, then tier tie-break. */
+    const membershipRankAddFields = {
+      $addFields: {
+        _membershipRank: {
+          $switch: {
+            branches: [
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "premium"] }, then: 5 },
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "gold"] }, then: 4 },
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "platinum"] }, then: 4 },
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "enterprise"] }, then: 4 },
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "standard"] }, then: 2 },
+              { case: { $eq: [{ $toLower: { $ifNull: ["$tier", ""] } }, "free"] }, then: 1 },
             ],
+            default: 1,
           },
         },
       },
-      { $sort: { _tierBoost: -1, featured: -1, createdAt: -1 } },
+    };
+
+    const defaultSortStage = { $sort: { _membershipRank: -1, featured: -1, createdAt: -1 } };
+    const mostReviewsSortStage = {
+      $sort: {
+        reviewCount: -1,
+        _membershipRank: -1,
+        featured: -1,
+        createdAt: -1,
+      },
+    };
+    const leastReviewsSortStage = {
+      $sort: {
+        reviewCount: 1,
+        _membershipRank: -1,
+        featured: -1,
+        createdAt: -1,
+      },
+    };
+    let sortStage = defaultSortStage;
+    if (reviewSortRaw === "most") sortStage = mostReviewsSortStage;
+    else if (reviewSortRaw === "least") sortStage = leastReviewsSortStage;
+
+    pipeline.push(membershipRankAddFields, sortStage,
       {
         $facet: {
           total: [{ $count: "n" }],
@@ -280,6 +337,7 @@ router.get("/", optionalAuth, async (req, res) => {
                 coverImageIndex: { $ifNull: ["$coverImageIndex", 0] },
                 videoUrl: { $ifNull: ["$videoUrl", ""] },
                 price: { $ifNull: ["$price", ""] },
+                businessName: { $ifNull: ["$businessName", ""] },
                 reviewCount: 1,
                 avgRating: 1,
                 createdAt: 1,
@@ -290,7 +348,17 @@ router.get("/", optionalAuth, async (req, res) => {
                   userId: { $toString: { $ifNull: ["$userId", ""] } },
                   id: { $toString: { $ifNull: ["$userId", ""] } },
                   title: "$title",
-                  name: "$title",
+                  businessName: { $ifNull: ["$businessName", ""] },
+                  name: {
+                    $let: {
+                      vars: {
+                        bn: { $trim: { input: { $ifNull: ["$businessName", ""] } } },
+                      },
+                      in: {
+                        $cond: [{ $gt: [{ $strLenCP: "$$bn" }, 0] }, "$$bn", "$title"],
+                      },
+                    },
+                  },
                   city: "$city",
                   neighborhood: "$neighborhood",
                   images: "$images",
@@ -308,6 +376,7 @@ router.get("/", optionalAuth, async (req, res) => {
     const listings = result[0]?.listings ?? [];
     const pages = Math.ceil(total / limit) || 1;
 
+    res.set("Cache-Control", "private, no-store, must-revalidate");
     res.json({ listings, total, pages, page });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch listings" });
@@ -424,7 +493,6 @@ router.post("/", requireAuth, async (req, res) => {
   if (!desc) return res.status(400).json({ message: "Description is required" });
   if (!stat) return res.status(400).json({ message: "Status is required" });
   if (images.length === 0) return res.status(400).json({ message: "At least one image is required" });
-  if (!priceStr) return res.status(400).json({ message: "Price is required" });
 
   if (!vendorMaySetPublicContactFields(tier)) {
     if (String(body.phone || "").trim()) {
@@ -444,6 +512,17 @@ router.post("/", requireAuth, async (req, res) => {
     videoUrl: body.videoUrl != null ? String(body.videoUrl).trim() : "",
   });
   if (!tierCheck.ok) return res.status(400).json({ message: tierCheck.message });
+
+  const listingCap = maxListingsForPlanTier(tier);
+  if (listingCap != null) {
+    const existingCount = await Listing.countDocuments({ userId: uid });
+    if (existingCount >= listingCap) {
+      return res.status(400).json({
+        message:
+          "Your free plan includes one listing. Upgrade your membership to add more listings.",
+      });
+    }
+  }
 
   const dup = await findListingByTitleCaseInsensitive(tit);
   if (dup) return res.status(400).json({ message: "A listing with this title already exists. Choose a different title." });
@@ -485,7 +564,10 @@ router.post("/", requireAuth, async (req, res) => {
       images,
       coverImageIndex,
       videoUrl: vid,
-      price: priceStr,
+      price: priceStr || "",
+      businessName: String(body.businessName != null ? body.businessName : "")
+        .trim()
+        .slice(0, 200),
       city: String(body.city || "").trim(),
       neighborhood: String(body.neighborhood || "").trim(),
       phone: String(body.phone || "").trim(),
@@ -518,6 +600,7 @@ router.put("/:id", requireAuth, async (req, res) => {
   const allowed = [
     "categoryId",
     "title",
+    "businessName",
     "description",
     "status",
     "features",
@@ -539,6 +622,12 @@ router.put("/:id", requireAuth, async (req, res) => {
   const payload = {};
   for (const key of allowed) {
     if (body[key] === undefined) continue;
+    if (key === "businessName") {
+      payload[key] = String(body[key] != null ? body[key] : "")
+        .trim()
+        .slice(0, 200);
+      continue;
+    }
     if (key === "features") {
       payload[key] = Array.isArray(body[key]) ? body[key] : [];
       continue;
@@ -605,9 +694,6 @@ router.put("/:id", requireAuth, async (req, res) => {
   }
   if (payload.title !== undefined && !payload.title) {
     return res.status(400).json({ message: "Title is required" });
-  }
-  if (payload.price !== undefined && !String(payload.price).trim()) {
-    return res.status(400).json({ message: "Price is required" });
   }
   if (payload.status !== undefined && !String(payload.status).trim()) {
     return res.status(400).json({ message: "Status is required" });

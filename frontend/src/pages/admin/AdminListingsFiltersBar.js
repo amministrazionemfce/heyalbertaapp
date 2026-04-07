@@ -5,22 +5,18 @@ import { CATEGORIES } from '../../data/categories';
 import { Filter, LayoutGrid, Search, Table as TableIcon } from 'lucide-react';
 
 const STATUS_IDLE = 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50';
-const STATUS_ACTIVE = 'bg-slate-800 text-white border-slate-800 shadow-sm';
+const STATUS_ACTIVE = 'bg-spruce-800 text-white border-slate-800 shadow-sm';
 
 export function AdminListingsFiltersBar({
   search,
   onSearchChange,
   statusFilter,
   onStatusFilterChange,
-  vendors,
-  vendorFilter,
-  onVendorFilterChange,
   categoryFilter,
   onCategoryFilterChange,
   viewMode,
   onViewModeChange,
 }) {
-  const vendorSelectValue = vendorFilter || 'all';
   const categorySelectValue = categoryFilter || 'all';
 
   return (
@@ -70,30 +66,6 @@ export function AdminListingsFiltersBar({
                 </button>
               );
             })}
-          </div>
-
-          <div className="w-full max-w-[min(100%,20rem)] sm:w-52 shrink-0">
-            <Label className="text-slate-600 text-xs font-medium mb-1.5 block">By vendor</Label>
-            <Select
-              value={vendorSelectValue}
-              onValueChange={(v) => onVendorFilterChange(v === 'all' ? '' : v)}
-            >
-              <SelectTrigger className="h-10" data-testid="listings-filter-vendor">
-                <SelectValue placeholder="All vendors">
-                  {vendorSelectValue === 'all'
-                    ? 'All vendors'
-                    : vendors.find((v) => v.id === vendorFilter)?.name ?? 'Vendor'}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All vendors</SelectItem>
-                {vendors.map((v) => (
-                  <SelectItem key={v.id} value={v.id}>
-                    {v.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
           </div>
 
           <div className="w-full max-w-[min(100%,20rem)] sm:w-52 shrink-0">

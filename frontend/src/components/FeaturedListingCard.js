@@ -93,7 +93,7 @@ export default function FeaturedListingCard({ listing }) {
             loading="lazy"
           />
           <div className="pointer-events-none absolute left-3 top-3 z-10">
-            <span className="rounded-md bg-cyan-500 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+            <span className="rounded-md bg-spruce-700 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
               Featured
             </span>
           </div>

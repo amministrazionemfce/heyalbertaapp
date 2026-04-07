@@ -1,4 +1,8 @@
 import axios from 'axios';
+import {
+  clearAuthForCurrentScope,
+  getStoredAuthToken,
+} from './authStorage';
 
 /**
  * If REACT_APP_BACKEND_URL has no `http://` or `https://`, axios treats it as a path on the
@@ -22,8 +26,43 @@ function normalizeBackendUrl(raw) {
   }
 }
 
-// Use REACT_APP_BACKEND_URL from .env (baked in at `npm run build`), or local dev fallback.
-export const BACKEND_URL = normalizeBackendUrl(process.env.REACT_APP_BACKEND_URL);
+function hostnameIsLocal(host) {
+  if (!host) return false;
+  const h = String(host).toLowerCase();
+  return h === 'localhost' || h === '127.0.0.1' || h === '[::1]' || h === '0.0.0.0';
+}
+
+/**
+ * CRA dev: if you open the app on localhost but REACT_APP_BACKEND_URL points at production
+ * (Railway, etc.), use the local API anyway so `npm start` always hits localhost:8000.
+ * Production builds keep whatever URL was set at build time.
+ */
+function resolveBackendUrl() {
+  const raw = process.env.REACT_APP_BACKEND_URL;
+  let origin = normalizeBackendUrl(raw);
+
+  if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') {
+    return origin;
+  }
+
+  const pageHost = window.location.hostname;
+  if (!hostnameIsLocal(pageHost)) {
+    return origin;
+  }
+
+  try {
+    const apiHost = new URL(origin).hostname;
+    if (!hostnameIsLocal(apiHost)) {
+      return 'http://localhost:8000';
+    }
+  } catch {
+    return 'http://localhost:8000';
+  }
+
+  return origin;
+}
+
+export const BACKEND_URL = resolveBackendUrl();
 
 /** Ngrok free tier serves a browser warning HTML page unless this header is sent; that page has no CORS headers, so the browser reports a CORS failure. */
 function isNgrokBackendUrl(url) {
@@ -51,7 +90,7 @@ const API = axios.create({
 });
 
 API.interceptors.request.use((config) => {
-  const token = localStorage.getItem('hey_alberta_token');
+  const token = getStoredAuthToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -65,8 +104,7 @@ API.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('hey_alberta_token');
-      localStorage.removeItem('hey_alberta_user');
+      clearAuthForCurrentScope();
     }
     return Promise.reject(error);
   }
@@ -95,7 +133,7 @@ export const billingAPI = {
 
 /** Upload a promotional video (auth required). Returns `{ url }` for storing on listing.videoUrl. */
 function uploadHeaders(extra = {}) {
-  const token = localStorage.getItem('hey_alberta_token');
+  const token = getStoredAuthToken();
   return {
     ...extra,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -143,7 +181,18 @@ export const listingAPI = {
   countsByCity: () => API.get('/listings/counts-by-city'),
   cityImages: () => API.get('/listings/city-images'),
   categoryImages: () => API.get('/listings/category-images'),
-  directory: (params) => API.get('/listings', { params }),
+  directory: (params, axiosConfig = {}) => {
+    const { headers, ...rest } = axiosConfig;
+    return API.get('/listings', {
+      ...rest,
+      params,
+      headers: {
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+        ...(headers || {}),
+      },
+    });
+  },
   create: (data) => API.post('/listings', data),
   update: (id, data) => API.put(`/listings/${id}`, data),
   delete: (id) => API.delete(`/listings/${id}`),
@@ -185,6 +234,10 @@ export const adminAPI = {
   stats: () => API.get('/admin/stats'),
   /** @param {Record<string, string|number>} [params] — page, limit, q, roleFilter, membershipFilter, sort, order */
   users: (params) => API.get('/admin/users', { params: params || {} }),
+  /** @param {{ role: string, adminPassword: string }} body */
+  switchUserRole: (userId, body) => API.patch(`/admin/users/${userId}/role`, body),
+  /** @param {{ adminPassword: string }} body */
+  impersonateUser: (userId, body) => API.post(`/admin/users/${userId}/impersonate`, body),
   emailUsers: (body) => API.post('/admin/users/email', body),
   bulkDeleteUsers: (body) => API.post('/admin/users/bulk-delete', body),
   cityImages: () => API.get('/admin/city-images'),
@@ -195,6 +248,13 @@ export const adminAPI = {
   updateSiteSettings: (data) => API.put('/admin/site-settings', data),
   contactMessages: (params) => API.get('/admin/contact-messages', { params }),
   markContactMessageRead: (id) => API.patch(`/admin/contact-messages/${id}/read`),
+  replyContactMessage: (id, body) => API.post(`/admin/contact-messages/${id}/reply`, body),
+  /** Notifications */
+  notificationUsers: (params) => API.get('/admin/notifications/users', { params: params || {} }),
+  /** Listing reviews (admin) */
+  listingReviews: (params) => API.get('/admin/reviews', { params: params || {} }),
+  updateListingReview: (reviewId, body) => API.patch(`/admin/reviews/${reviewId}`, body),
+  deleteListingReview: (reviewId) => API.delete(`/admin/reviews/${reviewId}`),
   marketingRecipientPools: () => API.get('/admin/marketing/recipient-pools'),
   sendMarketingEmail: (data) => API.post('/admin/marketing/send', data),
   newsSubscribers: () => API.get('/admin/news-subscribers'),

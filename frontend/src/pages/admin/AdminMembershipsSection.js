@@ -31,6 +31,17 @@ const FEAT_KEYS = {
   premium: 'membershipFeaturesPremium',
 };
 
+const PRICE_KEYS = {
+  standard: {
+    monthly: 'membershipPriceStandardMonthlyUsd',
+    yearly: 'membershipPriceStandardYearlyUsd',
+  },
+  premium: {
+    monthly: 'membershipPricePremiumMonthlyUsd',
+    yearly: 'membershipPricePremiumYearlyUsd',
+  },
+};
+
 export function AdminMembershipsSection({ onUpdate }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -69,7 +80,7 @@ export function AdminMembershipsSection({ onUpdate }) {
   if (loading) {
     return (
       <div className="flex justify-center py-16" data-testid="admin-memberships-section">
-        <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-spruce-800" />
       </div>
     );
   }
@@ -128,6 +139,44 @@ export function AdminMembershipsSection({ onUpdate }) {
         >
           <h3 className="font-heading font-semibold text-slate-900">{planLabel(planId)}</h3>
           <div className="mt-4 space-y-4">
+            {planId !== 'free' ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor={`m-price-${planId}-m`}>Display price (USD) — Monthly</Label>
+                  <Input
+                    id={`m-price-${planId}-m`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={form[PRICE_KEYS[planId].monthly] ?? ''}
+                    onChange={(e) =>
+                      setForm({ ...form, [PRICE_KEYS[planId].monthly]: e.target.value })
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor={`m-price-${planId}-y`}>Display price (USD) — Yearly</Label>
+                  <Input
+                    id={`m-price-${planId}-y`}
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={form[PRICE_KEYS[planId].yearly] ?? ''}
+                    onChange={(e) =>
+                      setForm({ ...form, [PRICE_KEYS[planId].yearly]: e.target.value })
+                    }
+                    className="mt-1"
+                  />
+                </div>
+                <p className="text-xs text-slate-500 sm:col-span-2">
+                  This updates the <span className="font-medium text-slate-700">displayed</span> prices on the public
+                  membership cards. Stripe billing/Checkout links are still controlled by your Stripe product/prices.
+                </p>
+              </div>
+            ) : null}
             <div>
               <Label htmlFor={`m-desc-${planId}`}>Description</Label>
               <Textarea
@@ -162,7 +211,7 @@ export function AdminMembershipsSection({ onUpdate }) {
         data-testid="admin-memberships-save"
       >
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-        Save membership copy
+        Save membership
       </Button>
         </div>
 

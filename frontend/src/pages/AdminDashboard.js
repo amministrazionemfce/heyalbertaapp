@@ -14,6 +14,8 @@ import { AdminSupportSection } from './admin/AdminSupportSection';
 import { AdminMembershipsSection } from './admin/AdminMembershipsSection';
 import { AdminSettingsSection } from './admin/AdminSettingsSection';
 import { AdminMarketingSection } from './admin/AdminMarketingSection';
+import { AdminNotificationsSection } from './admin/AdminNotificationsSection';
+import { AdminGeneralSection } from './admin/AdminGeneralSection';
 import { ROUTES } from '../constants';
 
 export default function AdminDashboard() {
@@ -22,10 +24,34 @@ export default function AdminDashboard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionParam = searchParams.get('section');
   const normalizedSection =
-    sectionParam === 'resources' ? 'news' : sectionParam === 'platform-reviews' ? 'general' : sectionParam;
+    sectionParam === 'resources'
+      ? 'news'
+      : sectionParam === 'platform-reviews'
+        ? 'reviews'
+        : sectionParam;
   const validSection = ADMIN_SECTIONS.some((s) => s.id === normalizedSection) ? normalizedSection : 'statistics';
   const [stats, setStats] = useState(null);
+  const [unreadContactMessages, setUnreadContactMessages] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const fetchStats = async () => {
+    const [unreadResult, statsResult] = await Promise.allSettled([
+      adminAPI.contactMessages({ read: 'false', limit: 200 }),
+      adminAPI.stats(),
+    ]);
+
+    let unreadCount = unreadContactMessages;
+    if (unreadResult.status === 'fulfilled') {
+      const unreadList = Array.isArray(unreadResult.value?.data) ? unreadResult.value.data : [];
+      unreadCount = unreadList.length;
+      setUnreadContactMessages(unreadCount);
+    }
+
+    if (statsResult.status === 'fulfilled') {
+      const baseStats = statsResult.value?.data || {};
+      setStats({ ...baseStats, unreadContactMessages: unreadCount });
+    }
+  };
 
   useEffect(() => {
     if (authLoading) {
@@ -35,21 +61,17 @@ export default function AdminDashboard() {
       navigate(ROUTES.LOGIN);
       return;
     }
-    adminAPI
-      .stats()
-      .then((r) => setStats(r.data))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    fetchStats().finally(() => setLoading(false));
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
     if (searchParams.get('section') === 'platform-reviews') {
-      setSearchParams({ section: 'general', tab: 'reviews' }, { replace: true });
+      setSearchParams({ section: 'reviews', tab: 'reviews' }, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
   const refreshStats = () => {
-    adminAPI.stats().then((r) => setStats(r.data)).catch(() => {});
+    fetchStats();
   };
 
   const setSection = (id) => {
@@ -71,7 +93,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col lg:flex-row" data-testid="admin-dashboard">
-      <AdminSidebar stats={stats} activeSectionId={activeSectionId} onSelectSection={setSection} />
+      <AdminSidebar
+        stats={stats}
+        unreadContactMessages={unreadContactMessages}
+        activeSectionId={activeSectionId}
+        onSelectSection={setSection}
+      />
 
       {/* Main content */}
       <main className="flex-1 min-w-0 py-6 px-4 md:px-6">
@@ -84,7 +111,9 @@ export default function AdminDashboard() {
           {validSection === 'city-images' && <AdminCityImagesSection />}
           {validSection === 'marketings' && <AdminMarketingSection />}
           {validSection === 'memberships' && <AdminMembershipsSection onUpdate={refreshStats} />}
-          {validSection === 'general' && <AdminSettingsSection onUpdate={refreshStats} />}
+          {validSection === 'reviews' && <AdminSettingsSection onUpdate={refreshStats} />}
+          {validSection === 'general' && <AdminGeneralSection onUpdate={refreshStats} />}
+          {validSection === 'notifications' && <AdminNotificationsSection onUpdate={refreshStats} />}
         </div>
       </main>
     </div>

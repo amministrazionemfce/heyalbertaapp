@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -15,9 +15,9 @@ import { StarRating } from '../components/StarRating';
 import { toast } from 'sonner';
 import {
   Pencil, Trash2, Loader2, Store, MessageSquare,
-  Clock, ListPlus, Star, Video, ImageIcon, MapPin,
+  Clock, ListPlus, Star, Video, ImageIcon, MapPin, Sparkles,
 } from 'lucide-react';
-import { ROUTES } from '../constants';
+import { MEMBERSHIP_PLANS_URL, ROUTES } from '../constants';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { getVendorVideoKind, isDirectPlayableVideoUrl } from '../lib/vendorVideoEmbed';
 import { emptyOpeningHours, OPENING_DAY_LABELS, OPENING_DAY_ORDER } from '../lib/vendorOpeningHours';
@@ -31,6 +31,7 @@ import MembershipTierEntitlementsCard, { MembershipUpgradeCard } from '../compon
 
 const emptyListingForm = {
   title: '',
+  businessName: '',
   description: '',
   price: '',
   categoryId: '',
@@ -47,7 +48,7 @@ const emptyListingForm = {
   coverImageIndex: 0,
   videoUrl: '',
   openingHours: emptyOpeningHours(),
-  showOpeningHours: true,
+  showOpeningHours: false,
 };
 
 /** YouTube / Vimeo / TikTok / Instagram embed, uploaded file player, or external link. */
@@ -218,6 +219,14 @@ export default function VendorDashboard() {
 
   const effectiveTab = tabFromUrl;
   const vendorListingPlan = membershipPlanTierFromUserAndListings(user, listings);
+  const planCapabilities = useMemo(
+    () => listingPlanTierCapabilities(vendorListingPlan),
+    [vendorListingPlan]
+  );
+  const freePlanListingLimitReached =
+    planCapabilities.maxListings != null &&
+    listings.length >= planCapabilities.maxListings &&
+    !editingListingId;
 
   const fetchListings = async () => {
     setListingsLoading(true);
@@ -251,14 +260,17 @@ export default function VendorDashboard() {
 
   const handleSaveListing = async () => {
     const openingHours = {};
-    for (const d of OPENING_DAY_ORDER) {
-      const v = listingForm.openingHours?.[d];
-      if (v != null && String(v).trim()) openingHours[d] = String(v).trim().slice(0, 120);
+    if (listingForm.showOpeningHours) {
+      for (const d of OPENING_DAY_ORDER) {
+        const v = listingForm.openingHours?.[d];
+        if (v != null && String(v).trim()) openingHours[d] = String(v).trim().slice(0, 120);
+      }
     }
     const latRaw = listingForm.latitude;
     const lngRaw = listingForm.longitude;
     const trimmed = {
       title: (listingForm.title || '').trim(),
+      businessName: (listingForm.businessName || '').trim(),
       description: (listingForm.description || '').trim(),
       price: (listingForm.price != null ? String(listingForm.price) : '').trim(),
       categoryId: (listingForm.categoryId || '').trim(),
@@ -280,12 +292,17 @@ export default function VendorDashboard() {
     const errors = listingFormValidation(trimmed, vendorListingPlan);
     setListingFormErrors(errors);
     setListingApiErrorLines([]);
-    if (hasListingFormErrors(errors)) return;
+    if (hasListingFormErrors(errors)) {
+      const msgs = Object.values(errors).filter(Boolean);
+      toast.error(msgs[0] || 'Please fix the highlighted fields before saving.');
+      return;
+    }
 
     setListingSaving(true);
     try {
       const payload = {
         title: trimmed.title,
+        businessName: trimmed.businessName,
         description: trimmed.description,
         price: trimmed.price,
         categoryId: trimmed.categoryId,
@@ -305,7 +322,7 @@ export default function VendorDashboard() {
         latitude: trimmed.latitude === '' ? undefined : trimmed.latitude,
         longitude: trimmed.longitude === '' ? undefined : trimmed.longitude,
         openingHours: trimmed.openingHours,
-        showOpeningHours: listingForm.showOpeningHours !== false,
+        showOpeningHours: Boolean(listingForm.showOpeningHours),
       };
       if (editingListingId) {
         await listingAPI.update(editingListingId, payload);
@@ -387,24 +404,28 @@ export default function VendorDashboard() {
           <div className="flex-1 min-w-0 flex flex-col">
           {effectiveTab === 'add-listing' && (
             <div className="space-y-4 w-full">
-              <ListingFormSection
-                listingForm={listingForm}
-                patchListingForm={patchListingForm}
-                editingListingId={editingListingId}
-                saving={listingSaving}
-                onSave={handleSaveListing}
-                onCancel={() => {
-                  setEditingListingId(null);
-                  setListingForm({ ...emptyListingForm, openingHours: emptyOpeningHours() });
-                  setListingFormErrors({});
-                  setListingApiErrorLines([]);
-                  setSearchParams({});
-                }}
-                disabled={false}
-                errors={listingFormErrors}
-                apiErrorLines={listingApiErrorLines}
-                vendorListingPlan={vendorListingPlan}
-              />
+              {freePlanListingLimitReached ? (
+                <FreePlanListingLimitPanel />
+              ) : (
+                <ListingFormSection
+                  listingForm={listingForm}
+                  patchListingForm={patchListingForm}
+                  editingListingId={editingListingId}
+                  saving={listingSaving}
+                  onSave={handleSaveListing}
+                  onCancel={() => {
+                    setEditingListingId(null);
+                    setListingForm({ ...emptyListingForm, openingHours: emptyOpeningHours() });
+                    setListingFormErrors({});
+                    setListingApiErrorLines([]);
+                    setSearchParams({});
+                  }}
+                  disabled={false}
+                  errors={listingFormErrors}
+                  apiErrorLines={listingApiErrorLines}
+                  vendorListingPlan={vendorListingPlan}
+                />
+              )}
             </div>
           )}
           {effectiveTab === 'listings' && (
@@ -412,6 +433,7 @@ export default function VendorDashboard() {
               hasProfile={hasProfile}
               listings={listings}
               loading={listingsLoading}
+              addListingBlocked={freePlanListingLimitReached}
               onAddListing={() => {
                 setEditingListingId(null);
                 setListingForm({ ...emptyListingForm, openingHours: emptyOpeningHours() });
@@ -425,6 +447,7 @@ export default function VendorDashboard() {
                 if (cap.maxImages === 1 && imgs.length > 1) imgs = imgs.slice(0, 1);
                 setListingForm({
                   title: listing.title || '',
+                  businessName: listing.businessName != null ? String(listing.businessName) : '',
                   description: listing.description || '',
                   price: listing.price != null ? String(listing.price) : '',
                   categoryId: listing.categoryId || '',
@@ -468,10 +491,32 @@ export default function VendorDashboard() {
   );
 }
 
+function FreePlanListingLimitPanel() {
+  return (
+    <div
+      className="mx-auto max-w-lg rounded-2xl border text-center shadow-sm md:p-10"
+      data-testid="free-plan-listing-limit-notice"
+    >
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full">
+        <Sparkles className="h-6 w-6" aria-hidden />
+      </div>
+      <h2 className="font-heading text-xl font-semibold text-slate-900 md:text-2xl">Listing limit reached</h2>
+      <p className="mt-3 text-sm leading-relaxed text-slate-600">
+        You can only have one listing with your current membership. If you want to add more listings, please
+        upgrade your membership.
+      </p>
+      <Button asChild className="mt-6 bg-spruce-700 hover:bg-spruce-800 text-white">
+        <Link to={MEMBERSHIP_PLANS_URL}>View membership plans</Link>
+      </Button>
+    </div>
+  );
+}
+
 function ListingsTableView({
   hasProfile,
   listings,
   loading,
+  addListingBlocked,
   onAddListing,
   onEditListing,
   onDeleteListing,
@@ -482,7 +527,11 @@ function ListingsTableView({
         <Store className="w-12 h-12 text-slate-300 mx-auto mb-4" />
         <p className="text-lg font-medium text-slate-600 mb-2">No listings yet</p>
         <p className="text-sm text-muted-foreground mb-4">Create your first listing under Add listing — it will show here when saved.</p>
-        <Button onClick={onAddListing} className="bg-spruce-700 hover:bg-spruce-800 text-white">
+        <Button
+          onClick={onAddListing}
+          className="bg-spruce-700 hover:bg-spruce-800 text-white"
+          title={addListingBlocked ? 'Free plan: one listing. Open to see upgrade options.' : undefined}
+        >
           <ListPlus className="w-4 h-4 mr-2" /> Add listing
         </Button>
       </div>
@@ -497,7 +546,11 @@ function ListingsTableView({
         <Store className="w-12 h-12 text-slate-300 mx-auto mb-4" />
         <p className="text-lg font-medium text-slate-600 mb-2">No listings yet</p>
         <p className="text-sm text-muted-foreground mb-4">Add your first listing to appear in the directory.</p>
-        <Button onClick={onAddListing} className="bg-spruce-700 hover:bg-spruce-800 text-white">
+        <Button
+          onClick={onAddListing}
+          className="bg-spruce-700 hover:bg-spruce-800 text-white"
+          title={addListingBlocked ? 'Free plan: one listing. Open to see upgrade options.' : undefined}
+        >
           <ListPlus className="w-4 h-4 mr-2" /> Add listing
         </Button>
       </div>
@@ -507,7 +560,12 @@ function ListingsTableView({
     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden" data-testid="dashboard-listings-table">
       <div className="p-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-heading text-lg font-semibold text-slate-900">Listings</h2>
-        <Button size="sm" onClick={onAddListing} className="bg-spruce-700 hover:bg-spruce-800 text-white">
+        <Button
+          size="sm"
+          onClick={onAddListing}
+          className="bg-spruce-700 hover:bg-spruce-800 text-white"
+          title={addListingBlocked ? 'Free plan: one listing. Open to see upgrade options.' : undefined}
+        >
           <ListPlus className="w-4 h-4 mr-1" /> Add listing
         </Button>
       </div>
@@ -650,6 +708,9 @@ function ListingFormSection({
     }
     if (!newUrls.length) return;
     if (cap.maxImages === 1) {
+      if ((images?.length || 0) >= 1 || newUrls.length > 1) {
+        toast.message('Free plan: only 1 image per listing. Upgrade to add more than one image.');
+      }
       patchListingForm((prev) => ({
         ...prev,
         images: newUrls.slice(0, 1),
@@ -707,7 +768,7 @@ function ListingFormSection({
         {editingListingId ? 'Edit listing' : 'Add listing'}
       </h2>
       <p className="text-xs text-slate-500 mb-4">
-        All fields are required except video (Standard and Gold). Listing title must be unique. Include pricing (any format).
+        Required fields are marked with *. Price is optional. Video is optional on Standard and Gold. Listing title must be unique.
         {cap.maxImages === 1
           ? ' Free plan: one image and a short description — see your plan on the right.'
           : ' Add images and choose the cover shown on the directory and listing page.'}
@@ -718,20 +779,42 @@ function ListingFormSection({
         <section className="space-y-4">
           <h3 className="text-sm font-semibold text-slate-900 border-b border-slate-100 pb-2">Listing details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="sm:col-span-2 lg:col-span-2">
-              <Label htmlFor="listing-title" className="text-xs">Title *</Label>
-              <Input
-                id="listing-title"
-                value={listingForm.title}
-                onChange={(e) => patchListingForm({ title: e.target.value })}
-                className="mt-1 h-9 w-full"
-                placeholder="e.g. Family Law Consultation"
-                data-testid="listing-form-title"
-              />
-              {errors.title && <p className="text-red-500 text-sm mt-0.5">{errors.title}</p>}
+            <div className="sm:col-span-2 lg:col-span-2 space-y-3">
+              <div>
+                <Label htmlFor="listing-title" className="text-xs">Title *</Label>
+                <Input
+                  id="listing-title"
+                  value={listingForm.title}
+                  onChange={(e) => patchListingForm({ title: e.target.value })}
+                  className="mt-1 h-9 w-full"
+                  placeholder="e.g. Family Law Consultation"
+                  data-testid="listing-form-title"
+                />
+                {errors.title && <p className="text-red-500 text-sm mt-0.5">{errors.title}</p>}
+              </div>
+              <div>
+                <Label htmlFor="listing-business-name" className="text-xs">
+                  Business name <span className="font-normal text-slate-500">(optional)</span>
+                </Label>
+                <Input
+                  id="listing-business-name"
+                  value={listingForm.businessName ?? ''}
+                  onChange={(e) => patchListingForm({ businessName: e.target.value })}
+                  className="mt-1 h-9 w-full"
+                  placeholder="e.g. Smith & Associates"
+                  autoComplete="organization"
+                  data-testid="listing-form-business-name"
+                />
+                <p className="mt-1 text-[11px] text-slate-500 leading-snug">
+                  Shown on directory cards and the listing page when set. Your listing title stays unique.
+                </p>
+                {errors.businessName && (
+                  <p className="text-red-500 text-sm mt-0.5">{errors.businessName}</p>
+                )}
+              </div>
             </div>
             <div>
-              <Label htmlFor="listing-price" className="text-xs">Price *</Label>
+              <Label htmlFor="listing-price" className="text-xs">Price (optional)</Label>
               <Input
                 id="listing-price"
                 type="text"
@@ -800,19 +883,21 @@ function ListingFormSection({
                 className="mt-0 min-h-[16rem] w-full resize-y"
                 placeholder={
                   cap.maxDescriptionWords != null
-                    ? `Up to ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words (no URLs or email addresses). At least 10 characters.`
+                    ? `Up to ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words (no phone numbers, URLs, or email addresses). At least 10 characters.`
                     : 'Describe this offering (at least 10 characters)…'
                 }
                 data-testid="listing-form-desc"
               />
               {cap.maxDescriptionWords != null ? (
-                <p className="text-[11px] text-slate-500">Do not include website links or email addresses in the description on the Free plan.</p>
+                <p className="text-[11px] text-slate-500">
+                  Free plan: do not include phone numbers, website links, or email addresses in the description.
+                </p>
               ) : null}
               {errors.description && <p className="text-red-500 text-sm">{errors.description}</p>}
             </div>
 
             <div className="min-w-0 space-y-4 rounded-xl border border-slate-200 p-4 md:p-5">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700 flex items-center gap-2 border-b border-slate-200/90 pb-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-700 flex items-center gap-2 border-slate-200/90 pb-2">
                 <MapPin className="w-4 h-4 text-spruce-600 shrink-0" aria-hidden /> Contact &amp; map
               </h4>
               <div>
@@ -918,47 +1003,55 @@ function ListingFormSection({
 
         <section className="space-y-4 rounded-xl border border-slate-200 p-4 md:p-5">
           <h3 className="text-sm font-semibold text-slate-900 pb-2">Hours of operation</h3>
-          <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+          <div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2">
             <input
               type="checkbox"
               id="listing-show-hours"
-              className="mt-1 h-4 w-4 rounded border-slate-300 text-spruce-700 focus:ring-spruce-600"
-              checked={listingForm.showOpeningHours !== false}
-              onChange={(e) => patchListingForm({ showOpeningHours: e.target.checked })}
+              className="h-4 w-4 rounded border-slate-300 text-spruce-700 focus:ring-spruce-600"
+              checked={Boolean(listingForm.showOpeningHours)}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                patchListingForm({
+                  showOpeningHours: checked,
+                  ...(checked ? {} : { openingHours: emptyOpeningHours() }),
+                });
+              }}
             />
             <Label htmlFor="listing-show-hours" className="text-sm font-normal leading-snug cursor-pointer text-slate-700">
-              Publish workings hours
+              Want to show working hours?
             </Label>
           </div>
-          <div>
-            <Label className="text-xs">Daily hours</Label>
-            <p className="text-[11px] text-slate-500 mt-0.5 mb-3">
-              e.g. <span className="font-mono text-slate-600">9:00 AM - 5:00 PM</span> or{' '}
-              <span className="font-mono text-slate-600">Closed</span>.
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
-              {OPENING_DAY_ORDER.map((day) => (
-                <div key={day}>
-                  <span className="text-[11px] font-medium text-slate-600 block mb-1">{OPENING_DAY_LABELS[day]}</span>
-                  <Input
-                    value={listingForm.openingHours?.[day] ?? ''}
-                    onChange={(e) =>
-                      patchListingForm((prev) => ({
-                        ...prev,
-                        openingHours: {
-                          ...emptyOpeningHours(),
-                          ...(prev.openingHours || {}),
-                          [day]: e.target.value,
-                        },
-                      }))
-                    }
-                    className="h-9 w-full"
-                    placeholder="9–5 or Closed"
-                  />
-                </div>
-              ))}
+          {listingForm.showOpeningHours ? (
+            <div>
+              <Label className="text-xs">Daily hours</Label>
+              <p className="text-[11px] text-slate-500 mt-0.5 mb-3">
+                e.g. <span className="font-mono text-slate-600">9:00 AM - 5:00 PM</span> or{' '}
+                <span className="font-mono text-slate-600">Closed</span>.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-3">
+                {OPENING_DAY_ORDER.map((day) => (
+                  <div key={day}>
+                    <span className="text-[11px] font-medium text-slate-600 block mb-1">{OPENING_DAY_LABELS[day]}</span>
+                    <Input
+                      value={listingForm.openingHours?.[day] ?? ''}
+                      onChange={(e) =>
+                        patchListingForm((prev) => ({
+                          ...prev,
+                          openingHours: {
+                            ...emptyOpeningHours(),
+                            ...(prev.openingHours || {}),
+                            [day]: e.target.value,
+                          },
+                        }))
+                      }
+                      className="h-9 w-full"
+                      placeholder="9–5 or Closed"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
         <section className="space-y-3">

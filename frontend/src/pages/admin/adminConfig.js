@@ -9,6 +9,8 @@ import {
   Image,
   Newspaper,
   Mail,
+  Bell,
+  Star,
 } from 'lucide-react';
 
 export const ADMIN_SECTIONS = [
@@ -20,7 +22,9 @@ export const ADMIN_SECTIONS = [
   { id: 'memberships', label: 'Memberships', icon: CreditCard, testId: 'admin-nav-memberships' },
   { id: 'statistics', label: 'Statistics', icon: BarChart3, testId: 'admin-nav-statistics' },
   { id: 'city-images', label: 'Images', icon: Image, testId: 'admin-nav-city-images' },
+  { id: 'reviews', label: 'Reviews', icon: Star, testId: 'admin-nav-reviews' },
   { id: 'general', label: 'General', icon: Settings, testId: 'admin-nav-general' },
+  { id: 'notifications', label: 'Notifications', icon: Bell, testId: 'admin-nav-notifications' },
 ];
 
 export const STAT_CARDS = [

@@ -47,8 +47,16 @@ const siteSettingsSchema = new mongoose.Schema(
     membershipFeaturesFree: { type: String, default: "" },
     membershipFeaturesStandard: { type: String, default: "" },
     membershipFeaturesPremium: { type: String, default: "" },
+    /** Admin-editable display prices for public membership cards (does not change Stripe billing). */
+    membershipPriceStandardMonthlyUsd: { type: Number },
+    membershipPriceStandardYearlyUsd: { type: Number },
+    membershipPricePremiumMonthlyUsd: { type: Number },
+    membershipPricePremiumYearlyUsd: { type: Number },
     /** Home page testimonials (“What People Say About Us”) */
     homeTestimonialsHeading: { type: String, default: "" },
+    /** Email verification templates (transactional) */
+    emailVerificationEmailSubject: { type: String, default: "" },
+    emailVerificationEmailBody: { type: String, default: "" },
     homeTestimonials: {
       type: [
         {

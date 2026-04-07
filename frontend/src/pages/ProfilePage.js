@@ -187,7 +187,7 @@ export default function ProfilePage() {
   ).length;
 
   return (
-    <div className="min-h-screen bg-slate-50/80 py-10 px-4" data-testid="profile-page">
+    <div className="min-h-screen py-10 px-4" data-testid="profile-page">
       <div className="mx-auto max-w-lg md:max-w-xl">
         <Link
           to={ROUTES.HOME}
@@ -198,9 +198,6 @@ export default function ProfilePage() {
 
         <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-900/5 md:p-6">
           <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-spruce-50 text-spruce-800">
-              <RoleIcon role={user.role} className="h-5 w-5" />
-            </div>
             <div className="min-w-0 flex-1">
               <h2 className="font-heading text-lg font-semibold text-slate-900">Account</h2>
               <p className="mt-0.5 text-sm text-slate-500">Role and membership for this account.</p>
@@ -218,7 +215,7 @@ export default function ProfilePage() {
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
               <dt className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
-                <Sparkles className="h-3.5 w-3.5 text-amber-500" aria-hidden />
+                <Sparkles className="h-3.5 w-3.5 text-spruce-800" aria-hidden />
                 Membership
               </dt>
               <dd className="min-w-0 text-right sm:max-w-[65%]">

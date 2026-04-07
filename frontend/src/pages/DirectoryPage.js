@@ -1,10 +1,15 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import ListingCard from '../components/ListingCard';
-import PriceRangeFilter, { PRICE_SLIDER_MAX } from '../components/PriceRangeFilter';
 import { listingAPI } from '../lib/api';
 import { CATEGORIES, CITIES } from '../data/categories';
 import { readFavoriteIds } from '../lib/listingFavorites';
@@ -17,12 +22,14 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ArrowDownUp,
 } from 'lucide-react';
 import { DirectoryListingsGridSkeleton } from '../components/ListingPageSkeletons';
 import { Skeleton } from '../components/ui/skeleton';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 const DEFAULT_PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 350;
 
 function parsePageSizeFromParams(searchParams) {
   const n = Number.parseInt(searchParams.get('perPage') || String(DEFAULT_PAGE_SIZE), 10);
@@ -71,7 +78,7 @@ function DirectoryListingPagination({
 
   return (
     <div
-      className="font-ui mt-8 flex w-full min-w-0 flex-col gap-3 pt-6 text-sm lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-x-4"
+      className="font-ui mt-3 flex w-full min-w-0 flex-col gap-3 pt-2 text-sm lg:flex-row lg:flex-wrap lg:items-center lg:justify-between lg:gap-x-4"
       data-testid="directory-pagination"
     >
       <div className="flex w-full min-w-0 items-center justify-between gap-3 lg:w-auto lg:justify-start lg:gap-6">
@@ -180,15 +187,11 @@ function DirectoryListingPagination({
   );
 }
 
-function parsePriceFromParams(searchParams, key, fallback) {
-  const raw = searchParams.get(key);
-  if (raw == null || raw === '') return fallback;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : fallback;
-}
-
 export default function DirectoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const directoryFetchSeqRef = useRef(0);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -204,45 +207,37 @@ export default function DirectoryPage() {
   const [sellerName, setSellerName] = useState(searchParams.get('vendorName') || searchParams.get('sellerName') || '');
   const [featured, setFeatured] = useState(searchParams.get('featured') === 'true');
   const [myLikings, setMyLikings] = useState(searchParams.get('myLikings') === 'true');
-  const [priceMin, setPriceMin] = useState(() => parsePriceFromParams(searchParams, 'minPrice', 0));
-  const [priceMax, setPriceMax] = useState(() => {
-    const maxParam = searchParams.get('maxPrice');
-    const maxP =
-      maxParam != null && maxParam !== '' && Number.isFinite(Number(maxParam))
-        ? Math.min(Math.max(0, Number(maxParam)), PRICE_SLIDER_MAX)
-        : PRICE_SLIDER_MAX;
-    return maxP;
-  });
   /** When URL has userId but no display name, resolve label from first listing title. */
   const [sellerResolvedName, setSellerResolvedName] = useState('');
-  const [priceMinDraft, setPriceMinDraft] = useState(() =>
-    String(parsePriceFromParams(searchParams, 'minPrice', 0))
-  );
-  const [priceMaxDraft, setPriceMaxDraft] = useState(() => {
-    const maxParam = searchParams.get('maxPrice');
-    const maxP =
-      maxParam != null && maxParam !== '' && Number.isFinite(Number(maxParam))
-        ? Math.min(Math.max(0, Number(maxParam)), PRICE_SLIDER_MAX)
-        : PRICE_SLIDER_MAX;
-    return String(maxP);
-  });
-
-  const priceFilterActive = priceMin > 0 || priceMax < PRICE_SLIDER_MAX;
 
   const pageSize = useMemo(() => parsePageSizeFromParams(searchParams), [searchParams]);
 
-  const searchRef = useRef(search);
+  const reviewSort = useMemo(() => {
+    const sp = new URLSearchParams(location.search);
+    const v = (sp.get('reviewSort') || sp.get('review_sort') || '').trim().toLowerCase();
+    if (v === 'least') return 'least';
+    if (v === 'most') return 'most';
+    return null;
+  }, [location.search]);
+
+  const [debouncedSearch, setDebouncedSearch] = useState(() => (searchParams.get('search') || '').trim());
+
   useEffect(() => {
-    searchRef.current = search;
+    const id = setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(id);
   }, [search]);
 
   const fetchListings = useCallback(
-    async (p = 1) => {
+    async (p = 1, opts = {}) => {
+      const sortForRequest = Object.prototype.hasOwnProperty.call(opts, 'reviewSort')
+        ? opts.reviewSort
+        : reviewSort;
+
+      const mySeq = ++directoryFetchSeqRef.current;
       setLoading(true);
       try {
         const params = { page: p, limit: pageSize };
-        const s = searchRef.current;
-        if (s) params.search = s;
+        if (debouncedSearch) params.search = debouncedSearch;
         if (category) params.categoryId = category;
         if (city) params.city = city;
         if (sellerUserId) params.userId = sellerUserId;
@@ -250,68 +245,80 @@ export default function DirectoryPage() {
         if (myLikings) {
           const favIds = readFavoriteIds();
           if (favIds.length === 0) {
+            if (mySeq !== directoryFetchSeqRef.current) return;
             setListings([]);
             setTotal(0);
             setPages(1);
             setPage(p);
-            setLoading(false);
             return;
           }
           params.myLikings = true;
           params.favoriteIds = favIds.join(',');
         }
-        if (priceFilterActive) {
-          params.minPrice = priceMin;
-          params.maxPrice = priceMax;
+        const dirHeaders = {};
+        if (sortForRequest === 'most') {
+          params.reviewSort = 'most';
+          params.review_sort = 'most';
+          dirHeaders['X-Directory-Review-Sort'] = 'most';
+        } else if (sortForRequest === 'least') {
+          params.reviewSort = 'least';
+          params.review_sort = 'least';
+          dirHeaders['X-Directory-Review-Sort'] = 'least';
         }
 
-        const res = await listingAPI.directory(params);
+        const res = await listingAPI.directory(params, { headers: dirHeaders });
+        if (mySeq !== directoryFetchSeqRef.current) return;
         setListings(res.data.listings || []);
         setTotal(res.data.total || 0);
         setPages(res.data.pages || 1);
         setPage(res.data.page ?? p);
       } catch {
+        if (mySeq !== directoryFetchSeqRef.current) return;
         setListings([]);
       } finally {
-        setLoading(false);
+        if (mySeq === directoryFetchSeqRef.current) setLoading(false);
       }
     },
     [
+      debouncedSearch,
       category,
       city,
       sellerUserId,
       featured,
       myLikings,
-      priceMin,
-      priceMax,
-      priceFilterActive,
       pageSize,
+      reviewSort,
     ]
   );
 
+  const searchParamFromUrl = searchParams.get('search') ?? '';
   useEffect(() => {
-    setSearch(searchParams.get('search') || '');
+    setSearch(searchParamFromUrl);
+    setDebouncedSearch(searchParamFromUrl.trim());
+  }, [searchParamFromUrl]);
+
+  useEffect(() => {
     setCategory(searchParams.get('category') || '');
     setCity(searchParams.get('city') || '');
     setSellerUserId(searchParams.get('userId') || searchParams.get('vendorId') || '');
     setSellerName(searchParams.get('vendorName') || searchParams.get('sellerName') || '');
     setFeatured(searchParams.get('featured') === 'true');
     setMyLikings(searchParams.get('myLikings') === 'true');
-    const minP = Math.min(Math.max(0, parsePriceFromParams(searchParams, 'minPrice', 0)), PRICE_SLIDER_MAX);
-    setPriceMin(minP);
-    const maxParam = searchParams.get('maxPrice');
-    const maxP =
-      maxParam != null && maxParam !== '' && Number.isFinite(Number(maxParam))
-        ? Math.min(Math.max(0, Number(maxParam)), PRICE_SLIDER_MAX)
-        : PRICE_SLIDER_MAX;
-    setPriceMax(maxP);
-    setPriceMinDraft(String(minP));
-    setPriceMaxDraft(String(maxP));
   }, [searchParams]);
 
   useEffect(() => {
     fetchListings(1);
-  }, [category, city, sellerUserId, featured, myLikings, priceMin, priceMax, pageSize, fetchListings]);
+  }, [
+    debouncedSearch,
+    category,
+    city,
+    sellerUserId,
+    featured,
+    myLikings,
+    pageSize,
+    reviewSort,
+    fetchListings,
+  ]);
 
   useEffect(() => {
     if (!sellerUserId) {
@@ -339,8 +346,10 @@ export default function DirectoryPage() {
 
   const handleSearch = (e) => {
     e.preventDefault();
+    const q = search.trim();
+    setDebouncedSearch(q);
     const next = new URLSearchParams();
-    if (search) next.set('search', search);
+    if (q) next.set('search', q);
     if (category) next.set('category', category);
     if (city) next.set('city', city);
     if (sellerUserId) {
@@ -349,13 +358,24 @@ export default function DirectoryPage() {
     }
     if (featured) next.set('featured', 'true');
     if (myLikings) next.set('myLikings', 'true');
-    if (priceFilterActive) {
-      next.set('minPrice', String(priceMin));
-      next.set('maxPrice', String(priceMax));
-    }
     if (pageSize !== DEFAULT_PAGE_SIZE) next.set('perPage', String(pageSize));
+    const rs = (searchParams.get('reviewSort') || searchParams.get('review_sort') || '')
+      .trim()
+      .toLowerCase();
+    if (rs === 'most' || rs === 'least') next.set('reviewSort', rs);
     setSearchParams(next);
-    fetchListings(1);
+  };
+
+  /** @param {null | 'most' | 'least'} mode */
+  const applyReviewSort = (mode) => {
+    const next = new URLSearchParams(location.search);
+    next.delete('review_sort');
+    if (mode === 'most') next.set('reviewSort', 'most');
+    else if (mode === 'least') next.set('reviewSort', 'least');
+    else next.delete('reviewSort');
+    const q = next.toString();
+    navigate({ pathname: location.pathname, search: q ? `?${q}` : '' }, { replace: false });
+    void fetchListings(1, { reviewSort: mode });
   };
 
   const handlePerPageChange = (n) => {
@@ -368,18 +388,14 @@ export default function DirectoryPage() {
   };
 
   const clearFilters = () => {
-    searchRef.current = '';
     setSearch('');
+    setDebouncedSearch('');
     setCategory('');
     setCity('');
     setSellerUserId('');
     setSellerName('');
     setFeatured(false);
     setMyLikings(false);
-    setPriceMin(0);
-    setPriceMax(PRICE_SLIDER_MAX);
-    setPriceMinDraft('0');
-    setPriceMaxDraft(String(PRICE_SLIDER_MAX));
     setSearchParams({});
     // Do not call fetchListings here: this closure still sees the previous filter state (e.g. featured),
     // so an in-flight request can finish after the effect-driven fetch and overwrite results.
@@ -404,51 +420,11 @@ export default function DirectoryPage() {
     });
   };
 
-  const handlePriceRangeChange = ({ min, max }) => {
-    setPriceMin(min);
-    setPriceMax(max);
-    setPriceMinDraft(String(min));
-    setPriceMaxDraft(String(max));
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      const active = min > 0 || max < PRICE_SLIDER_MAX;
-      if (active) {
-        next.set('minPrice', String(min));
-        next.set('maxPrice', String(max));
-      } else {
-        next.delete('minPrice');
-        next.delete('maxPrice');
-      }
-      return next;
-    });
-  };
-
-  const commitPriceMinInput = () => {
-    const raw = priceMinDraft.trim();
-    let v = raw === '' ? 0 : parseInt(raw, 10);
-    if (!Number.isFinite(v)) v = 0;
-    v = Math.max(0, Math.min(v, PRICE_SLIDER_MAX));
-    let maxVal = priceMax;
-    if (v > maxVal) maxVal = v;
-    handlePriceRangeChange({ min: v, max: maxVal });
-  };
-
-  const commitPriceMaxInput = () => {
-    const raw = priceMaxDraft.trim();
-    let v = raw === '' ? PRICE_SLIDER_MAX : parseInt(raw, 10);
-    if (!Number.isFinite(v)) v = PRICE_SLIDER_MAX;
-    v = Math.max(0, Math.min(v, PRICE_SLIDER_MAX));
-    let minVal = priceMin;
-    if (v < minVal) minVal = v;
-    handlePriceRangeChange({ min: minVal, max: v });
-  };
-
   const activeFilters =
     [search, category, city, sellerName || sellerResolvedName || sellerUserId].filter(Boolean)
       .length +
     (featured ? 1 : 0) +
-    (myLikings ? 1 : 0) +
-    (priceFilterActive ? 1 : 0);
+    (myLikings ? 1 : 0);
 
   const categoryName = CATEGORIES.find((c) => c.id === category)?.name;
   const displayCategoryLabel = categoryName || 'All Categories';
@@ -456,7 +432,7 @@ export default function DirectoryPage() {
 
   return (
     <div className="min-h-screen" data-testid="directory-page">
-      <div className="w-full px-4 py-8 sm:px-5 md:px-6 md:py-10 lg:px-8 xl:px-10">
+      <div className="w-full px-4 py-1 sm:px-5 md:px-6 md:py-5 lg:px-8 xl:px-10">
         <div className="flex flex-col lg:flex-row lg:gap-8 xl:gap-10 lg:items-start">
           <aside
             className="w-full lg:w-72 xl:w-80 shrink-0 lg:sticky lg:top-24 space-y-4"
@@ -467,9 +443,9 @@ export default function DirectoryPage() {
               data-testid="search-filter-bar"
             >
               <div className="px-5 pt-5 pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2 text-spruce-800">
+                <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4" aria-hidden />
-                  <h2 className="font-heading text-lg font-semibold tracking-tight">Filters</h2>
+                  <h2 className="font-heading text-lg tracking-tight">Filters</h2>
                 </div>
               </div>
               <form onSubmit={handleSearch} className="p-5 space-y-4">
@@ -580,72 +556,11 @@ export default function DirectoryPage() {
                   </label>
                 </div>
 
-                <div className="space-y-3 pt-1">
-                  <p className="text-sm font-medium text-slate-800">Price</p>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label htmlFor="price-min-input" className="text-xs font-medium text-slate-600">
-                        Min ($)
-                      </label>
-                      <Input
-                        id="price-min-input"
-                        type="number"
-                        min={0}
-                        max={PRICE_SLIDER_MAX}
-                        step={50}
-                        value={priceMinDraft}
-                        onChange={(e) => setPriceMinDraft(e.target.value)}
-                        onBlur={commitPriceMinInput}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        className="h-10 bg-white border-slate-200 tabular-nums"
-                        data-testid="price-min-input"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label htmlFor="price-max-input" className="text-xs font-medium text-slate-600">
-                        Max ($)
-                      </label>
-                      <Input
-                        id="price-max-input"
-                        type="number"
-                        min={0}
-                        max={PRICE_SLIDER_MAX}
-                        step={50}
-                        value={priceMaxDraft}
-                        onChange={(e) => setPriceMaxDraft(e.target.value)}
-                        onBlur={commitPriceMaxInput}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            e.currentTarget.blur();
-                          }
-                        }}
-                        className="h-10 bg-white border-slate-200 tabular-nums"
-                        data-testid="price-max-input"
-                      />
-                    </div>
-                  </div>
-
-                  <PriceRangeFilter
-                    min={priceMin}
-                    max={priceMax}
-                    rangeMax={PRICE_SLIDER_MAX}
-                    onChange={handlePriceRangeChange}
-                    hideValueSummary
-                  />
-                </div>
-
               </form>
             </div>
           </aside>
 
-          <div className="min-w-0 flex-1 lg:min-w-0">
+          <div className="flex min-h-[calc(100dvh-10rem)] min-w-0 flex-1 flex-col lg:min-w-0 mt-2 md:mt-0">
             {loading ? (
               <div className="min-h-[42vh] py-2" role="status" aria-live="polite" aria-busy="true" aria-label="Loading listings">
                 <div className="mb-4 space-y-2">
@@ -655,108 +570,142 @@ export default function DirectoryPage() {
                 <DirectoryListingsGridSkeleton count={pageSize} />
               </div>
             ) : (
-              <>
-                {activeFilters > 0 ? (
-                  <div
-                    className="mb-4 rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm"
-                    data-testid="directory-active-filters"
-                  >
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                        {search && (
-                          <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">{search}</span>
-                        )}
-                        {categoryName && (
-                          <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-800">
-                            {categoryName}
-                          </span>
-                        )}
-                        {city && (
-                          <span className="rounded-md bg-secondary-50 px-2 py-1 text-xs text-secondary-800">
-                            {city}
-                          </span>
-                        )}
-                        {sellerUserId && (
-                          <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                            {sellerName || sellerResolvedName || `Seller #${sellerUserId}`}
-                          </span>
-                        )}
-                        {featured && (
-                          <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">Featured</span>
-                        )}
-                        {myLikings && (
-                          <span className="rounded-md bg-spruce-50 px-2 py-1 text-xs text-spruce-900">My likings</span>
-                        )}
-                        {priceFilterActive && (
-                          <span className="rounded-md bg-indigo-50 px-2 py-1 text-xs text-indigo-900">
-                            ${priceMin} – ${priceMax}
-                          </span>
-                        )}
+              <div className="flex min-h-0 flex-1 flex-col mt-3">
+                <div className="mb-4 flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
+                  <div className="w-full min-w-0 sm:w-1/2 flex flex-col justify-center sm:max-w-[50%]">
+                    {activeFilters > 0 ? (
+                      <div
+                        className="w-full rounded-xl border border-slate-200/90 bg-white p-2 shadow-sm"
+                        data-testid="directory-active-filters"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                            {search && (
+                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">{search}</span>
+                            )}
+                            {categoryName && (
+                              <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-800">
+                                {categoryName}
+                              </span>
+                            )}
+                            {city && (
+                              <span className="rounded-md bg-secondary-50 px-2 py-1 text-xs text-secondary-800">
+                                {city}
+                              </span>
+                            )}
+                            {sellerUserId && (
+                              <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                                {sellerName || sellerResolvedName || `Seller #${sellerUserId}`}
+                              </span>
+                            )}
+                            {featured && (
+                              <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">Featured</span>
+                            )}
+                            {myLikings && (
+                              <span className="rounded-md bg-spruce-50 px-2 py-1 text-xs text-spruce-900">My likings</span>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+                         
+                            <button
+                              type="button"
+                              onClick={clearFilters}
+                              className="font-ui inline-flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+                              data-testid="clear-filters-btn"
+                            >
+                              <X className="h-3.5 w-3.5" aria-hidden /> Clear all
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-3 sm:gap-4">
-                        <span
-                          className="font-ui text-sm font-semibold tabular-nums text-slate-900"
-                          data-testid="directory-active-filters-count"
-                        >
+                    ) : (
+                      <header className="pr-2" data-testid="directory-results-bar">
+                        <h2 className="font-heading text-sm text-slate-900 md:text-lg">
                           {total > 0
                             ? `${total} result${total === 1 ? '' : 's'}`
                             : 'No results match your filters'}
-                        </span>
-                        <button
+                        </h2>
+                      </header>
+                    )}
+                  </div>
+                  <div className="flex w-full items-center justify-start sm:w-1/2 sm:justify-end sm:pl-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
                           type="button"
-                          onClick={clearFilters}
-                          className="font-ui inline-flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:underline"
-                          data-testid="clear-filters-btn"
+                          variant="outline"
+                          className="h-10 min-w-[10.5rem] justify-between gap-2 border-slate-200 bg-white px-3 hover:bg-white sm:min-w-[11.5rem]"
+                          data-testid="directory-review-sort-btn"
+                          aria-label="Sort listings by review count"
+                          aria-haspopup="menu"
                         >
-                          <X className="h-3.5 w-3.5" aria-hidden /> Clear all
-                        </button>
+                          <span className="flex min-w-0 flex-1 items-center gap-2">
+                            <ArrowDownUp className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+                            <span className="truncate text-sm font-medium text-slate-900">
+                              {reviewSort === 'most'
+                                ? 'Most reviews'
+                                : reviewSort === 'least'
+                                  ? 'Least reviews'
+                                  : 'No sort'}
+                            </span>
+                          </span>
+                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="min-w-[12rem] py-1" role="menu">
+                        <DropdownMenuItem
+                          variant={reviewSort == null ? 'highlight' : 'default'}
+                          onClick={() => applyReviewSort(null)}
+                          data-testid="directory-review-sort-none"
+                        >
+                          No sort
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant={reviewSort === 'most' ? 'highlight' : 'default'}
+                          onClick={() => applyReviewSort('most')}
+                          data-testid="directory-review-sort-most"
+                        >
+                          Most reviews
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          variant={reviewSort === 'least' ? 'highlight' : 'default'}
+                          onClick={() => applyReviewSort('least')}
+                          data-testid="directory-review-sort-least"
+                        >
+                          Least reviews
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {listings.length === 0 ? (
+                    <div
+                      className="flex w-full flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/60 px-4 py-12 text-center min-h-[min(70dvh,calc(100dvh-14rem))]"
+                      data-testid="no-listings-message"
+                    >
+                      <div className="mx-auto max-w-md">
+                        <p className="mb-2 text-lg text-slate-600">No listings match your filters.</p>
+                        <p className="mb-6 text-sm text-slate-500">
+                          Adjust filters or clear them to see more results.
+                        </p>
+                        <Button variant="outline" onClick={clearFilters} className="bg-white">
+                          Clear filters & show all
+                        </Button>
                       </div>
                     </div>
-                    {total === 0 ? (
-                      <p className="mt-2 text-sm text-slate-500">Adjust filters or search, then apply.</p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <header
-                    className="mb-4"
-                    data-testid="directory-results-bar"
-                  >
-                    <h2 className="font-heading text-sm text-slate-900 md:text-xl">
-                      {total > 0
-                        ? `${total} result${total === 1 ? '' : 's'}`
-                        : 'No results match your filters'}
-                    </h2>
-                    {total === 0 ? (
-                      <p className="mt-1 text-sm text-slate-500">Adjust filters or search, then apply.</p>
-                    ) : null}
-                  </header>
-                )}
-
-                {listings.length === 0 ? (
-                  <div
-                    className="rounded-2xl border border-dashed border-slate-200 bg-white/60 px-4 py-20 text-center"
-                    data-testid="no-listings-message"
-                  >
-                    <div className="mx-auto max-w-md">
-                      <p className="mb-2 text-lg text-slate-600">No listings match your filters.</p>
-                      <p className="mb-6 text-sm text-slate-500">
-                        Try clearing filters or searching with different keywords.
-                      </p>
-                      <Button variant="outline" onClick={clearFilters} className="bg-white">
-                        Clear filters & show all
-                      </Button>
+                  ) : (
+                    <div
+                      className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 md:gap-6 lg:gap-7"
+                      data-testid="listings-grid"
+                    >
+                      {listings.map((listing) => (
+                        <ListingCard key={listing.id} listing={listing} />
+                      ))}
                     </div>
-                  </div>
-                ) : (
-                  <div
-                    className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 md:gap-6 lg:gap-7"
-                    data-testid="listings-grid"
-                  >
-                    {listings.map((listing) => (
-                      <ListingCard key={listing.id} listing={listing} />
-                    ))}
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <DirectoryListingPagination
                   page={page}
@@ -768,7 +717,7 @@ export default function DirectoryPage() {
                   onPageChange={fetchListings}
                   onPerPageChange={handlePerPageChange}
                 />
-              </>
+              </div>
             )}
           </div>
         </div>

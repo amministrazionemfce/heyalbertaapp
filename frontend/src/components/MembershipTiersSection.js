@@ -175,7 +175,8 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
 
   return (
     <section
-      className="relative border-t border-slate-200/70 bg-white"
+      id="membership"
+      className="relative scroll-mt-20 border-t border-slate-200/70 bg-white"
       data-testid="membership-tiers-section"
     >
       <div className="container relative mx-auto max-w-7xl px-4 pb-16 pt-12 md:px-8 md:pb-24 md:pt-16">
@@ -328,7 +329,7 @@ export function MembershipTiersPreview({ form }) {
 
   return (
     <section
-      className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50/90 shadow-inner"
+      className="relative overflow-hidden rounded-xl border border-slate-200 shadow-inner"
       data-testid="membership-tiers-preview"
       aria-label="Membership section preview"
     >

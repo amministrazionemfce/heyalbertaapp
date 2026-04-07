@@ -76,6 +76,7 @@ export default function CategoryScrollTabs({
       >
         {items.map((item) => {
           const selected = value === item.id;
+          const Icon = item.Icon;
           return (
             <button
               key={item.id === '' ? 'all' : item.id}
@@ -83,12 +84,15 @@ export default function CategoryScrollTabs({
               role="tab"
               aria-selected={selected}
               onClick={() => onChange(item.id)}
-              className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition-all md:px-5 md:py-2.5 md:text-[0.95rem] ${
+              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition-all md:px-5 md:py-2.5 md:text-[0.95rem] ${
                 selected ? accentClass : inactiveClass
               }`}
               data-testid={`category-tab-${item.id === '' ? 'all' : item.id}`}
             >
-              {item.label}
+              {Icon ? (
+                <Icon className="h-4 w-4 shrink-0 opacity-95 md:h-[1.05rem] md:w-[1.05rem]" strokeWidth={2} aria-hidden />
+              ) : null}
+              <span>{item.label}</span>
             </button>
           );
         })}

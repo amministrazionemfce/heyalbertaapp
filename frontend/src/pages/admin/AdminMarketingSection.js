@@ -15,9 +15,6 @@ function mergePoolEmails(pools, toggles) {
   if (toggles.vendorBusinesses && pools?.vendorBusinesses?.emails) {
     pools.vendorBusinesses.emails.forEach((e) => set.add(e));
   }
-  if (toggles.vendorAccounts && pools?.vendorAccounts?.emails) {
-    pools.vendorAccounts.emails.forEach((e) => set.add(e));
-  }
   return [...set].sort();
 }
 
@@ -28,7 +25,6 @@ export function AdminMarketingSection() {
   const [poolToggles, setPoolToggles] = useState({
     allUsers: false,
     vendorBusinesses: false,
-    vendorAccounts: false,
   });
   const [emailChecked, setEmailChecked] = useState({});
   const [subject, setSubject] = useState('');
@@ -119,7 +115,7 @@ export function AdminMarketingSection() {
   if (loading) {
     return (
       <div className="flex justify-center py-16" data-testid="admin-marketing-section">
-        <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-spruce-800" />
       </div>
     );
   }
@@ -128,7 +124,6 @@ export function AdminMarketingSection() {
     ? [
         { key: 'allUsers', meta: pools.allUsers },
         { key: 'vendorBusinesses', meta: pools.vendorBusinesses },
-        { key: 'vendorAccounts', meta: pools.vendorAccounts },
       ]
     : [];
 
@@ -136,18 +131,6 @@ export function AdminMarketingSection() {
     <div className="w-full max-w-none space-y-8" data-testid="admin-marketing-section">
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:items-start">
         <div className="space-y-8 min-w-0">
-          <div className="rounded-xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm">
-            <h2 className="font-heading text-lg font-semibold text-slate-900 flex items-center gap-2">
-              <Mail className="w-5 h-5 text-spruce-700" />
-              Email campaign
-            </h2>
-            <p className="text-sm text-slate-600 mt-1">
-              Compose a plain-text message and choose who receives it. Addresses are merged and de-duplicated. 
-              {/* Configure SMTP on the server (<code className="text-xs bg-slate-100 px-1 rounded">SMTP_HOST</code>,{' '}
-              <code className="text-xs bg-slate-100 px-1 rounded">MAIL_FROM</code>, etc.) before sending. */}
-            </p>
-          </div>
-
           <div className="rounded-xl border border-slate-200 bg-white p-5 md:p-6 shadow-sm space-y-4">
             <h3 className="font-semibold text-slate-900">Recipient lists</h3>
             <p className="text-sm text-slate-600">Turn on one or more groups, then refine individual addresses below.</p>
@@ -155,7 +138,7 @@ export function AdminMarketingSection() {
               {poolRows.map(({ key, meta }) => (
                 <label
                   key={key}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-100 bg-slate-50/80 p-3 hover:bg-slate-50"
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50"
                 >
                   <input
                     type="checkbox"

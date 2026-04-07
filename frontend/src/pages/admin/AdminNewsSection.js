@@ -394,27 +394,13 @@ export function AdminNewsSection({ onUpdate }) {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <Loader2 className="w-10 h-10 animate-spin text-admin-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-spruce-800" />
       </div>
     );
   }
 
   return (
     <div className="space-y-8" data-testid="admin-news-section">
-      <div className="rounded-2xl border border-spruce-700/40 bg-gradient-to-br from-spruce-900 via-spruce-800 to-spruce-900 p-6 md:p-8 text-white shadow-lg">
-        <div className="flex items-start gap-3">
-          <div className="rounded-xl bg-white/10 p-2.5">
-            <Newspaper className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h2 className="font-heading text-xl font-bold">News</h2>
-            <p className="text-sm text-spruce-100/90 mt-1 max-w-2xl">
-              Use the <strong className="text-white">Banner &amp; page</strong> tab for the hero image and headline. Articles and category cards have their
-              own tabs below.
-            </p>
-          </div>
-        </div>
-      </div>
 
       <div className="rounded-2xl border-2 border-spruce-200 bg-white shadow-sm ring-1 ring-spruce-100 overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 p-5 md:p-6 border-b border-slate-100 bg-slate-50/60">

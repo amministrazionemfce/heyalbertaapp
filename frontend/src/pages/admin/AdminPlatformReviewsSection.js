@@ -98,7 +98,7 @@ export function AdminPlatformReviewsSection({ onUpdate }) {
   if (loading) {
     return (
       <div className="flex justify-center py-16" data-testid="admin-platform-reviews-section">
-        <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-spruce-800" />
       </div>
     );
   }

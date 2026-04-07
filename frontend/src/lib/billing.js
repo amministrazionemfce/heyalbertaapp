@@ -1,4 +1,5 @@
 import { billingAPI } from './api';
+import { getStoredAuthToken } from './authStorage';
 
 const CHECKOUT_LINKS = Object.freeze({
   standardMonthly: process.env.REACT_APP_STRIPE_STANDARD_MONTHLY_URL || '',
@@ -42,8 +43,7 @@ export function getPlanActionLabel(planId, currentTier = 'free') {
 
 export async function redirectToPlanCheckout(planId, cadence = 'monthly') {
   const normalizedCadence = cadence === 'yearly' ? 'yearly' : 'monthly';
-  const token =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('hey_alberta_token') : null;
+  const token = typeof window !== 'undefined' ? getStoredAuthToken() : null;
 
   const tryBackend = async () => {
     if (!token) return null;

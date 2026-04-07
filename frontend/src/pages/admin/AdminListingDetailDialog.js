@@ -31,7 +31,12 @@ export function AdminListingDetailDialog({ listing, onClose, getCategoryName, on
               )}
 
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div><span className="text-slate-500">Seller (listing)</span><p className="font-medium">{listing.sellerTitle || listing.title || '—'}</p></div>
+                <div>
+                  <span className="text-slate-500">Business name</span>
+                  <p className="font-medium">
+                    {(listing.businessName && String(listing.businessName).trim()) || '—'}
+                  </p>
+                </div>
                 <div><span className="text-slate-500">Category</span><p className="font-medium">{getCategoryName(listing.categoryId) || listing.categoryId || '—'}</p></div>
                 <div>
                   <span className="text-slate-500">Registered</span>

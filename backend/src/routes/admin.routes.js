@@ -1,5 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
+import bcrypt from "bcryptjs";
+import Stripe from "stripe";
 import { requireAdmin } from "../middleware/admin.js";
 
 import Listing from "../models/Listing.js";
@@ -12,7 +14,8 @@ import SiteSettings from "../models/SiteSettings.js";
 import ContactMessage from "../models/ContactMessage.js";
 import NewsSubscriber from "../models/NewsSubscriber.js";
 import { matchReviewsByListingId } from "../utils/reviewListingQuery.js";
-import { sendMarketingBatch } from "../utils/mail.js";
+import { sendMarketingBatch, sendTransactionalMail, isMailConfigured } from "../utils/mail.js";
+import { createImpersonationToken } from "../utils/jwt.js";
 
 const router = express.Router();
 
@@ -33,6 +36,20 @@ function isValidObjectId(id) {
 
 function escapeRegex(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const ASSIGNABLE_ROLES = new Set(["user", "vendor", "admin"]);
+
+async function assertAdminPassword(adminUser, adminPassword) {
+  const pw = String(adminPassword ?? "").trim();
+  if (!pw) {
+    return { ok: false, status: 400, message: "Admin password is required." };
+  }
+  const valid = await bcrypt.compare(pw, adminUser.passwordHash);
+  if (!valid) {
+    return { ok: false, status: 401, message: "Incorrect admin password." };
+  }
+  return { ok: true };
 }
 
 async function deleteUserListingData(userId) {
@@ -60,16 +77,20 @@ router.get("/listings", requireAdmin, async (req, res) => {
     const listings = await Listing.find(query).sort({ createdAt: -1 });
     const result = listings.map((list) => {
       const obj = list.toObject();
+      const business = String(list.businessName || "").trim();
+      const displaySellerName = business || list.title || null;
       return {
         ...obj,
         id: list._id.toString(),
         userId: list.userId ?? null,
-        sellerTitle: list.title ?? null,
+        businessName: business || "",
+        sellerTitle: displaySellerName,
         sellerCity: list.city ?? null,
         seller: {
           userId: list.userId ?? null,
           title: list.title ?? null,
-          name: list.title ?? null,
+          businessName: business,
+          name: displaySellerName,
           city: list.city ?? null,
           neighborhood: list.neighborhood ?? null,
           images: Array.isArray(list.images) ? list.images : [],
@@ -78,6 +99,138 @@ router.get("/listings", requireAdmin, async (req, res) => {
     });
 
     res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/*
+------------------------------------------------
+LISTING REVIEWS (Admin panel)
+------------------------------------------------
+*/
+router.get("/reviews", requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+    const q = String(req.query.q || "").trim();
+    const listingId = String(req.query.listingId || "").trim();
+
+    const baseMatch = {};
+    if (listingId && isValidObjectId(listingId)) {
+      baseMatch.listingId = listingId;
+    }
+
+    const listingsColl = Listing.collection?.collectionName || "listings";
+    const rx = q ? new RegExp(escapeRegex(q), "i") : null;
+
+    const withListingLookup = [
+      { $match: baseMatch },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: listingsColl,
+          let: { lid: "$listingId" },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: "$_id" }, "$$lid"] } } },
+            { $project: { title: 1, businessName: 1, userId: 1, categoryId: 1 } },
+          ],
+          as: "_listing",
+        },
+      },
+      { $addFields: { _listing: { $arrayElemAt: ["$_listing", 0] } } },
+      ...(rx
+        ? [
+            {
+              $match: {
+                $or: [
+                  { userName: rx },
+                  { comment: rx },
+                  { reply: rx },
+                  { listingId: rx },
+                  { "_listing.title": rx },
+                  { "_listing.businessName": rx },
+                ],
+              },
+            },
+          ]
+        : []),
+    ];
+
+    const [rows, total] = await Promise.all([
+      Review.aggregate([
+        ...withListingLookup,
+        { $skip: skip },
+        { $limit: limit },
+        {
+          $project: {
+            id: { $toString: "$_id" },
+            listingId: 1,
+            userId: 1,
+            userName: 1,
+            rating: 1,
+            comment: 1,
+            reply: 1,
+            createdAt: 1,
+            listingTitle: { $ifNull: ["$_listing.title", null] },
+            listingBusinessName: { $ifNull: ["$_listing.businessName", ""] },
+            listingOwnerId: { $ifNull: ["$_listing.userId", null] },
+            listingCategoryId: { $ifNull: ["$_listing.categoryId", null] },
+          },
+        },
+      ]),
+      Review.aggregate([...withListingLookup, { $count: "n" }]).then((r) => r?.[0]?.n ?? 0),
+    ]);
+
+    res.json({
+      reviews: rows,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.patch("/reviews/:reviewId", requireAdmin, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    if (!isValidObjectId(reviewId)) {
+      return res.status(400).json({ message: "Invalid review id" });
+    }
+    const patch = {};
+    if (req.body?.rating !== undefined) {
+      patch.rating = Math.max(1, Math.min(5, Number(req.body.rating) || 5));
+    }
+    if (req.body?.comment !== undefined) {
+      const c = String(req.body.comment ?? "").trim();
+      if (!c) return res.status(400).json({ message: "Comment cannot be empty." });
+      patch.comment = c;
+    }
+    if (req.body?.reply !== undefined) {
+      const rep = String(req.body.reply ?? "").trim();
+      patch.reply = rep ? rep : null;
+    }
+    const updated = await Review.findByIdAndUpdate(reviewId, patch, { new: true });
+    if (!updated) return res.status(404).json({ message: "Review not found" });
+    res.json(updated.toJSON());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete("/reviews/:reviewId", requireAdmin, async (req, res) => {
+  try {
+    const { reviewId } = req.params;
+    if (!isValidObjectId(reviewId)) {
+      return res.status(400).json({ message: "Invalid review id" });
+    }
+    const deleted = await Review.findByIdAndDelete(reviewId);
+    if (!deleted) return res.status(404).json({ message: "Review not found" });
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -148,6 +301,8 @@ router.get("/stats", requireAdmin, async (req, res) => {
     const usersEmailUnverified = Math.max(0, totalUsers - usersEmailVerified);
 
     const listingsFeatured = await Listing.countDocuments({ featured: true });
+    // Back-compat: older frontend expects `vendorsFeatured` even though this is really featured listings.
+    const vendorsFeatured = listingsFeatured;
     const vendorsTierStandard = await Listing.countDocuments({ tier: "standard" });
     const vendorsTierPremium = await Listing.countDocuments({ tier: "premium" });
     const totalListings = await Listing.countDocuments();
@@ -156,10 +311,19 @@ router.get("/stats", requireAdmin, async (req, res) => {
     const listingsPublished = await Listing.countDocuments({ status: "published" });
     const listingsDraft = await Listing.countDocuments({ status: "draft" });
 
-    const STANDARD_MRR_CAD = 15;
-    const PREMIUM_MRR_CAD = 20;
-    const estimatedMrrCad =
-      vendorsTierStandard * STANDARD_MRR_CAD + vendorsTierPremium * PREMIUM_MRR_CAD;
+    const stripeKey = String(process.env.STRIPE_SECRET_KEY || "").trim();
+    const stripeConnected = Boolean(stripeKey && !stripeKey.startsWith("pk_"));
+    const stripe = stripeConnected ? new Stripe(stripeKey) : null;
+
+    // Finance: real Stripe balance + revenue (when configured).
+    let finance = {
+      stripeConnected,
+      currency: null,
+      availableBalance: null,
+      pendingBalance: null,
+      revenueLast30Days: null,
+      revenueLast6MonthsByMonth: [],
+    };
 
     const monthKeys = adminMonthKeys(6);
     const userDocs = await User.find({}, { createdAt: 1 }).lean();
@@ -180,10 +344,69 @@ router.get("/stats", requireAdmin, async (req, res) => {
       newListings: monthKeys.map((k) => countInMonth(listingDocs, k)),
     };
 
-    const stripeConnected = Boolean(
-      String(process.env.STRIPE_SECRET_KEY || "").trim() &&
-        !String(process.env.STRIPE_SECRET_KEY || "").startsWith("pk_")
-    );
+    if (stripe) {
+      try {
+        const bal = await stripe.balance.retrieve();
+        const available = Array.isArray(bal?.available) ? bal.available : [];
+        const pending = Array.isArray(bal?.pending) ? bal.pending : [];
+        const pickCurrency = (arr) => String(arr?.[0]?.currency || "").toUpperCase() || null;
+        const cur = pickCurrency(available) || pickCurrency(pending);
+        const sum = (arr) =>
+          (Array.isArray(arr) ? arr : []).reduce((acc, x) => acc + (Number(x?.amount) || 0), 0);
+        finance.currency = cur;
+        finance.availableBalance = sum(available) / 100;
+        finance.pendingBalance = sum(pending) / 100;
+
+        const now = Math.floor(Date.now() / 1000);
+        const gte6m = Math.floor(
+          new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).getTime() / 1000
+        );
+        const revenueCentsByKey = new Map(monthKeys.map((k) => [k, 0]));
+
+        let startingAfter = undefined;
+        while (true) {
+          const page = await stripe.charges.list({
+            limit: 100,
+            ...(startingAfter ? { starting_after: startingAfter } : {}),
+            created: { gte: gte6m, lte: now },
+          });
+          const charges = Array.isArray(page?.data) ? page.data : [];
+          for (const c of charges) {
+            if (!c || c.paid !== true) continue;
+            if (c.status && c.status !== "succeeded") continue;
+            const key = docMonthKey(new Date((c.created || 0) * 1000));
+            if (!key || !revenueCentsByKey.has(key)) continue;
+            revenueCentsByKey.set(key, (revenueCentsByKey.get(key) || 0) + (Number(c.amount) || 0));
+            if (!finance.currency && c.currency) finance.currency = String(c.currency).toUpperCase();
+          }
+          if (!page?.has_more || charges.length === 0) break;
+          startingAfter = charges[charges.length - 1].id;
+        }
+        finance.revenueLast6MonthsByMonth = monthKeys.map((k) => (revenueCentsByKey.get(k) || 0) / 100);
+
+        const gte30d = Math.floor((Date.now() - 30 * 24 * 3600 * 1000) / 1000);
+        let last30 = 0;
+        startingAfter = undefined;
+        while (true) {
+          const page = await stripe.charges.list({
+            limit: 100,
+            ...(startingAfter ? { starting_after: startingAfter } : {}),
+            created: { gte: gte30d, lte: now },
+          });
+          const charges = Array.isArray(page?.data) ? page.data : [];
+          for (const c of charges) {
+            if (!c || c.paid !== true) continue;
+            if (c.status && c.status !== "succeeded") continue;
+            last30 += Number(c.amount) || 0;
+          }
+          if (!page?.has_more || charges.length === 0) break;
+          startingAfter = charges[charges.length - 1].id;
+        }
+        finance.revenueLast30Days = last30 / 100;
+      } catch (e) {
+        finance = { ...finance, error: e?.message || "finance_unavailable" };
+      }
+    }
 
     res.json({
       totalUsers,
@@ -206,11 +429,7 @@ router.get("/stats", requireAdmin, async (req, res) => {
       listingsPublished,
       listingsDraft,
       listingsFeatured,
-      finance: {
-        estimatedMrrCad,
-        currency: "CAD",
-        stripeConnected,
-      },
+      finance,
       trends,
     });
   } catch (error) {
@@ -225,6 +444,41 @@ USERS (paginated, sortable, filterable) + bulk email + bulk delete
 ------------------------------------------------
 */
 const USER_SORT_FIELDS = new Set(["name", "role", "email", "createdAt", "lastActiveAt"]);
+
+/*
+------------------------------------------------
+NOTIFICATIONS: new users since last seen (admin)
+------------------------------------------------
+*/
+router.get("/notifications/users", requireAdmin, async (req, res) => {
+  try {
+    const sinceIdRaw = String(req.query.sinceId || "").trim();
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || "10"), 10) || 10));
+    const q = String(req.query.q ?? "").trim();
+
+    const filter = {};
+    if (sinceIdRaw && isValidObjectId(sinceIdRaw)) {
+      filter._id = { $gt: new mongoose.Types.ObjectId(sinceIdRaw) };
+    }
+    if (q) {
+      const rx = new RegExp(escapeRegex(q), "i");
+      filter.$or = [{ name: rx }, { email: rx }];
+    }
+
+    const users = await User.find(filter, { passwordHash: 0 })
+      .sort({ _id: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      users,
+      newestId: users.length ? String(users[0]._id) : null,
+      count: users.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
 function membershipRankFromTierString(t) {
   const s = String(t || "").toLowerCase();
@@ -322,6 +576,81 @@ router.get("/users", requireAdmin, async (req, res) => {
       page,
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.patch("/users/:userId/role", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user id." });
+    }
+    const newRole = String(req.body?.role ?? "").trim();
+    if (!ASSIGNABLE_ROLES.has(newRole)) {
+      return res.status(400).json({ message: "Invalid role." });
+    }
+    const adminCheck = await assertAdminPassword(req.user, req.body?.adminPassword);
+    if (!adminCheck.ok) {
+      return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    if (String(req.user._id) === String(userId)) {
+      return res.status(400).json({ message: "You cannot change your own role from this panel." });
+    }
+
+    const target = await User.findById(userId);
+    if (!target) {
+      return res.status(404).json({ message: "User not found." });
+    }
+
+    if (String(target.role) === "admin" && newRole !== "admin") {
+      const adminCount = await User.countDocuments({ role: "admin" });
+      if (adminCount <= 1) {
+        return res.status(400).json({ message: "Cannot remove the last admin role." });
+      }
+    }
+
+    target.role = newRole;
+    await target.save();
+
+    const updated = await User.findById(userId, { passwordHash: 0 }).lean();
+    res.json({ user: updated, message: "Role updated." });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/users/:userId/impersonate", requireAdmin, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (!isValidObjectId(userId)) {
+      return res.status(400).json({ message: "Invalid user id." });
+    }
+    const adminCheck = await assertAdminPassword(req.user, req.body?.adminPassword);
+    if (!adminCheck.ok) {
+      return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    const targetDoc = await User.findById(userId);
+    if (!targetDoc) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    if (String(targetDoc.role) === "admin") {
+      return res.status(400).json({ message: "Impersonating admin accounts is not allowed." });
+    }
+
+    const token = createImpersonationToken(
+      String(targetDoc._id),
+      String(targetDoc.role),
+      String(req.user._id)
+    );
+
+    res.json({
+      token,
+      user: targetDoc.toJSON(),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -567,7 +896,13 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       "membershipFeaturesFree",
       "membershipFeaturesStandard",
       "membershipFeaturesPremium",
+      "membershipPriceStandardMonthlyUsd",
+      "membershipPriceStandardYearlyUsd",
+      "membershipPricePremiumMonthlyUsd",
+      "membershipPricePremiumYearlyUsd",
       "homeTestimonialsHeading",
+      "emailVerificationEmailSubject",
+      "emailVerificationEmailBody",
     ];
     for (const k of allowed) {
       if (req.body[k] !== undefined) s[k] = req.body[k];
@@ -661,6 +996,37 @@ router.patch("/contact-messages/:id/read", requireAdmin, async (req, res) => {
   }
 });
 
+router.post("/contact-messages/:id/reply", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid id" });
+    }
+    if (!isMailConfigured()) {
+      return res.status(503).json({ message: "Email is not configured on this server." });
+    }
+
+    const doc = await ContactMessage.findById(id).lean();
+    if (!doc) return res.status(404).json({ message: "Message not found" });
+
+    const to = String(doc.email || "").trim();
+    if (!EMAIL_RE.test(to)) {
+      return res.status(400).json({ message: "Message has no valid recipient email." });
+    }
+
+    const subject = String(req.body?.subject || "").trim();
+    const text = String(req.body?.text || "").trim();
+    if (!subject) return res.status(400).json({ message: "Subject is required." });
+    if (!text) return res.status(400).json({ message: "Message is required." });
+
+    await sendTransactionalMail({ to, subject, text });
+    res.json({ ok: true });
+  } catch (error) {
+    const msg = error?.code === "MAIL_NOT_CONFIGURED" ? "Email is not configured on this server." : error.message;
+    res.status(500).json({ message: msg });
+  }
+});
+
 /*
 ------------------------------------------------
 News page — email subscribers
@@ -705,14 +1071,10 @@ router.get("/marketing/recipient-pools", requireAdmin, async (req, res) => {
   try {
     const users = await User.find({}, { email: 1, role: 1, name: 1 }).lean();
     const allUserEmails = [];
-    const vendorAccountEmails = [];
     for (const u of users) {
       const em = String(u.email || "").trim().toLowerCase();
       if (!EMAIL_RE.test(em)) continue;
       allUserEmails.push(em);
-      if (String(u.role || "").toLowerCase() === "vendor") {
-        vendorAccountEmails.push(em);
-      }
     }
 
     const listingEmails = await Listing.find(
@@ -739,12 +1101,6 @@ router.get("/marketing/recipient-pools", requireAdmin, async (req, res) => {
         label: "All vendor business emails",
         description: "Contact emails saved on vendor profiles.",
         emails: uniq(vendorBusinessEmails),
-      },
-      vendorAccounts: {
-        key: "vendorAccounts",
-        label: "Vendor account logins",
-        description: "Users with the vendor role.",
-        emails: uniq(vendorAccountEmails),
       },
     });
   } catch (error) {

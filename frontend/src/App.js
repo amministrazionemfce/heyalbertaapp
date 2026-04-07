@@ -25,6 +25,8 @@ import CheckoutReturnPage from './pages/CheckoutReturnPage';
 import { CheckoutLoadingProvider } from './lib/checkoutLoadingContext';
 import { CookieConsentProvider } from './components/CookieConsentBanner';
 import { ROUTES, ROUTE_PATTERNS } from './constants';
+import { ImpersonationHandoff } from './components/ImpersonationHandoff';
+import { HashScroll } from './components/HashScroll';
 
 function Layout({ children, hideNav }) {
   return (
@@ -42,6 +44,8 @@ function App() {
       <CheckoutLoadingProvider>
       <CookieConsentProvider>
       <BrowserRouter>
+        <ImpersonationHandoff />
+        <HashScroll />
         <Toaster
           position="top-right"
           theme="light"

@@ -17,6 +17,8 @@ const listingSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   categoryId: { type: String, required: true },
   title: { type: String, required: true },
+  /** Public-facing business / brand name (optional); shown on cards when set. */
+  businessName: { type: String, default: "" },
   description: { type: String, required: true },
   /** draft | published — visibility when seller is approved */
   status: { type: String, required: true, default: "draft" },

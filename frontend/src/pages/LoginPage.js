@@ -90,10 +90,7 @@ export default function LoginPage() {
           </Link>
 
           <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">Log in to your account</h1>
-          <p className="text-sm text-muted-foreground mb-8">
-            Don't have an account? {' '}
-            <Link to={ROUTES.REGISTER} className="text-spruce-700 hover:underline font-medium">Sign up</Link>
-          </p>
+       
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="login-form">
             <AuthFormError lines={apiErrorLines} data-testid="login-api-error" />
@@ -165,6 +162,10 @@ export default function LoginPage() {
               </div>
             ) : null}
           </form>
+          <p className="text-sm text-muted-foreground mb-8 mt-4">
+            Don't have an account? {' '}
+            <Link to={ROUTES.REGISTER} className="text-spruce-700 hover:underline font-medium">Sign up</Link>
+          </p>
 
           <p className="text-xs text-muted-foreground text-center mt-6">
             Admin demo: admin@heyalberta.ca / admin123

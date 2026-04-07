@@ -62,9 +62,6 @@ export default function ListingCard({ listing, onAdminOpen }) {
   const { favorited, toggleFavorite } = useListingFavorite(listing.id);
 
   const title = String(listing.title || '').trim();
-  const sellerName = String(seller.name || '').trim();
-  const showSellerLine =
-    sellerName && sellerName.toLowerCase() !== title.toLowerCase();
 
   const ratingForStars =
     avgRating != null && !Number.isNaN(Number(avgRating)) ? Number(avgRating) : 0;
@@ -101,7 +98,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
           />
 
           {featured && (
-            <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-cyan-500/95 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
+            <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-spruce-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
               Featured
             </div>
           )}
@@ -142,10 +139,6 @@ export default function ListingCard({ listing, onAdminOpen }) {
           <h3 className="min-h-0 font-heading text-base font-semibold leading-snug text-slate-900 line-clamp-2 transition-colors group-hover:text-spruce-800">
             {listing.title}
           </h3>
-
-          {showSellerLine ? (
-            <p className="mt-1 line-clamp-1 text-sm font-medium text-slate-600">{seller.name}</p>
-          ) : null}
 
           {descriptionPlain ? (
             <p className="mt-2 line-clamp-1 text-sm leading-relaxed text-slate-600">{descriptionPlain}</p>

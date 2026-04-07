@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
@@ -23,6 +23,7 @@ import { resolveMediaUrl } from '../../lib/mediaUrl';
 import { useAuth } from '../../lib/auth';
 import { ROUTES } from '../../constants';
 import ConfirmActionModal from '../../components/ConfirmActionModal';
+import { IMPERSONATION_HANDOFF_PREFIX } from '../../components/ImpersonationHandoff';
 import {
   ArrowDown,
   ArrowUp,
@@ -30,8 +31,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Key,
   LayoutList,
   Loader2,
+  LogIn,
   Mail,
   Search,
   Trash2,
@@ -142,6 +145,21 @@ function MembershipStatusPill({ status }) {
   );
 }
 
+function EmailVerifiedPill({ verified }) {
+  const ok = Boolean(verified);
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold tracking-tight ring-1 ${
+        ok
+          ? 'bg-emerald-50 text-emerald-900 ring-emerald-200/80'
+          : 'bg-slate-50 text-slate-600 ring-slate-200/80'
+      }`}
+    >
+      {ok ? 'Verified' : 'Not verified'}
+    </span>
+  );
+}
+
 /** Listing count chip — stands out when the user has listings, muted at zero. */
 function ListingCountBadge({ count }) {
   const n = typeof count === 'number' && Number.isFinite(count) ? count : 0;
@@ -164,19 +182,11 @@ function ListingCountBadge({ count }) {
   );
 }
 
-function formatLastActive(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
-  } catch {
-    return '—';
-  }
-}
+const ASSIGNABLE_ROLES = [
+  { value: 'user', label: 'User' },
+  { value: 'vendor', label: 'Vendor' },
+  { value: 'admin', label: 'Admin' },
+];
 
 function authUserId(user) {
   if (!user) return '';
@@ -185,6 +195,7 @@ function authUserId(user) {
 
 export function AdminUsersSection() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user: authUser } = useAuth();
   const myId = authUserId(authUser);
 
@@ -194,7 +205,7 @@ export function AdminUsersSection() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState(() => String(searchParams.get('q') || '').trim());
   const [debouncedQ, setDebouncedQ] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [membershipFilter, setMembershipFilter] = useState('all');
@@ -216,12 +227,39 @@ export function AdminUsersSection() {
   const [singleDeleteContent, setSingleDeleteContent] = useState('');
   const [singleDeleteLoading, setSingleDeleteLoading] = useState(false);
 
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [roleModalUser, setRoleModalUser] = useState(null);
+  const [roleStep, setRoleStep] = useState(1);
+  const [roleSelected, setRoleSelected] = useState('user');
+  const [rolePassword, setRolePassword] = useState('');
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
+
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [impersonateTarget, setImpersonateTarget] = useState(null);
+  const [impersonatePassword, setImpersonatePassword] = useState('');
+  const [impersonateSubmitting, setImpersonateSubmitting] = useState(false);
+
   const headerCheckboxRef = useRef(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(searchInput.trim()), 350);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  useEffect(() => {
+    const q = String(searchParams.get('q') || '').trim();
+    if (q) {
+      setSearchInput(q);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.delete('q');
+          return p;
+        },
+        { replace: true }
+      );
+    }
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     setPage(1);
@@ -310,6 +348,113 @@ export function AdminUsersSection() {
     if (id === myId) return true;
     if (String(u.role || '').toLowerCase() === 'admin') return true;
     return false;
+  };
+
+  const rowRoleSwitchDisabled = (u) => {
+    const id = userRowId(u);
+    if (!id) return true;
+    return id === myId;
+  };
+
+  const rowImpersonateDisabled = (u) =>
+    String(u.role || '').toLowerCase() === 'admin';
+
+  const openRoleModal = (u) => {
+    setRoleModalUser(u);
+    setRoleStep(1);
+    setRoleSelected(String(u.role || 'user').toLowerCase());
+    setRolePassword('');
+    setRoleModalOpen(true);
+  };
+
+  const closeRoleModal = () => {
+    setRoleModalOpen(false);
+    setRoleModalUser(null);
+    setRoleStep(1);
+    setRolePassword('');
+    setRoleSubmitting(false);
+  };
+
+  const openImpersonateModal = (u) => {
+    setImpersonateTarget(u);
+    setImpersonatePassword('');
+    setImpersonateOpen(true);
+  };
+
+  const closeImpersonateModal = () => {
+    setImpersonateOpen(false);
+    setImpersonateTarget(null);
+    setImpersonatePassword('');
+    setImpersonateSubmitting(false);
+  };
+
+  const continueRoleToPassword = () => {
+    if (!ASSIGNABLE_ROLES.some((r) => r.value === roleSelected)) {
+      toast.error('Choose a valid role.');
+      return;
+    }
+    setRoleStep(2);
+    setRolePassword('');
+  };
+
+  const submitRoleChange = async () => {
+    if (!roleModalUser) return;
+    const id = userRowId(roleModalUser);
+    if (!id) return;
+    const pw = rolePassword.trim();
+    if (!pw) {
+      toast.error('Enter your admin password.');
+      return;
+    }
+    setRoleSubmitting(true);
+    try {
+      await adminAPI.switchUserRole(id, {
+        role: roleSelected,
+        adminPassword: pw,
+      });
+      toast.success('Role updated.');
+      closeRoleModal();
+      await loadUsers();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not update role.');
+    } finally {
+      setRoleSubmitting(false);
+    }
+  };
+
+  const confirmImpersonate = async () => {
+    if (!impersonateTarget) return;
+    const id = userRowId(impersonateTarget);
+    if (!id) return;
+    const pw = impersonatePassword.trim();
+    if (!pw) {
+      toast.error('Enter your admin password.');
+      return;
+    }
+    setImpersonateSubmitting(true);
+    try {
+      const { data } = await adminAPI.impersonateUser(id, {
+        adminPassword: pw,
+      });
+      const handoffId = crypto.randomUUID();
+      const key = `${IMPERSONATION_HANDOFF_PREFIX}${handoffId}`;
+      localStorage.setItem(
+        key,
+        JSON.stringify({
+          token: data.token,
+          user: data.user,
+          exp: Date.now() + 2 * 60 * 1000,
+        })
+      );
+      const url = `${window.location.origin}${ROUTES.HOME}?impersonate=${encodeURIComponent(handoffId)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      toast.success('Preview opened in a new tab.');
+      closeImpersonateModal();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not start preview.');
+    } finally {
+      setImpersonateSubmitting(false);
+    }
   };
 
   const openSingleDelete = (u) => {
@@ -468,6 +613,12 @@ export function AdminUsersSection() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             <Input
+              id="admin-users-directory-search"
+              name="admin_users_directory_q"
+              type="search"
+              autoComplete="search"
+              autoCorrect="off"
+              spellCheck={false}
               placeholder="Search name or email…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -553,12 +704,12 @@ export function AdminUsersSection() {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-spruce-800" />
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm min-w-[1000px]">
+            <table className="w-full text-sm min-w-[960px]">
               <thead className="border-b border-slate-200">
                 <tr>
                   <th className="w-12 px-2 py-2">
@@ -584,6 +735,9 @@ export function AdminUsersSection() {
                   <th className="text-left px-3 py-2 font-semibold text-slate-700">
                     Email
                   </th>
+                  <th className="text-left px-3 py-2 font-semibold text-slate-700 w-[7.5rem]">
+                    Email verified
+                  </th>
                   <th className="text-left px-3 py-2">
                     <SortHeaderButton
                       label="Role"
@@ -599,13 +753,10 @@ export function AdminUsersSection() {
                   <th className="text-left px-3 py-2 font-semibold text-slate-700">
                     Joined
                   </th>
-                  <th className="text-left px-3 py-2 font-semibold text-slate-700">
-                    Last active
-                  </th>
                   <th className="text-left px-3 py-2 font-semibold text-slate-700 w-[7rem]">
                     Listings
                   </th>
-                  <th className="px-2 py-2 w-[6.25rem] text-center font-semibold text-slate-700">
+                  <th className="px-2 py-2 w-[10.5rem] text-center font-semibold text-slate-700">
                     Actions
                   </th>
                 </tr>
@@ -615,6 +766,8 @@ export function AdminUsersSection() {
                   const id = userRowId(u);
                   const joined = u.createdAt || u.created_at;
                   const disabledDel = rowDeleteDisabled(u);
+                  const disabledRole = rowRoleSwitchDisabled(u);
+                  const disabledImpersonate = rowImpersonateDisabled(u);
                   const listingsCount =
                     typeof u.listingsCount === 'number' ? u.listingsCount : 0;
                   return (
@@ -639,6 +792,9 @@ export function AdminUsersSection() {
                         {u.name}
                       </td>
                       <td className="px-3 py-1.5 text-slate-600">{u.email}</td>
+                      <td className="px-3 py-1.5 align-middle">
+                        <EmailVerifiedPill verified={u.emailVerified} />
+                      </td>
                       <td className="px-3 py-1.5">
                         <RolePill role={u.role} />
                       </td>
@@ -650,14 +806,11 @@ export function AdminUsersSection() {
                           ? new Date(joined).toLocaleDateString()
                           : '—'}
                       </td>
-                      <td className="px-3 py-1.5 text-slate-500 whitespace-nowrap text-[13px]">
-                        {formatLastActive(u.lastActiveAt)}
-                      </td>
                       <td className="px-3 py-1.5 align-middle">
                         <ListingCountBadge count={listingsCount} />
                       </td>
                       <td className="px-2 py-1.5 align-middle">
-                        <div className="flex items-center justify-center gap-1.5">
+                        <div className="flex flex-wrap items-center justify-center gap-1.5">
                           <button
                             type="button"
                             className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-admin-600 text-white shadow-sm shadow-admin-700/15 transition hover:bg-admin-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-admin-500 focus-visible:ring-offset-2"
@@ -670,6 +823,34 @@ export function AdminUsersSection() {
                             }
                           >
                             <Eye className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-500 text-white shadow-sm shadow-amber-600/20 transition hover:bg-amber-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-35 disabled:shadow-none"
+                            aria-label={`Change role for ${u.name || u.email}`}
+                            title={
+                              disabledRole
+                                ? 'You cannot change your own role here'
+                                : 'Change user role'
+                            }
+                            disabled={disabledRole}
+                            onClick={() => openRoleModal(u)}
+                          >
+                            <Key className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-slate-600 text-white shadow-sm shadow-slate-700/20 transition hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-35 disabled:shadow-none"
+                            aria-label={`Open preview as ${u.name || u.email}`}
+                            title={
+                              disabledImpersonate
+                                ? 'Cannot preview as an admin account'
+                                : 'Open site in a new tab as this user'
+                            }
+                            disabled={disabledImpersonate}
+                            onClick={() => openImpersonateModal(u)}
+                          >
+                            <LogIn className="h-3.5 w-3.5 shrink-0" strokeWidth={2.25} aria-hidden />
                           </button>
                           <button
                             type="button"
@@ -889,6 +1070,162 @@ export function AdminUsersSection() {
                   <Trash2 className="h-4 w-4" />
                 )}
                 Delete user
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={roleModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeRoleModal();
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {roleStep === 1
+                ? `Change role — ${roleModalUser?.name || roleModalUser?.email || 'User'}`
+                : 'Confirm with your password'}
+            </DialogTitle>
+          </DialogHeader>
+          {roleStep === 1 ? (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-slate-600">
+                Choose the new role. You will be asked for your admin password on the next step.
+              </p>
+              <div className="space-y-2">
+                <Label>New role</Label>
+                <Select value={roleSelected} onValueChange={setRoleSelected}>
+                  <SelectTrigger className="h-10 bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ASSIGNABLE_ROLES.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeRoleModal}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  className="bg-admin-700 hover:bg-admin-800"
+                  onClick={continueRoleToPassword}
+                >
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              <p className="text-sm text-slate-600">
+                Enter <span className="font-medium text-slate-800">your</span> admin account password
+                to apply this change.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="admin-role-password">Admin password</Label>
+                <Input
+                  id="admin-role-password"
+                  name="admin_role_reauth_pw"
+                  type="password"
+                  autoComplete="off"
+                  value={rolePassword}
+                  onChange={(e) => setRolePassword(e.target.value)}
+                  className="bg-white"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setRoleStep(1);
+                    setRolePassword('');
+                  }}
+                  disabled={roleSubmitting}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  className="gap-2 bg-admin-700 hover:bg-admin-800"
+                  onClick={submitRoleChange}
+                  disabled={roleSubmitting}
+                >
+                  {roleSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Key className="h-4 w-4" />
+                  )}
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={impersonateOpen}
+        onOpenChange={(open) => {
+          if (!open) closeImpersonateModal();
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              Preview as {impersonateTarget?.name || impersonateTarget?.email || 'user'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-1">
+            <p className="text-sm text-slate-600">
+              A new tab will open signed in as this user so you can see what they can access. Enter
+              your admin password to continue.
+            </p>
+            <div className="space-y-2">
+              <Label htmlFor="admin-impersonate-password">Admin password</Label>
+              <Input
+                id="admin-impersonate-password"
+                name="admin_impersonate_reauth_pw"
+                type="password"
+                autoComplete="off"
+                value={impersonatePassword}
+                onChange={(e) => setImpersonatePassword(e.target.value)}
+                className="bg-white"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeImpersonateModal}
+                disabled={impersonateSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="gap-2 bg-slate-700 hover:bg-spruce-800"
+                onClick={confirmImpersonate}
+                disabled={impersonateSubmitting}
+              >
+                {impersonateSubmitting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogIn className="h-4 w-4" />
+                )}
+                Open preview tab
               </Button>
             </div>
           </div>

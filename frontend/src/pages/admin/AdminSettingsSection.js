@@ -1,10 +1,10 @@
 import { useSearchParams } from 'react-router-dom';
 import { Settings, Quote } from 'lucide-react';
-import { AdminPlaceholder } from './AdminPlaceholder';
 import { AdminPlatformReviewsSection } from './AdminPlatformReviewsSection';
+import { AdminListingReviewsSection } from './AdminListingReviewsSection';
 
 const SETTINGS_TABS = [
-  { id: 'overview', label: 'Overview', icon: Settings },
+  { id: 'overview', label: 'Listings reviews', icon: Settings },
   { id: 'reviews', label: 'Platform reviews', icon: Quote },
 ];
 
@@ -16,7 +16,7 @@ export function AdminSettingsSection({ onUpdate }) {
   const activeTab = SETTINGS_TABS.some((t) => t.id === tab) ? tab : 'overview';
 
   const setTab = (id) => {
-    setSearchParams({ section: 'general', tab: id }, { replace: true });
+    setSearchParams({ section: 'reviews', tab: id }, { replace: true });
   };
 
   return (
@@ -44,11 +44,7 @@ export function AdminSettingsSection({ onUpdate }) {
       </div>
 
       {activeTab === 'overview' && (
-        <AdminPlaceholder
-          icon={Settings}
-          title="General settings"
-          description="More site-wide options can live here. Use the Platform reviews tab to edit home page testimonials."
-        />
+        <AdminListingReviewsSection onUpdate={onUpdate} />
       )}
       {activeTab === 'reviews' && <AdminPlatformReviewsSection onUpdate={onUpdate} />}
     </div>

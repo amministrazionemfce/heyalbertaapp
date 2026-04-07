@@ -5,23 +5,23 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 const VARIANTS = {
   danger: {
     headerClass:
-      'bg-gradient-to-br from-adminDanger-600 via-red-600 to-adminDanger-800 text-white',
+      'bg-spruce-800 text-white',
     iconWrap: 'bg-white/20 text-white ring-2 ring-white/30',
     confirmClass:
-      'bg-gradient-to-br from-adminDanger-600 via-red-600 to-adminDanger-800 hover:from-adminDanger-700 hover:via-red-700 hover:to-adminDanger-900 text-white shadow-md shadow-adminDanger-900/25',
+      'bg-red-600 hover:from-adminDanger-700 hover:via-red-700 hover:to-adminDanger-900 text-white shadow-md shadow-adminDanger-900/25',
     ring: 'ring-2 ring-adminDanger-100',
   },
   warning: {
     headerClass:
-      'bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white',
+      'bg-spruce-800 text-white',
     iconWrap: 'bg-white/20 text-white ring-2 ring-white/30',
     confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md',
     ring: 'ring-2 ring-amber-100',
   },
   neutral: {
-    headerClass: 'bg-gradient-to-br from-slate-700 to-slate-900 text-white',
+    headerClass: 'bg-spruce-800 text-white',
     iconWrap: 'bg-white/15 text-white ring-2 ring-white/20',
-    confirmClass: 'bg-slate-800 hover:bg-slate-900 text-white',
+    confirmClass: 'bg-spruce-800 hover:bg-slate-900 text-white',
     ring: 'ring-1 ring-slate-200',
   },
 };

@@ -1,14 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { LayoutGrid } from 'lucide-react';
 import { listingAPI } from '../lib/api';
-import { CATEGORIES } from '../data/categories';
+import { CATEGORIES, getCategoryIcon } from '../data/categories';
 import { ROUTES, directoryCategoryQuery } from '../constants';
 import CategoryScrollTabs from './CategoryScrollTabs';
 import FeaturedListingCard from './FeaturedListingCard';
 
 const PAGE_SIZE = 12;
 
-const tabItems = [{ id: '', label: 'All' }, ...CATEGORIES.map((c) => ({ id: c.id, label: c.name }))];
+const tabItems = [
+  { id: '', label: 'All', Icon: LayoutGrid },
+  ...CATEGORIES.map((c) => ({
+    id: c.id,
+    label: c.name,
+    Icon: getCategoryIcon(c.icon),
+  })),
+];
 
 /**
  * Featured listings grid with category tabs + horizontal scroll arrows.

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Check, X } from 'lucide-react';
 import { Button } from './ui/button';
-import { ROUTES } from '../constants';
+import { MEMBERSHIP_PLANS_URL } from '../constants';
 import { getMembershipEntitlementsCopy } from '../lib/listingTierRules';
 
 /**
@@ -51,7 +51,7 @@ export function MembershipUpgradeCard({ planTier }) {
         Unlock more visibility, media, contact options, and review tools on {nextLabel}.
       </p>
       <Button asChild className="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm">
-        <Link to={ROUTES.PROFILE}>View plans</Link>
+        <Link to={MEMBERSHIP_PLANS_URL}>View plans</Link>
       </Button>
     </div>
   );

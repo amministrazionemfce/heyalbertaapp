@@ -37,10 +37,28 @@ export function mergeMembershipPlansFromSettings(settings) {
     const desc = settings?.[descKey] != null ? String(settings[descKey]).trim() : '';
     const featText = settings?.[featKey] != null ? String(settings[featKey]).trim() : '';
     const features = splitLines(featText);
+    const priceOverride = (key) => {
+      const v = settings?.[key];
+      const n = v == null ? null : Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const pricing =
+      plan.id === 'standard'
+        ? {
+            monthly: { ...plan.pricing.monthly, usd: priceOverride('membershipPriceStandardMonthlyUsd') ?? plan.pricing.monthly.usd },
+            yearly: { ...plan.pricing.yearly, usd: priceOverride('membershipPriceStandardYearlyUsd') ?? plan.pricing.yearly.usd },
+          }
+        : plan.id === 'premium'
+          ? {
+              monthly: { ...plan.pricing.monthly, usd: priceOverride('membershipPricePremiumMonthlyUsd') ?? plan.pricing.monthly.usd },
+              yearly: { ...plan.pricing.yearly, usd: priceOverride('membershipPricePremiumYearlyUsd') ?? plan.pricing.yearly.usd },
+            }
+          : plan.pricing;
     return {
       ...plan,
       description: desc || plan.description,
       features: features || plan.features,
+      ...(pricing ? { pricing } : {}),
     };
   });
 }
@@ -79,6 +97,10 @@ export function buildMembershipFormDefaultsFromPlans() {
     membershipFeaturesFree: (free?.features ?? []).join('\n'),
     membershipFeaturesStandard: (standard?.features ?? []).join('\n'),
     membershipFeaturesPremium: (premium?.features ?? []).join('\n'),
+    membershipPriceStandardMonthlyUsd: standard?.pricing?.monthly?.usd ?? '',
+    membershipPriceStandardYearlyUsd: standard?.pricing?.yearly?.usd ?? '',
+    membershipPricePremiumMonthlyUsd: premium?.pricing?.monthly?.usd ?? '',
+    membershipPricePremiumYearlyUsd: premium?.pricing?.yearly?.usd ?? '',
   };
 }
 
@@ -104,5 +126,9 @@ export function mergeApiMembershipFormWithDefaults(apiData) {
     membershipFeaturesFree: pick('membershipFeaturesFree'),
     membershipFeaturesStandard: pick('membershipFeaturesStandard'),
     membershipFeaturesPremium: pick('membershipFeaturesPremium'),
+    membershipPriceStandardMonthlyUsd: pick('membershipPriceStandardMonthlyUsd'),
+    membershipPriceStandardYearlyUsd: pick('membershipPriceStandardYearlyUsd'),
+    membershipPricePremiumMonthlyUsd: pick('membershipPricePremiumMonthlyUsd'),
+    membershipPricePremiumYearlyUsd: pick('membershipPricePremiumYearlyUsd'),
   };
 }

@@ -157,7 +157,7 @@ export function AdminResourcesSection({ onUpdate }) {
 
       {loading ? (
         <div className="flex justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-admin-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-spruce-800" />
         </div>
       ) : filteredResources.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center">

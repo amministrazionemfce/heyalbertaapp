@@ -1,7 +1,7 @@
 import { Badge } from '../../components/ui/badge';
 import { ADMIN_SECTIONS } from './adminConfig';
 
-export function AdminSidebar({ stats, activeSectionId, onSelectSection }) {
+export function AdminSidebar({ stats, unreadContactMessages = null, activeSectionId, onSelectSection }) {
   return (
     <aside className="lg:w-48 flex-shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-slate-200  lg:min-h-screen lg:sticky lg:top-0 z-40">
       <div className="flex flex-col lg:block">
@@ -9,8 +9,13 @@ export function AdminSidebar({ stats, activeSectionId, onSelectSection }) {
           {ADMIN_SECTIONS.map((item) => {
             const Icon = item.icon;
             const active = activeSectionId === item.id;
+            const unreadSupport =
+              unreadContactMessages != null
+                ? Number(unreadContactMessages) || 0
+                : Number(stats?.unreadContactMessages ?? 0) || 0;
             const pendingBadge = item.id === 'listings' && (stats?.pendingVendors ?? stats?.pending_vendors) > 0;
-            const supportBadge = item.id === 'support' && (stats?.unreadContactMessages ?? 0) > 0;
+            const supportBadge = item.id === 'support' && unreadSupport > 0;
+            const notificationsBadge = item.id === 'notifications' && unreadSupport > 0;
             return (
               <button
                 key={item.id}
@@ -30,7 +35,12 @@ export function AdminSidebar({ stats, activeSectionId, onSelectSection }) {
                 )}
                 {supportBadge && (
                   <Badge variant="counter" className="ml-auto shrink-0 min-w-[1.5rem] justify-center px-2 py-0.5 text-xs">
-                    {stats.unreadContactMessages > 99 ? '99+' : stats.unreadContactMessages}
+                    {unreadSupport > 99 ? '99+' : unreadSupport}
+                  </Badge>
+                )}
+                {notificationsBadge && (
+                  <Badge variant="counter" className="ml-auto shrink-0 min-w-[1.5rem] justify-center px-2 py-0.5 text-xs">
+                    {unreadSupport > 99 ? '99+' : unreadSupport}
                   </Badge>
                 )}
               </button>

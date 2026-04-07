@@ -9,6 +9,11 @@ export function normalizedVendorPlanTier(tier) {
   return "free";
 }
 
+/** Max listings per user for this plan; null = unlimited (aligned with `listingPlanTierCapabilities`). */
+export function maxListingsForPlanTier(vendorTier) {
+  return normalizedVendorPlanTier(vendorTier) === "free" ? 1 : null;
+}
+
 export function countWords(s) {
   return String(s || "")
     .trim()

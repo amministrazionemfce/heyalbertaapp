@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { StarRating, StarInput } from '../components/StarRating';
 import { listingAPI, reviewAPI } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { CATEGORIES } from '../data/categories';
+import { CATEGORIES, getCategoryIcon } from '../data/categories';
 import { toast } from 'sonner';
 import { getApiErrorLines } from '../lib/formatApiError';
 import { ROUTES, vendorPath, listingPath, directoryCategoryQuery } from '../constants';
@@ -31,7 +31,6 @@ import {
   ChevronRight,
   ThumbsUp,
   Share2,
-  Shield,
   Star,
   Sparkles,
   Calendar,
@@ -436,8 +435,18 @@ export default function ListingDetailPage() {
     uid && reviews.some((r) => String(r.userId ?? r.user_id ?? '') === uid)
   );
 
-  const categoryName = CATEGORIES.find((c) => c.id === listing.categoryId)?.name || listing.categoryId;
-  const mapQuery = [seller.name, seller.city, seller.neighborhood, 'Alberta'].filter(Boolean).join(', ');
+  const category = CATEGORIES.find((c) => c.id === listing.categoryId) || null;
+  const categoryName = category?.name || listing.categoryId;
+  const CategoryIcon = category ? getCategoryIcon(category.icon) : null;
+  const businessName = String(listing.businessName || seller.businessName || '').trim();
+  const mapQuery = [
+    businessName || listing.title,
+    seller.city,
+    seller.neighborhood,
+    'Alberta',
+  ]
+    .filter(Boolean)
+    .join(', ');
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`;
   // Prefer Maps Embed API when the env key looks valid (Google keys start with "AIzaSy"; "AlzaSy" is a common typo).
   // Invalid keys would show Google's error iframe — fall back to legacy no-key embed instead.
@@ -562,8 +571,12 @@ export default function ListingDetailPage() {
 
             <div className="rounded-2xl border border-slate-100 bg-white p-6 md:p-8 shadow-sm">
               <div className="flex flex-wrap items-start gap-3 mb-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-spruce-800">
-                  <Shield className="w-6 h-6" aria-hidden />
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl">
+                  {CategoryIcon ? (
+                    <CategoryIcon className="w-6 h-6" aria-hidden />
+                  ) : (
+                    <span className="w-6 h-6" aria-hidden />
+                  )}
                 </div>
                 <div className="min-w-0 flex-1">
                   <h1
@@ -572,14 +585,11 @@ export default function ListingDetailPage() {
                   >
                     {listing.title}
                   </h1>
-                  {seller.name && (
-                    <Link
-                      to={vendorPath(seller.userId || seller.id)}
-                      className="mt-1 inline-block text-spruce-700 hover:underline font-medium text-sm md:text-base"
-                    >
-                      {seller.name}
-                    </Link>
-                  )}
+                  {businessName ? (
+                    <p className="mt-1 text-spruce-700 font-medium text-sm md:text-base">
+                      {businessName}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 

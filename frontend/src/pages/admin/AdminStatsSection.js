@@ -1,7 +1,23 @@
-import { Users, Store, List, Wallet } from 'lucide-react';
+import { Users, List, Wallet } from 'lucide-react';
 import { SimpleLineChart } from '../../components/SimpleLineChart';
 
 const CHART_COLOR = '#0ea5e9';
+const FINANCE_COLOR = '#16a34a';
+
+function formatMoney(amount, currency) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return '—';
+  const cur = String(currency || '').trim();
+  try {
+    return new Intl.NumberFormat(undefined, {
+      style: 'currency',
+      currency: cur || 'USD',
+      maximumFractionDigits: 0,
+    }).format(n);
+  } catch {
+    return `${n.toFixed(0)}${cur ? ` ${cur}` : ''}`;
+  }
+}
 
 function SectorCardHeader({ icon: Icon, iconBg, title, total, totalMuted }) {
   return (
@@ -26,10 +42,15 @@ function SectorCardHeader({ icon: Icon, iconBg, title, total, totalMuted }) {
 export function AdminStatsSection({ stats }) {
   const trends = stats?.trends || {};
   const labels = Array.isArray(trends.labels) ? trends.labels : [];
+  const finance = stats?.finance || {};
+  const financeLabels = labels;
+  const financeValues = Array.isArray(finance.revenueLast6MonthsByMonth)
+    ? finance.revenueLast6MonthsByMonth
+    : [];
 
   return (
     <section className="space-y-10" data-testid="admin-stats">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 min-h-[180px] flex flex-col">
           <SectorCardHeader
             icon={Users}
@@ -45,29 +66,6 @@ export function AdminStatsSection({ stats }) {
             <li className="flex justify-between gap-2">
               <span>User role</span>
               <span className="font-semibold text-slate-800 tabular-nums">{stats?.usersByRole?.user ?? 0}</span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 min-h-[180px] flex flex-col">
-          <SectorCardHeader
-            icon={Store}
-            iconBg="bg-emerald-600"
-            title="Sellers"
-            total={stats?.totalVendors ?? 0}
-          />
-          <ul className="text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4 flex-1">
-            <li className="flex justify-between gap-2">
-              <span>Approved</span>
-              <span className="font-semibold text-emerald-700 tabular-nums">{stats?.approvedVendors ?? 0}</span>
-            </li>
-            <li className="flex justify-between gap-2">
-              <span>Pending</span>
-              <span className="font-semibold text-amber-700 tabular-nums">{stats?.pendingVendors ?? 0}</span>
-            </li>
-            <li className="flex justify-between gap-2">
-              <span>Featured</span>
-              <span className="font-semibold text-slate-800 tabular-nums">{stats?.vendorsFeatured ?? 0}</span>
             </li>
           </ul>
         </div>
@@ -100,10 +98,29 @@ export function AdminStatsSection({ stats }) {
             icon={Wallet}
             iconBg="bg-slate-400"
             title="Finance"
-            total="—"
-            totalMuted
+            total={finance?.stripeConnected ? formatMoney(finance?.revenueLast30Days, finance?.currency) : '—'}
+            totalMuted={!finance?.stripeConnected}
           />
-          <div className="flex-1 border-t border-slate-100 mt-4 pt-4 min-h-[4rem]" aria-hidden="true" />
+          <ul className="text-sm text-slate-600 space-y-3 border-t border-slate-100 pt-4 flex-1">
+            <li className="flex justify-between gap-2">
+              <span>Available</span>
+              <span className="font-semibold text-slate-800 tabular-nums">
+                {finance?.stripeConnected ? formatMoney(finance?.availableBalance, finance?.currency) : '—'}
+              </span>
+            </li>
+            <li className="flex justify-between gap-2">
+              <span>Pending</span>
+              <span className="font-semibold text-slate-800 tabular-nums">
+                {finance?.stripeConnected ? formatMoney(finance?.pendingBalance, finance?.currency) : '—'}
+              </span>
+            </li>
+            <li className="flex justify-between gap-2">
+              <span>Last 30 days</span>
+              <span className="font-semibold text-emerald-700 tabular-nums">
+                {finance?.stripeConnected ? formatMoney(finance?.revenueLast30Days, finance?.currency) : '—'}
+              </span>
+            </li>
+          </ul>
         </div>
       </div>
 
@@ -112,6 +129,18 @@ export function AdminStatsSection({ stats }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <SimpleLineChart title="New users" labels={labels} values={trends.newUsers} color={CHART_COLOR} />
           <SimpleLineChart title="New listings" labels={labels} values={trends.newListings} color={CHART_COLOR} />
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4">Finance (last 6 months)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SimpleLineChart
+            title={finance?.stripeConnected ? `Revenue (${String(finance?.currency || '').toUpperCase() || '—'})` : 'Revenue'}
+            labels={financeLabels}
+            values={financeValues}
+            color={FINANCE_COLOR}
+          />
         </div>
       </div>
     </section>

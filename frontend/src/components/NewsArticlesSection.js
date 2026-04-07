@@ -14,7 +14,7 @@ function formatArticleDate(iso) {
 
 function NewsArticleCardSkeleton() {
   return (
-    <div className="flex-shrink-0 w-[min(100%,260px)] sm:w-[248px] md:w-[268px] snap-start flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-md ring-1 ring-slate-900/5">
+    <div className="flex-shrink-0 w-[min(100%,260px)] sm:w-[248px] md:w-[268px] snap-start flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white">
       <Skeleton className="aspect-[4/3] w-full rounded-none rounded-t-2xl" />
       <div className="px-3 pt-2 pb-1">
         <Skeleton className="h-4 w-28" />

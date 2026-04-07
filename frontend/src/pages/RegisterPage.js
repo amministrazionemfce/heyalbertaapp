@@ -79,10 +79,7 @@ export default function RegisterPage() {
           </Link>
 
           <h1 className="font-heading text-2xl font-bold text-slate-900 mb-2">Create your account</h1>
-          <p className="text-sm text-muted-foreground mb-8">
-            Already have an account? {' '}
-            <Link to={ROUTES.LOGIN} className="text-spruce-700 hover:underline font-medium">Log in</Link>
-          </p>
+        
 
           <form onSubmit={handleSubmit} className="space-y-5" data-testid="register-form">
             <AuthFormError lines={apiErrorLines} data-testid="register-api-error" />
@@ -171,6 +168,10 @@ export default function RegisterPage() {
               Create Account
             </Button>
           </form>
+          <p className="text-sm text-muted-foreground mb-8 mt-4">
+            Already have an account? {' '}
+            <Link to={ROUTES.LOGIN} className="text-spruce-700 hover:underline font-medium">Log in</Link>
+          </p>
         </div>
       </div>
       <div className="hidden lg:flex lg:w-1/2 relative min-h-screen">

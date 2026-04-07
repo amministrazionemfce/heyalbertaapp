@@ -14,10 +14,6 @@ export function listingValidation(data) {
     errors.category = 'Please select a category';
   if (!data.city)
     errors.city = 'Please select a city';
-  const price = (data.price != null ? String(data.price) : '').trim();
-  if (!price) {
-    errors.price = 'Price is required (e.g. $99, From $50/hr, or Contact for quote)';
-  }
   if (data.email && data.email.trim() && !emailRegex.test(data.email.trim()))
     errors.email = 'Enter a valid email address';
   if (data.website && data.website.trim() && !/^https?:\/\/.+/.test(data.website.trim()))

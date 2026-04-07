@@ -254,12 +254,12 @@ export default function AboutPage() {
                     <Button
                       type="button"
                       onClick={card.onClick}
-                      className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white uppercase tracking-wide text-xs font-semibold h-11 px-8"
+                      className="w-full sm:w-auto bg-slate-900 hover:bg-spruce-800 text-white uppercase tracking-wide text-xs font-semibold h-11 px-8"
                     >
                       {card.cta}
                     </Button>
                   ) : (
-                    <Button asChild className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white uppercase tracking-wide text-xs font-semibold h-11 px-8">
+                    <Button asChild className="w-full sm:w-auto bg-slate-900 hover:bg-spruce-800 text-white uppercase tracking-wide text-xs font-semibold h-11 px-8">
                       <Link to={card.href}>{card.cta}</Link>
                     </Button>
                   )}

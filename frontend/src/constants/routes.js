@@ -37,6 +37,9 @@ export const ROUTE_PATTERNS = Object.freeze({
 /** Vendor dashboard — add listing tab (query string) */
 export const DASHBOARD_ADD_LISTING = `${ROUTES.DASHBOARD}?tab=add-listing`;
 
+/** Home page — public membership / pricing section (`<section id="membership">`) */
+export const MEMBERSHIP_PLANS_URL = `${ROUTES.HOME}#membership`;
+
 export function listingPath(id) {
   return `${ROUTES.LISTINGS}/${id}`;
 }

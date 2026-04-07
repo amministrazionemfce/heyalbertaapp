@@ -18,6 +18,11 @@ export function listingFormValidation(data, planTier = 'free') {
   if (!title) errors.title = 'Title is required';
   else if (title.length < 2) errors.title = 'Title must be at least 2 characters';
 
+  const businessName = (data.businessName || '').trim();
+  if (businessName.length > 200) {
+    errors.businessName = 'Business name must be 200 characters or less';
+  }
+
   const desc = (data.description || '').trim();
   if (!desc) errors.description = 'Description is required';
   else if (desc.length < 10) errors.description = 'Description must be at least 10 characters';
@@ -25,7 +30,7 @@ export function listingFormValidation(data, planTier = 'free') {
     errors.description = `Description is limited to ${FREE_LISTING_DESCRIPTION_MAX_WORDS} words on the Free plan.`;
   }
   if (!cap.allowContactInListingDescription && desc && descriptionHasBlockedContactPatterns(desc)) {
-    errors.description = 'URLs and email addresses are not allowed in your listing description on the Free plan.';
+    errors.description = 'Phone numbers, URLs, and email addresses are not allowed in your listing description on the Free plan.';
   }
 
   if (!(data.categoryId || '').trim()) errors.categoryId = 'Please select a category';
@@ -69,9 +74,6 @@ export function listingFormValidation(data, planTier = 'free') {
   else if (status !== 'draft' && status !== 'published') {
     errors.status = 'Status must be Draft or Published';
   }
-
-  const price = (data.price != null ? String(data.price) : '').trim();
-  if (!price) errors.price = 'Price is required (e.g. $99, From $50/hr, or Contact for quote)';
 
   const images = Array.isArray(data.images) ? data.images : [];
   if (images.length === 0) errors.images = 'Add at least one image';
