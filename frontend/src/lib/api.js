@@ -1,7 +1,29 @@
 import axios from 'axios';
 
-// Use REACT_APP_BACKEND_URL from .env, or fallback for local dev (e.g. backend on port 8000)
-export const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8000';
+/**
+ * If REACT_APP_BACKEND_URL has no `http://` or `https://`, axios treats it as a path on the
+ * current site (e.g. https://heyalberta.com/your-api.up.railway.app/api/...) → 404.
+ */
+function normalizeBackendUrl(raw) {
+  const fallback = 'http://localhost:8000';
+  let u = String(raw ?? '').trim();
+  if (!u) return fallback;
+  if (u.startsWith('//')) {
+    u = `https:${u}`;
+  } else if (!/^https?:\/\//i.test(u)) {
+    const hostStart = u.replace(/^\/+/, '');
+    const isLocal = /^localhost\b/i.test(hostStart) || /^127\.0\.0\.1\b/.test(hostStart);
+    u = `${isLocal ? 'http' : 'https'}://${hostStart}`;
+  }
+  try {
+    return new URL(u).origin;
+  } catch {
+    return fallback;
+  }
+}
+
+// Use REACT_APP_BACKEND_URL from .env (baked in at `npm run build`), or local dev fallback.
+export const BACKEND_URL = normalizeBackendUrl(process.env.REACT_APP_BACKEND_URL);
 
 /** Ngrok free tier serves a browser warning HTML page unless this header is sent; that page has no CORS headers, so the browser reports a CORS failure. */
 function isNgrokBackendUrl(url) {

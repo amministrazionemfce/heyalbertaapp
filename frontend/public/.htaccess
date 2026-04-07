@@ -1,10 +1,13 @@
-# SPA fallback for shared hosting (Apache).
-# Without this, refreshing /profile, /listings/..., etc. returns 404 because those paths are not real files.
+# SPA fallback — Apache & LiteSpeed (shared hosting).
+# Deep links (/verify-email, /checkout/return, /profile, …) must serve index.html or you get a server 404.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
+
   RewriteRule ^index\.html$ - [L]
+
   RewriteCond %{REQUEST_FILENAME} !-f
   RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  # QSA keeps ?token=… and ?session_id=… on the request for React Router.
+  RewriteRule . /index.html [L,QSA]
 </IfModule>
