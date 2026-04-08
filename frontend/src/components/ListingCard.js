@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Star, ThumbsUp } from 'lucide-react';
 import ListingCategoryLabel from './ListingCategoryLabel';
@@ -52,8 +53,17 @@ function plainTextExcerpt(raw) {
 export default function ListingCard({ listing, onAdminOpen }) {
   const adminMode = typeof onAdminOpen === 'function';
   const seller = listing.seller || {};
-  const thumb =
-    resolveMediaUrl(getListingCoverImageUrl(listing)) || getListingCoverImageUrl(listing) || seller.images?.[0];
+  const thumb = useMemo(
+    () =>
+      resolveMediaUrl(getListingCoverImageUrl(listing)) ||
+      getListingCoverImageUrl(listing) ||
+      seller.images?.[0],
+    [listing, seller.images]
+  );
+  const [imageOk, setImageOk] = useState(true);
+  useEffect(() => {
+    setImageOk(true);
+  }, [thumb]);
   const reviewCount = listing.reviewCount ?? 0;
   const avgRating = listing.avgRating != null ? Number(listing.avgRating) : null;
   const priceStr = listing.price != null && String(listing.price).trim() ? String(listing.price).trim() : null;
@@ -90,15 +100,29 @@ export default function ListingCard({ listing, onAdminOpen }) {
 
       <div className="relative z-10 flex flex-1 flex-col pointer-events-none">
         <div className="relative h-44 overflow-hidden rounded-t-2xl bg-slate-100">
-          <img
-            src={thumb || 'services/1.jpg'}
-            alt=""
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            loading="lazy"
-          />
+          {imageOk && (thumb || 'services/1.jpg') ? (
+            <img
+              src={thumb || 'services/1.jpg'}
+              alt=""
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+              loading="lazy"
+              onError={() => setImageOk(false)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-slate-50 to-slate-200">
+              <div className="text-center px-4">
+                <div className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white/80 px-4 py-2 shadow-sm">
+                  <span className="font-heading text-sm font-bold tracking-wide text-spruce-800">
+                    HeyAlberta
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">Image unavailable</p>
+              </div>
+            </div>
+          )}
 
           {featured && (
-            <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-spruce-700 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
+            <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
               Featured
             </div>
           )}
@@ -125,7 +149,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
               type="button"
               onClick={toggleFavorite}
               className={`pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-                favorited ? 'text-spruce-700' : 'text-slate-600 hover:border-spruce-300 hover:text-spruce-800'
+                favorited ? 'text-yellow-500' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-500'
               }`}
               aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
               data-testid={`listing-favorite-${listing.id}`}

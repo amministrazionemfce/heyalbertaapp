@@ -27,6 +27,7 @@ import { CookieConsentProvider } from './components/CookieConsentBanner';
 import { ROUTES, ROUTE_PATTERNS } from './constants';
 import { ImpersonationHandoff } from './components/ImpersonationHandoff';
 import { HashScroll } from './components/HashScroll';
+import { MaintenanceGate } from './components/MaintenanceGate';
 
 function Layout({ children, hideNav }) {
   return (
@@ -44,6 +45,7 @@ function App() {
       <CheckoutLoadingProvider>
       <CookieConsentProvider>
       <BrowserRouter>
+        <MaintenanceGate>
         <ImpersonationHandoff />
         <HashScroll />
         <Toaster
@@ -93,6 +95,7 @@ function App() {
           <Route path={ROUTES.ABOUT} element={<Layout><AboutPage /></Layout>} />
           <Route path={ROUTES.CONTACT} element={<Layout><ContactPage /></Layout>} />
         </Routes>
+        </MaintenanceGate>
       </BrowserRouter>
       </CookieConsentProvider>
       </CheckoutLoadingProvider>

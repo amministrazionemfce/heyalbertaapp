@@ -246,6 +246,11 @@ export const adminAPI = {
   updateCategoryImages: (categories) => API.put('/admin/category-images', { categories }),
   siteSettings: () => API.get('/admin/site-settings'),
   updateSiteSettings: (data) => API.put('/admin/site-settings', data),
+  /** @param {{ adminPassword: string }} body — downloads MongoDB JSON backup */
+  downloadMongoBackup: (body) =>
+    API.post('/admin/backup/mongodb', body, { responseType: 'blob' }),
+  /** @param {{ adminPassword: string, maintenanceMode: boolean, maintenanceMessage?: string }} body */
+  setMaintenanceMode: (body) => API.post('/admin/maintenance', body),
   contactMessages: (params) => API.get('/admin/contact-messages', { params }),
   markContactMessageRead: (id) => API.patch(`/admin/contact-messages/${id}/read`),
   replyContactMessage: (id, body) => API.post(`/admin/contact-messages/${id}/reply`, body),

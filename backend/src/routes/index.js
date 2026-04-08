@@ -1,4 +1,5 @@
 import express from "express";
+import { maintenanceModeGuard } from "../middleware/maintenanceMode.js";
 import authRoutes from "./auth.routes.js";
 import reviewRoutes from "./review.routes.js";
 import resourceRoutes from "./resource.routes.js";
@@ -11,6 +12,8 @@ import billingRoutes from "./billing.routes.js";
 import newsSubscribeRoutes from "./newsSubscribe.routes.js";
 
 const router = express.Router();
+
+router.use(maintenanceModeGuard);
 
 router.use("/auth", authRoutes);
 router.use("/uploads", uploadRoutes);

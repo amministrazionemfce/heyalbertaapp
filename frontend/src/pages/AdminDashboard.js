@@ -29,7 +29,8 @@ export default function AdminDashboard() {
       : sectionParam === 'platform-reviews'
         ? 'reviews'
         : sectionParam;
-  const validSection = ADMIN_SECTIONS.some((s) => s.id === normalizedSection) ? normalizedSection : 'statistics';
+  // Default admin landing: Listings (not Statistics).
+  const validSection = ADMIN_SECTIONS.some((s) => s.id === normalizedSection) ? normalizedSection : 'listings';
   const [stats, setStats] = useState(null);
   const [unreadContactMessages, setUnreadContactMessages] = useState(0);
   const [loading, setLoading] = useState(true);

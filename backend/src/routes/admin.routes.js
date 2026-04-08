@@ -1027,6 +1027,137 @@ router.post("/contact-messages/:id/reply", requireAdmin, async (req, res) => {
   }
 });
 
+/**
+ * Serialize driver documents to plain JSON (Mongo extended-JSON style) without importing
+ * a separate `bson` major version — avoids "BSON types must be from bson 6.x.x" mismatches.
+ */
+function backupSerializeValue(value) {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== "object") return value;
+
+  if (value instanceof Date) {
+    return { $date: value.toISOString() };
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return {
+      $binary: {
+        base64: value.toString("base64"),
+        subType: "00",
+      },
+    };
+  }
+
+  if (value instanceof mongoose.Types.ObjectId) {
+    return { $oid: value.toString() };
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((x) => backupSerializeValue(x));
+  }
+
+  if (value.constructor?.name === "ObjectId" && typeof value.toString === "function") {
+    return { $oid: value.toString() };
+  }
+
+  if (value._bsontype === "Long" && typeof value.toString === "function") {
+    return { $numberLong: value.toString() };
+  }
+  if (value._bsontype === "Decimal128" && typeof value.toString === "function") {
+    return { $numberDecimal: value.toString() };
+  }
+  if (value._bsontype === "Double" && typeof value.toString === "function") {
+    return { $numberDouble: value.toString() };
+  }
+  if (value._bsontype === "Int32" && typeof value.valueOf === "function") {
+    return { $numberInt: String(value.valueOf()) };
+  }
+
+  const out = {};
+  for (const k of Object.keys(value)) {
+    out[k] = backupSerializeValue(value[k]);
+  }
+  return out;
+}
+
+async function buildMongoJsonBackupPayload() {
+  const db = mongoose.connection.db;
+  if (!db) throw new Error("Database is not connected.");
+  const cols = await db.listCollections().toArray();
+  const payload = {
+    exportedAt: new Date().toISOString(),
+    format: "mongodb-ejson",
+    note:
+      "Hey Alberta database export (MongoDB). User password hashes are redacted. " +
+      "This is not a SQL dump; import with MongoDB tools or a restore script as appropriate.",
+    collections: {},
+  };
+  for (const { name } of cols) {
+    if (!name || String(name).startsWith("system.")) continue;
+    const docs = await db.collection(name).find({}).toArray();
+    const serialized = docs.map((doc) => {
+      const ser = backupSerializeValue(doc);
+      if (name === "users" && ser && typeof ser === "object" && "passwordHash" in ser) {
+        return { ...ser, passwordHash: "[REDACTED]" };
+      }
+      return ser;
+    });
+    payload.collections[name] = serialized;
+  }
+  return payload;
+}
+
+/*
+------------------------------------------------
+Backup (MongoDB JSON) + maintenance mode
+------------------------------------------------
+*/
+router.post("/backup/mongodb", requireAdmin, async (req, res) => {
+  try {
+    const adminCheck = await assertAdminPassword(req.user, req.body?.adminPassword);
+    if (!adminCheck.ok) {
+      return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+    const data = await buildMongoJsonBackupPayload();
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const body = JSON.stringify(data, null, 2);
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="hey-alberta-mongodb-backup-${stamp}.json"`
+    );
+    return res.send(body);
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/maintenance", requireAdmin, async (req, res) => {
+  try {
+    const adminCheck = await assertAdminPassword(req.user, req.body?.adminPassword);
+    if (!adminCheck.ok) {
+      return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+    const enabled = Boolean(req.body?.maintenanceMode ?? req.body?.enabled);
+    const msgIn = String(req.body?.maintenanceMessage ?? "").trim();
+    const s = await getOrCreateSiteSettings();
+    s.maintenanceMode = enabled;
+    if (enabled) {
+      if (msgIn) s.maintenanceMessage = msgIn;
+    } else {
+      s.maintenanceMessage = "";
+    }
+    await s.save();
+    return res.json({
+      maintenanceMode: s.maintenanceMode,
+      maintenanceMessage: s.maintenanceMessage || "",
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+});
+
 /*
 ------------------------------------------------
 News page — email subscribers

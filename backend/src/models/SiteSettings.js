@@ -57,6 +57,9 @@ const siteSettingsSchema = new mongoose.Schema(
     /** Email verification templates (transactional) */
     emailVerificationEmailSubject: { type: String, default: "" },
     emailVerificationEmailBody: { type: String, default: "" },
+    /** Public site maintenance (non-admins see maintenance UI; admins bypass). */
+    maintenanceMode: { type: Boolean, default: false },
+    maintenanceMessage: { type: String, default: "" },
     homeTestimonials: {
       type: [
         {

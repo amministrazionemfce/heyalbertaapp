@@ -93,7 +93,7 @@ export default function FeaturedListingCard({ listing }) {
             loading="lazy"
           />
           <div className="pointer-events-none absolute left-3 top-3 z-10">
-            <span className="rounded-md bg-spruce-700 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+            <span className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
               Featured
             </span>
           </div>
@@ -112,7 +112,7 @@ export default function FeaturedListingCard({ listing }) {
             type="button"
             onClick={toggleFavorite}
             className={`pointer-events-auto z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-              favorited ? 'text-spruce-700' : 'text-slate-600 hover:border-slate-300 hover:text-spruce-800'
+              favorited ? 'text-yellow-600' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-600'
             }`}
             aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
           >

@@ -550,7 +550,7 @@ export default function DirectoryPage() {
                       data-testid="filter-my-likings"
                     />
                     <span className="flex items-center gap-2 text-sm text-slate-700">
-                      <ThumbsUp className="w-4 h-4 text-spruce-600" aria-hidden />
+                      <ThumbsUp className="w-4 h-4 text-yellow-600" aria-hidden />
                       My likings
                     </span>
                   </label>
@@ -565,12 +565,11 @@ export default function DirectoryPage() {
               <div className="min-h-[42vh] py-2" role="status" aria-live="polite" aria-busy="true" aria-label="Loading listings">
                 <div className="mb-4 space-y-2">
                   <Skeleton className="h-7 w-48 rounded-lg" />
-                  <Skeleton className="h-4 w-64 max-w-full rounded" />
                 </div>
                 <DirectoryListingsGridSkeleton count={pageSize} />
               </div>
             ) : (
-              <div className="flex min-h-0 flex-1 flex-col mt-3">
+              <div className="flex min-h-0 flex-1 flex-col">
                 <div className="mb-4 flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
                   <div className="w-full min-w-0 sm:w-1/2 flex flex-col justify-center sm:max-w-[50%]">
                     {activeFilters > 0 ? (

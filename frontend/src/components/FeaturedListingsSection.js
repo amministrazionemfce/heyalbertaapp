@@ -71,12 +71,13 @@ export default function FeaturedListingsSection() {
         </div>
 
         {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 sm:gap-5">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-5">
             {Array.from({ length: PAGE_SIZE }).map((_, i) => (
               <div
                 key={i}
-                className="animate-pulse overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
+                className="w-full min-w-0 shrink-0 sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-5rem)/5)]"
               >
+                <div className="animate-pulse overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm">
                 <div className="aspect-[4/3] bg-slate-200" />
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
                   <div className="flex items-center gap-2">
@@ -91,6 +92,7 @@ export default function FeaturedListingsSection() {
                   <div className="h-3.5 w-32 rounded bg-slate-200" />
                   <div className="h-3.5 w-28 rounded bg-slate-200" />
                 </div>
+                </div>
               </div>
             ))}
           </div>
@@ -101,9 +103,14 @@ export default function FeaturedListingsSection() {
             No featured listings in this category yet. Try another category or browse the full directory.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 sm:gap-5">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-5">
             {listings.map((listing) => (
-              <FeaturedListingCard key={listing.id} listing={listing} />
+              <div
+                key={listing.id}
+                className="w-full min-w-0 shrink-0 sm:w-[calc((100%-1.25rem)/2)] md:w-[calc((100%-2.5rem)/3)] lg:w-[calc((100%-5rem)/5)]"
+              >
+                <FeaturedListingCard listing={listing} />
+              </div>
             ))}
           </div>
         )}
