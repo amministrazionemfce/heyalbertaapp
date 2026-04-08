@@ -123,7 +123,10 @@ router.put("/:id", requireAdmin, async (req, res) => {
   for (const key of allowed) {
     if (req.body[key] !== undefined) payload[key] = req.body[key];
   }
-  const updated = await Resource.findByIdAndUpdate(id, payload, { new: true, runValidators: false });
+  const updated = await Resource.findByIdAndUpdate(id, payload, {
+    returnDocument: "after",
+    runValidators: false,
+  });
   if (!updated) return res.status(404).json({ message: "Resource not found" });
   res.json(updated);
 });

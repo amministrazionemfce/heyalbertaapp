@@ -23,7 +23,7 @@ export const ADMIN_SECTIONS = [
   { id: 'statistics', label: 'Statistics', icon: BarChart3, testId: 'admin-nav-statistics' },
   { id: 'city-images', label: 'Images', icon: Image, testId: 'admin-nav-city-images' },
   { id: 'reviews', label: 'Reviews', icon: Star, testId: 'admin-nav-reviews' },
-  { id: 'general', label: 'General', icon: Settings, testId: 'admin-nav-general' },
+  { id: 'general', label: 'System', icon: Settings, testId: 'admin-nav-general' },
   { id: 'notifications', label: 'Notifications', icon: Bell, testId: 'admin-nav-notifications' },
 ];
 

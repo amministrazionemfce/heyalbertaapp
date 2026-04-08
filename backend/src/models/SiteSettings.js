@@ -57,6 +57,9 @@ const siteSettingsSchema = new mongoose.Schema(
     /** Email verification templates (transactional) */
     emailVerificationEmailSubject: { type: String, default: "" },
     emailVerificationEmailBody: { type: String, default: "" },
+    /** Review notification email templates (sent to vendors) */
+    reviewNotificationEmailSubject: { type: String, default: "" },
+    reviewNotificationEmailBody: { type: String, default: "" },
     /** Public site maintenance (non-admins see maintenance UI; admins bypass). */
     maintenanceMode: { type: Boolean, default: false },
     maintenanceMessage: { type: String, default: "" },
@@ -71,6 +74,23 @@ const siteSettingsSchema = new mongoose.Schema(
         },
       ],
       default: [],
+    },
+    /** System theme colors */
+    themeColors: {
+      type: {
+        primary: { type: String, default: "#16a34a" },
+        primaryDark: { type: String, default: "#166534" },
+        accent: { type: String, default: "#ea580c" },
+        text: { type: String, default: "#1e293b" },
+        border: { type: String, default: "#e2e8f0" },
+      },
+      default: {
+        primary: "#16a34a",
+        primaryDark: "#166534",
+        accent: "#ea580c",
+        text: "#1e293b",
+        border: "#e2e8f0",
+      }
     },
   },
   { versionKey: false, timestamps: { createdAt: false, updatedAt: true } }

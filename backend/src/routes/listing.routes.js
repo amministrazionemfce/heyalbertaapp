@@ -12,7 +12,7 @@ import {
   maxListingsForPlanTier,
 } from "../utils/listingTierCaps.js";
 import { matchReviewsByListingId } from "../utils/reviewListingQuery.js";
-import { listingsFeaturedForBillingTier } from "../utils/membershipFeatured.js";
+import { listingsFeaturedForUserPlan } from "../utils/membershipFeatured.js";
 
 const router = express.Router();
 
@@ -82,14 +82,23 @@ function tierRankForDefault(raw) {
   return 0;
 }
 
+function effectiveBillingWithPromo(userDoc) {
+  const b = String(userDoc?.billingTier || "free").toLowerCase();
+  if (b === "premium") return "premium";
+  if (b === "standard") return "standard";
+  const exp = userDoc?.promoStandardExpiresAt;
+  if (exp && new Date(exp) > new Date()) return "standard";
+  return "free";
+}
+
 async function defaultTierForUser(userId) {
   const uid = String(userId);
   const [first, userDoc] = await Promise.all([
     Listing.findOne({ userId: uid }).sort({ createdAt: 1 }).lean(),
-    User.findById(uid).select("billingTier").lean(),
+    User.findById(uid).select("billingTier promoStandardExpiresAt").lean(),
   ]);
   const rList = tierRankForDefault(first?.tier || "free");
-  const rBill = tierRankForDefault(userDoc?.billingTier || "free");
+  const rBill = tierRankForDefault(effectiveBillingWithPromo(userDoc));
   const r = Math.max(rList, rBill);
   if (r >= 2) return "premium";
   if (r >= 1) return "standard";
@@ -547,8 +556,8 @@ router.post("/", requireAuth, async (req, res) => {
       : Number(body.longitude);
 
   const sellerStatus = await resolveSellerStatusForCreate();
-  const ownerBilling = await User.findById(uid).select("billingTier").lean();
-  const featured = listingsFeaturedForBillingTier(ownerBilling?.billingTier);
+  const ownerBilling = await User.findById(uid).select("billingTier promoStandardExpiresAt").lean();
+  const featured = listingsFeaturedForUserPlan(ownerBilling);
 
   try {
     const listing = await Listing.create({
@@ -733,7 +742,10 @@ router.put("/:id", requireAuth, async (req, res) => {
     if (dup) return res.status(400).json({ message: "A listing with this title already exists. Choose a different title." });
   }
   try {
-    const updated = await Listing.findByIdAndUpdate(req.params.id, payload, { new: true, runValidators: true });
+    const updated = await Listing.findByIdAndUpdate(req.params.id, payload, {
+      returnDocument: "after",
+      runValidators: true,
+    });
     return res.json(updated);
   } catch (err) {
     if (err.name === "ValidationError") {

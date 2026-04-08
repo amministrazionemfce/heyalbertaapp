@@ -96,6 +96,7 @@ export function AuthProvider({ children }) {
       return;
     }
     clearLocalAuth();
+    localStorage.removeItem('hey_alberta_dismissed_system_notification_id');
     setUser(null);
   }, [loadUser]);
 

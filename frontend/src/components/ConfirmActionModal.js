@@ -6,23 +6,21 @@ const VARIANTS = {
   danger: {
     headerClass:
       'bg-spruce-800 text-white',
-    iconWrap: 'bg-white/20 text-white ring-2 ring-white/30',
+    iconWrap: 'bg-white/20 text-white ring-white/30',
     confirmClass:
       'bg-red-600 hover:from-adminDanger-700 hover:via-red-700 hover:to-adminDanger-900 text-white shadow-md shadow-adminDanger-900/25',
-    ring: 'ring-2 ring-adminDanger-100',
+    
   },
   warning: {
     headerClass:
       'bg-spruce-800 text-white',
-    iconWrap: 'bg-white/20 text-white ring-2 ring-white/30',
+    iconWrap: 'bg-white/20 text-white ring-white/30',
     confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md',
-    ring: 'ring-2 ring-amber-100',
   },
   neutral: {
     headerClass: 'bg-spruce-800 text-white',
-    iconWrap: 'bg-white/15 text-white ring-2 ring-white/20',
+    iconWrap: 'bg-white/15 text-white ring-white/20',
     confirmClass: 'bg-spruce-800 hover:bg-slate-900 text-white',
-    ring: 'ring-1 ring-slate-200',
   },
 };
 
@@ -99,7 +97,7 @@ export default function ConfirmActionModal({
           </div>
         </div>
 
-        <div className="space-y-4 bg-slate-50 px-6 py-5">
+        <div className="space-y-4px-6 py-5">
           <div className="text-center text-sm leading-relaxed text-slate-600 sm:text-left">
             {description}
           </div>

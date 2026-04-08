@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Check, Crown, Sprout, Zap } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Button } from './ui/button';
 import { ROUTES } from '../constants';
 import { getPlanPriceDisplay } from '../data/membershipPlans';
-import { siteAPI, listingAPI } from '../lib/api';
+import { siteAPI, listingAPI, billingAPI } from '../lib/api';
 import {
   mergeMembershipPlansFromSettings,
   membershipSectionHeadlinesFromSettings,
@@ -14,12 +14,6 @@ import { getPlanActionLabel, redirectToPlanCheckout } from '../lib/billing';
 import { useCheckoutLoading } from '../lib/checkoutLoadingContext';
 import { useAuth } from '../lib/auth';
 import { membershipPlanTierFromUserAndListings } from '../lib/membershipTier';
-
-const TIER_ICONS = {
-  free: Sprout,
-  standard: Zap,
-  premium: Crown,
-};
 
 /** Shared spruce palette for all tiers (no per-tier accent colors). */
 const MEMBERSHIP_CARD_THEME = {
@@ -79,12 +73,16 @@ function PopularRibbon({ compact = false }) {
 export default function MembershipTiersSection({ defaultCadence = 'monthly', onSelectPlan } = {}) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { startCheckoutLoading, stopCheckoutLoading } = useCheckoutLoading();
   const [cadence, setCadence] = useState(defaultCadence === 'yearly' ? 'yearly' : 'monthly');
   const [loadingPlanId, setLoadingPlanId] = useState('');
   const [currentTier, setCurrentTier] = useState('free');
+  const [membershipLoading, setMembershipLoading] = useState(true);
   const [siteSettings, setSiteSettings] = useState(null);
+  /** Latest user for async tier resolution without re-subscribing when refreshUser() replaces the object. */
+  const userRef = useRef(user);
+  userRef.current = user;
 
   useEffect(() => {
     let cancelled = false;
@@ -111,22 +109,44 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
   );
 
   const resolveTier = useCallback(async () => {
-    if (!user) {
+    const u = userRef.current;
+    if (!u) {
       setCurrentTier('free');
+      setMembershipLoading(false);
       return;
     }
+    setMembershipLoading(true);
     try {
+      try {
+        const syncRes = await billingAPI.syncSubscription();
+        const eff = syncRes?.data?.effectiveTier;
+        if (eff === 'free' || eff === 'standard' || eff === 'premium') {
+          setCurrentTier(eff);
+          try {
+            await refreshUser();
+          } catch {
+            /* ignore */
+          }
+          setMembershipLoading(false);
+          return;
+        }
+      } catch {
+        /* Stripe not configured or offline */
+      }
       const listingsRes = await listingAPI.myListings();
       const rows = listingsRes.data || [];
-      setCurrentTier(membershipPlanTierFromUserAndListings(user, rows));
+      setCurrentTier(membershipPlanTierFromUserAndListings(userRef.current, rows));
     } catch {
-      setCurrentTier(membershipPlanTierFromUserAndListings(user, []));
+      setCurrentTier(membershipPlanTierFromUserAndListings(userRef.current, []));
+    } finally {
+      setMembershipLoading(false);
     }
-  }, [user]);
+  }, [refreshUser]);
 
   useEffect(() => {
     resolveTier();
-  }, [user?.id, user?.billingTier, location.search, resolveTier]);
+    // Intentionally omit user.billingTier / promo fields: refreshUser() after sync would retrigger forever.
+  }, [user?.id, location.search, resolveTier]);
 
   useEffect(() => {
     setCadence(defaultCadence === 'yearly' ? 'yearly' : 'monthly');
@@ -135,14 +155,25 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
   const handlePlanAction = async (plan) => {
     try {
       setLoadingPlanId(plan.id);
+      setMembershipLoading(true);
       if (typeof onSelectPlan === 'function') {
         await onSelectPlan(plan, { cadence });
         return;
       }
+      const bt = String(userRef.current?.billingTier || 'free').toLowerCase();
+      const likelySubscriptionUpdate =
+        (bt === 'standard' || bt === 'premium') && (plan.id === 'standard' || plan.id === 'premium');
       startCheckoutLoading(
-        plan.id === 'free' ? 'Opening billing portal…' : 'Preparing secure checkout…'
+        plan.id === 'free'
+          ? 'Opening billing portal…'
+          : likelySubscriptionUpdate
+            ? 'Updating your plan…'
+            : 'Preparing secure checkout…'
       );
-      const result = await redirectToPlanCheckout(plan.id, cadence);
+      const result = await redirectToPlanCheckout(plan.id, cadence, {
+        billingTier: userRef.current?.billingTier,
+        refreshUser,
+      });
       if (!result.ok) {
         if (result.needAuth) {
           toast.info('Sign in to subscribe or manage billing.');
@@ -150,6 +181,13 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
           return;
         }
         toast.error(result.message || 'Billing is not available right now.');
+        return;
+      }
+      if (result.mode === 'updated') {
+        if (result.effectiveTier === 'free' || result.effectiveTier === 'standard' || result.effectiveTier === 'premium') {
+          setCurrentTier(result.effectiveTier);
+        }
+        toast.success(result.unchanged ? 'You are already on this plan.' : 'Your subscription was updated.');
         return;
       }
       if (result.mode === 'portal') {
@@ -170,6 +208,7 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
     } finally {
       stopCheckoutLoading();
       setLoadingPlanId('');
+      setMembershipLoading(false);
     }
   };
 
@@ -223,12 +262,11 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
 
         <div className="mx-auto grid max-w-6xl gap-8 md:grid-cols-3 md:items-stretch md:gap-6 lg:gap-8">
           {displayPlans.map((plan) => {
-            const isCurrent = plan.id === currentTier;
             const prices = getPlanPriceDisplay(plan, cadence);
             const isFeatured = plan.id === 'standard';
             const loading = loadingPlanId === plan.id;
-            const Icon = TIER_ICONS[plan.id] || Sprout;
             const t = MEMBERSHIP_CARD_THEME;
+            const isCurrent = !membershipLoading && plan.id === currentTier;
             const label = loading ? 'Please wait…' : getPlanActionLabel(plan.id, currentTier);
             const isDowngradeFreeCta = plan.id === 'free' && currentTier !== 'free';
 
@@ -237,54 +275,81 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
                 key={plan.id}
                 className={`relative flex h-full flex-col overflow-hidden rounded-2xl ${t.shell}`}
               >
-                {isFeatured ? <PopularRibbon /> : null}
+                {membershipLoading ? null : isFeatured ? <PopularRibbon /> : null}
                 <div className="flex flex-1 flex-col px-7 pb-8 pt-7 md:px-8 md:pb-9 md:pt-8">
                   <div className="mb-5 flex min-h-[2.75rem] flex-wrap items-center justify-center gap-2">
-                    {isCurrent ? <CurrentPlanBadge /> : null}
+                    {membershipLoading ? (
+                      <div className="h-9 w-36 animate-pulse rounded-full bg-slate-100" aria-hidden />
+                    ) : isCurrent ? (
+                      <CurrentPlanBadge />
+                    ) : null}
                   </div>
 
                   <div className="flex flex-col items-center text-center">
-                    <Icon
-                      className="mb-5 h-10 w-10 text-spruce-700 md:h-11 md:w-11"
-                      strokeWidth={1.75}
-                      aria-hidden
-                    />
-
-                    <p
-                      className={`font-heading text-3xl font-bold tabular-nums tracking-tight md:text-[2.125rem] md:leading-none ${t.price}`}
-                    >
-                      {prices.primary}
-                    </p>
-                    {prices.secondary && (
-                      <p className={`mt-1.5 text-sm font-medium ${t.freq}`}>{prices.secondary}</p>
+                    {membershipLoading ? (
+                      <>
+                        <div className="h-10 w-24 animate-pulse rounded-lg bg-slate-100" aria-hidden />
+                        <div className="mt-2 h-4 w-28 animate-pulse rounded bg-slate-100" aria-hidden />
+                      </>
+                    ) : (
+                      <>
+                        <p
+                          className={`font-heading text-3xl font-bold tabular-nums tracking-tight md:text-[2.125rem] md:leading-none ${t.price}`}
+                        >
+                          {prices.primary}
+                        </p>
+                        {prices.secondary && (
+                          <p className={`mt-1.5 text-sm font-medium ${t.freq}`}>{prices.secondary}</p>
+                        )}
+                      </>
                     )}
 
                     <hr className={`my-6 w-full max-w-[220px] border-t ${t.divider}`} />
 
-                    <p className={`text-xs font-semibold uppercase tracking-wider ${t.tagline}`}>
-                      {plan.tagline}
-                    </p>
-                    <h3 className={`mt-2 font-heading text-xl font-bold leading-snug ${t.name}`}>
-                      {plan.name}
-                    </h3>
+                    {membershipLoading ? (
+                      <>
+                        <div className="h-3 w-20 animate-pulse rounded bg-slate-100" aria-hidden />
+                        <div className="mt-3 h-6 w-28 animate-pulse rounded bg-slate-100" aria-hidden />
+                      </>
+                    ) : (
+                      <>
+                        <p className={`text-xs font-semibold uppercase tracking-wider ${t.tagline}`}>
+                          {plan.tagline}
+                        </p>
+                        <h3 className={`mt-2 font-heading text-xl font-bold leading-snug ${t.name}`}>
+                          {plan.name}
+                        </h3>
+                      </>
+                    )}
 
                     <p className={`mt-3 text-sm leading-relaxed ${t.desc}`}>{plan.description}</p>
                   </div>
 
                   <ul className="mt-7 flex w-full flex-1 flex-col gap-3 text-left">
-                    {plan.features.map((f, fi) => (
-                      <li
-                        key={`${plan.id}-${fi}-${String(f).slice(0, 24)}`}
-                        className={`flex w-full items-start gap-3 text-left text-sm leading-snug ${t.feature}`}
-                      >
-                        <Check
-                          className="mt-0.5 h-5 w-5 shrink-0 text-spruce-700"
-                          strokeWidth={2.5}
-                          aria-hidden
-                        />
-                        <span className="min-w-0 flex-1 text-left">{f}</span>
-                      </li>
-                    ))}
+                    {membershipLoading
+                      ? Array.from({ length: Math.min(5, plan.features?.length || 5) }).map((_, i) => (
+                          <li
+                            key={`${plan.id}-sk-${i}`}
+                            className={`flex w-full items-start gap-3 text-left text-sm leading-snug ${t.feature}`}
+                            aria-hidden
+                          >
+                            <div className="mt-1 h-5 w-5 shrink-0 animate-pulse rounded bg-slate-100" />
+                            <div className="h-4 w-full animate-pulse rounded bg-slate-100" />
+                          </li>
+                        ))
+                      : plan.features.map((f, fi) => (
+                          <li
+                            key={`${plan.id}-${fi}-${String(f).slice(0, 24)}`}
+                            className={`flex w-full items-start gap-3 text-left text-sm leading-snug ${t.feature}`}
+                          >
+                            <Check
+                              className="mt-0.5 h-5 w-5 shrink-0 text-spruce-700"
+                              strokeWidth={2.5}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 flex-1 text-left">{f}</span>
+                          </li>
+                        ))}
                   </ul>
 
                   {isCurrent ? (
@@ -295,7 +360,7 @@ export default function MembershipTiersSection({ defaultCadence = 'monthly', onS
                   ) : (
                     <Button
                       type="button"
-                      disabled={loading}
+                      disabled={membershipLoading || loading}
                       onClick={() => handlePlanAction(plan)}
                       variant="default"
                       className={`mt-8 h-11 w-full text-sm disabled:pointer-events-none ${
@@ -381,7 +446,6 @@ export function MembershipTiersPreview({ form }) {
               const prices = getPlanPriceDisplay(plan, cadence);
               const isFeatured = plan.id === 'standard';
               const isCurrent = plan.id === previewTier;
-              const Icon = TIER_ICONS[plan.id] || Sprout;
               const t = MEMBERSHIP_CARD_THEME;
               const label = getPlanActionLabel(plan.id, previewTier);
 
@@ -401,12 +465,6 @@ export function MembershipTiersPreview({ form }) {
                     </div>
 
                     <div className="flex flex-col items-center text-center">
-                      <Icon
-                        className="mb-4 h-9 w-9 text-spruce-700 md:mb-5 md:h-10 md:w-10"
-                        strokeWidth={1.75}
-                        aria-hidden
-                      />
-
                       <p
                         className={`font-heading text-xl font-bold tabular-nums tracking-tight md:text-2xl md:leading-none ${t.price}`}
                       >

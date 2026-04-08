@@ -1,5 +1,6 @@
 import express from "express";
 import mongoose from "mongoose";
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { requireAdmin } from "../middleware/admin.js";
@@ -13,6 +14,10 @@ import CategoryImage from "../models/CategoryImage.js";
 import SiteSettings from "../models/SiteSettings.js";
 import ContactMessage from "../models/ContactMessage.js";
 import NewsSubscriber from "../models/NewsSubscriber.js";
+import Promotion from "../models/Promotion.js";
+import PromotionSend from "../models/PromotionSend.js";
+import PromotionRedemption from "../models/PromotionRedemption.js";
+import SystemNotification from "../models/SystemNotification.js";
 import { matchReviewsByListingId } from "../utils/reviewListingQuery.js";
 import { sendMarketingBatch, sendTransactionalMail, isMailConfigured } from "../utils/mail.js";
 import { createImpersonationToken } from "../utils/jwt.js";
@@ -50,6 +55,22 @@ async function assertAdminPassword(adminUser, adminPassword) {
     return { ok: false, status: 401, message: "Incorrect admin password." };
   }
   return { ok: true };
+}
+
+function adminFrontendBase() {
+  let u = String(process.env.FRONTEND_URL || "http://localhost:3000").trim();
+  if (!/^https?:\/\//i.test(u)) {
+    u = `http://${u.replace(/^\/+/, "")}`;
+  }
+  return u.replace(/\/$/, "");
+}
+
+function personalizePromoText(raw, { name, code, durationDays, redeemUrl }) {
+  return String(raw || "")
+    .replace(/\{\{name\}\}/g, name || "")
+    .replace(/\{\{code\}\}/g, code || "")
+    .replace(/\{\{durationDays\}\}/g, String(durationDays ?? ""))
+    .replace(/\{\{redeemUrl\}\}/g, redeemUrl || "");
 }
 
 async function deleteUserListingData(userId) {
@@ -214,7 +235,7 @@ router.patch("/reviews/:reviewId", requireAdmin, async (req, res) => {
       const rep = String(req.body.reply ?? "").trim();
       patch.reply = rep ? rep : null;
     }
-    const updated = await Review.findByIdAndUpdate(reviewId, patch, { new: true });
+    const updated = await Review.findByIdAndUpdate(reviewId, patch, { returnDocument: "after" });
     if (!updated) return res.status(404).json({ message: "Review not found" });
     res.json(updated.toJSON());
   } catch (error) {
@@ -251,7 +272,7 @@ router.put("/listings/:listingId/moderation", requireAdmin, async (req, res) => 
     if (!["pending", "approved", "rejected"].includes(sellerStatus)) {
       return res.status(400).json({ message: "sellerStatus must be pending, approved, or rejected" });
     }
-    const listing = await Listing.findByIdAndUpdate(listingId, { sellerStatus }, { new: true });
+    const listing = await Listing.findByIdAndUpdate(listingId, { sellerStatus }, { returnDocument: "after" });
     if (!listing) return res.status(404).json({ message: "Listing not found" });
     res.json({ message: "Listing updated", listing });
   } catch (error) {
@@ -793,7 +814,7 @@ router.put("/city-images", requireAdmin, async (req, res) => {
       await CityImage.findOneAndUpdate(
         { cityName },
         { imageUrl },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
       );
       upserts += 1;
     }
@@ -849,7 +870,7 @@ router.put("/category-images", requireAdmin, async (req, res) => {
       await CategoryImage.findOneAndUpdate(
         { categoryId },
         { imageUrl },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
       );
       upserts += 1;
     }
@@ -903,9 +924,23 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       "homeTestimonialsHeading",
       "emailVerificationEmailSubject",
       "emailVerificationEmailBody",
+      "reviewNotificationEmailSubject",
+      "reviewNotificationEmailBody",
     ];
     for (const k of allowed) {
       if (req.body[k] !== undefined) s[k] = req.body[k];
+    }
+    if (req.body.themeColors !== undefined) {
+      const raw = req.body.themeColors;
+      if (raw && typeof raw === 'object') {
+        s.themeColors = {
+          primary: String(raw.primary || '#16a34a').trim() || '#16a34a',
+          primaryDark: String(raw.primaryDark || '#166534').trim() || '#166534',
+          accent: String(raw.accent || '#ea580c').trim() || '#ea580c',
+          text: String(raw.text || '#1e293b').trim() || '#1e293b',
+          border: String(raw.border || '#e2e8f0').trim() || '#e2e8f0',
+        };
+      }
     }
     if (req.body.homeHeroSlides !== undefined) {
       const raw = req.body.homeHeroSlides;
@@ -985,12 +1020,132 @@ router.patch("/contact-messages/:id/read", requireAdmin, async (req, res) => {
     const doc = await ContactMessage.findByIdAndUpdate(
       id,
       { read: true, readAt: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!doc) return res.status(404).json({ message: "Message not found" });
 
     res.json(doc.toJSON());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/*
+------------------------------------------------
+SYSTEM NOTIFICATIONS (Admin panel)
+------------------------------------------------
+*/
+router.get("/system-notifications", requireAdmin, async (_req, res) => {
+  try {
+    const rows = await SystemNotification.find({}).sort({ updatedAt: -1 }).limit(100).lean();
+    res.json(
+      rows.map((d) => ({
+        ...d,
+        id: String(d._id),
+      }))
+    );
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.post("/system-notifications", requireAdmin, async (req, res) => {
+  try {
+    const title = String(req.body?.title || "").trim();
+    const message = String(req.body?.message || "").trim();
+    const variant = String(req.body?.variant || "info").trim();
+    const enabled = req.body?.enabled === false ? false : true;
+
+    if (!message) {
+      return res.status(400).json({ message: "Message is required." });
+    }
+    if (!["info", "warning", "danger"].includes(variant)) {
+      return res.status(400).json({ message: "variant must be info, warning, or danger." });
+    }
+
+    const startsAtRaw = req.body?.startsAt;
+    const endsAtRaw = req.body?.endsAt;
+    const startsAt = startsAtRaw ? new Date(startsAtRaw) : null;
+    const endsAt = endsAtRaw ? new Date(endsAtRaw) : null;
+    if (startsAt && Number.isNaN(startsAt.getTime())) {
+      return res.status(400).json({ message: "startsAt must be a valid date/time." });
+    }
+    if (endsAt && Number.isNaN(endsAt.getTime())) {
+      return res.status(400).json({ message: "endsAt must be a valid date/time." });
+    }
+
+    const doc = await SystemNotification.create({
+      title,
+      message,
+      variant,
+      enabled,
+      startsAt,
+      endsAt,
+    });
+
+    // Enforce: only one enabled notification at a time.
+    if (enabled) {
+      await SystemNotification.updateMany(
+        { _id: { $ne: doc._id }, enabled: true },
+        { $set: { enabled: false } }
+      );
+    }
+    res.json(doc.toJSON());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.put("/system-notifications/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+
+    const payload = {};
+    if (req.body?.title !== undefined) payload.title = String(req.body.title || "").trim();
+    if (req.body?.message !== undefined) payload.message = String(req.body.message || "").trim();
+    if (req.body?.variant !== undefined) payload.variant = String(req.body.variant || "info").trim();
+    if (req.body?.enabled !== undefined) payload.enabled = Boolean(req.body.enabled);
+    if (req.body?.startsAt !== undefined) payload.startsAt = req.body.startsAt ? new Date(req.body.startsAt) : null;
+    if (req.body?.endsAt !== undefined) payload.endsAt = req.body.endsAt ? new Date(req.body.endsAt) : null;
+
+    if (payload.variant && !["info", "warning", "danger"].includes(payload.variant)) {
+      return res.status(400).json({ message: "variant must be info, warning, or danger." });
+    }
+    if (payload.message !== undefined && !payload.message) {
+      return res.status(400).json({ message: "Message is required." });
+    }
+    if (payload.startsAt && Number.isNaN(payload.startsAt.getTime())) {
+      return res.status(400).json({ message: "startsAt must be a valid date/time." });
+    }
+    if (payload.endsAt && Number.isNaN(payload.endsAt.getTime())) {
+      return res.status(400).json({ message: "endsAt must be a valid date/time." });
+    }
+
+    const doc = await SystemNotification.findByIdAndUpdate(id, payload, { returnDocument: "after" });
+    if (!doc) return res.status(404).json({ message: "Notification not found" });
+
+    // Enforce: only one enabled notification at a time.
+    if (doc.enabled) {
+      await SystemNotification.updateMany(
+        { _id: { $ne: doc._id }, enabled: true },
+        { $set: { enabled: false } }
+      );
+    }
+    res.json(doc.toJSON());
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+router.delete("/system-notifications/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id" });
+    const doc = await SystemNotification.findByIdAndDelete(id);
+    if (!doc) return res.status(404).json({ message: "Notification not found" });
+    res.json({ ok: true });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1271,6 +1426,293 @@ router.post("/marketing/send", requireAdmin, async (req, res) => {
       });
     }
     res.status(500).json({ message: error.message || "Failed to send email." });
+  }
+});
+
+router.get("/promotions", requireAdmin, async (_req, res) => {
+  try {
+    const rows = await Promotion.find().sort({ createdAt: -1 }).lean();
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Could not load promotions." });
+  }
+});
+
+router.post("/promotions", requireAdmin, async (req, res) => {
+  try {
+    let code = String(req.body?.code || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!code) {
+      code = `PROMO-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
+    }
+    const taken = await Promotion.findOne({ code });
+    if (taken) {
+      return res.status(400).json({ message: "A promotion with this code already exists." });
+    }
+    const durationDays = Math.floor(Number(req.body?.durationDays));
+    if (!Number.isFinite(durationDays) || durationDays < 1 || durationDays > 3650) {
+      return res.status(400).json({ message: "durationDays must be between 1 and 3650." });
+    }
+    const label = String(req.body?.label ?? "").trim().slice(0, 200);
+    let redeemBy;
+    if (req.body?.redeemBy != null && String(req.body.redeemBy).trim()) {
+      const d = new Date(req.body.redeemBy);
+      if (!Number.isFinite(d.getTime())) {
+        return res.status(400).json({ message: "Invalid redeemBy date." });
+      }
+      redeemBy = d;
+    }
+    let sysNotifPayload = null;
+    const sn = req.body?.systemNotification;
+    if (sn && typeof sn === "object") {
+      const enabled = Boolean(sn.enabled);
+      const title = String(sn.title || "").trim().slice(0, 120);
+      const message = String(sn.message || "").trim().slice(0, 500);
+      const variant = String(sn.variant || "info").trim();
+      if (!["info", "warning", "danger"].includes(variant)) {
+        return res.status(400).json({ message: "systemNotification.variant must be info, warning, or danger." });
+      }
+      if (enabled && !message) {
+        return res.status(400).json({ message: "systemNotification.message is required when enabled." });
+      }
+      sysNotifPayload = { enabled, title, message, variant };
+    }
+
+    let systemNotificationId;
+    if (sysNotifPayload?.enabled) {
+      const created = await SystemNotification.create({
+        title: sysNotifPayload.title,
+        message: sysNotifPayload.message,
+        variant: sysNotifPayload.variant,
+        enabled: true,
+      });
+      systemNotificationId = created._id;
+      // Enforce single enabled notification.
+      await SystemNotification.updateMany(
+        { _id: { $ne: created._id }, enabled: true },
+        { $set: { enabled: false } }
+      );
+    }
+
+    const doc = await Promotion.create({
+      code,
+      label,
+      durationDays,
+      redeemBy,
+      active: req.body?.active === false ? false : true,
+      systemNotificationId,
+      systemNotification: sysNotifPayload || undefined,
+    });
+    res.status(201).json(doc.toObject({ virtuals: true }));
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "A promotion with this code already exists." });
+    }
+    console.error("admin create promotion:", err?.message || err);
+    res.status(500).json({ message: err.message || "Could not create promotion." });
+  }
+});
+
+router.patch("/promotions/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id." });
+    const doc = await Promotion.findById(id);
+    if (!doc) return res.status(404).json({ message: "Promotion not found." });
+    if (req.body?.label !== undefined) doc.label = String(req.body.label ?? "").trim().slice(0, 200);
+    if (req.body?.durationDays !== undefined) {
+      const d = Math.floor(Number(req.body.durationDays));
+      if (!Number.isFinite(d) || d < 1 || d > 3650) {
+        return res.status(400).json({ message: "durationDays must be between 1 and 3650." });
+      }
+      doc.durationDays = d;
+    }
+    if (req.body?.active !== undefined) doc.active = Boolean(req.body.active);
+    if (req.body?.redeemBy !== undefined) {
+      if (req.body.redeemBy === null || req.body.redeemBy === "") {
+        doc.redeemBy = undefined;
+      } else {
+        const d = new Date(req.body.redeemBy);
+        if (!Number.isFinite(d.getTime())) {
+          return res.status(400).json({ message: "Invalid redeemBy date." });
+        }
+        doc.redeemBy = d;
+      }
+    }
+
+    if (req.body?.systemNotification !== undefined) {
+      const sn = req.body.systemNotification;
+      if (sn === null) {
+        // Remove linked notification entirely.
+        if (doc.systemNotificationId) {
+          try {
+            await SystemNotification.deleteOne({ _id: doc.systemNotificationId });
+          } catch {
+            /* ignore */
+          }
+        }
+        doc.systemNotificationId = undefined;
+        doc.systemNotification = undefined;
+      } else if (sn && typeof sn === "object") {
+        const enabled = Boolean(sn.enabled);
+        const title = String(sn.title || "").trim().slice(0, 120);
+        const message = String(sn.message || "").trim().slice(0, 500);
+        const variant = String(sn.variant || "info").trim();
+        if (!["info", "warning", "danger"].includes(variant)) {
+          return res.status(400).json({ message: "systemNotification.variant must be info, warning, or danger." });
+        }
+        if (enabled && !message) {
+          return res.status(400).json({ message: "systemNotification.message is required when enabled." });
+        }
+
+        doc.systemNotification = { enabled, title, message, variant };
+
+        if (!doc.systemNotificationId && enabled) {
+          const created = await SystemNotification.create({ title, message, variant, enabled: true });
+          doc.systemNotificationId = created._id;
+          await SystemNotification.updateMany(
+            { _id: { $ne: created._id }, enabled: true },
+            { $set: { enabled: false } }
+          );
+        } else if (doc.systemNotificationId) {
+          if (enabled) {
+            await SystemNotification.findByIdAndUpdate(
+              doc.systemNotificationId,
+              { title, message, variant, enabled: true },
+              { returnDocument: "after" }
+            );
+            await SystemNotification.updateMany(
+              { _id: { $ne: doc.systemNotificationId }, enabled: true },
+              { $set: { enabled: false } }
+            );
+          } else {
+            await SystemNotification.findByIdAndUpdate(
+              doc.systemNotificationId,
+              { title, message, variant, enabled: false },
+              { returnDocument: "after" }
+            );
+          }
+        }
+      }
+    }
+    await doc.save();
+    res.json(doc.toObject({ virtuals: true }));
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Could not update promotion." });
+  }
+});
+
+router.delete("/promotions/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id." });
+    const doc = await Promotion.findById(id);
+    if (!doc) return res.status(404).json({ message: "Promotion not found." });
+    if (doc.systemNotificationId) {
+      try {
+        await SystemNotification.deleteOne({ _id: doc.systemNotificationId });
+      } catch {
+        /* ignore */
+      }
+    }
+    await Promotion.deleteOne({ _id: doc._id });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ message: err.message || "Could not delete promotion." });
+  }
+});
+
+router.post("/promotions/:id/send-email", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id." });
+    const promo = await Promotion.findById(id);
+    if (!promo) return res.status(404).json({ message: "Promotion not found." });
+
+    const rawIds = Array.isArray(req.body?.userIds) ? req.body.userIds : [];
+    const subjectT = String(req.body?.subject ?? "").trim();
+    const textT = String(req.body?.body ?? req.body?.text ?? "").trim();
+    if (!subjectT) return res.status(400).json({ message: "Subject is required." });
+    if (!textT) return res.status(400).json({ message: "Message body is required." });
+    const ids = [...new Set(rawIds.map((x) => String(x ?? "").trim()).filter(isValidObjectId))];
+    if (!ids.length) return res.status(400).json({ message: "Select at least one user." });
+    if (ids.length > 500) return res.status(400).json({ message: "Maximum 500 users per send." });
+
+    const redeemUrl = `${adminFrontendBase()}/profile`;
+    let sent = 0;
+    const errors = [];
+
+    for (const userId of ids) {
+      const u = await User.findById(userId).select("email name").lean();
+      if (!u?.email) continue;
+      const name = String(u.name || "").trim() || "there";
+      const vars = {
+        name,
+        code: promo.code,
+        durationDays: promo.durationDays,
+        redeemUrl,
+      };
+      const subject = personalizePromoText(subjectT, vars);
+      const text = personalizePromoText(textT, vars);
+      try {
+        await sendTransactionalMail({ to: u.email, subject, text });
+        sent += 1;
+        await PromotionSend.updateOne(
+          { promotionId: id, userId: userId },
+          { promotionId: id, userId: userId, sentAt: new Date() },
+          { upsert: true }
+        );
+      } catch (e) {
+        errors.push({ email: u.email, message: e?.message || "send failed" });
+      }
+    }
+
+    if (sent === 0) {
+      return res.status(400).json({
+        message: errors.length ? errors[0].message : "No messages sent (no valid recipient emails).",
+        sent: 0,
+        errors,
+      });
+    }
+
+    res.json({ message: `Sent ${sent} message(s).`, sent, errors });
+  } catch (error) {
+    if (error.code === "MAIL_NOT_CONFIGURED") {
+      return res.status(503).json({
+        message:
+          "Email is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and MAIL_FROM on the server.",
+      });
+    }
+    res.status(500).json({ message: error.message || "Failed to send email." });
+  }
+});
+
+router.get("/promotions/:id/history", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isValidObjectId(id)) return res.status(400).json({ message: "Invalid id." });
+
+    const promo = await Promotion.findById(id);
+    if (!promo) return res.status(404).json({ message: "Promotion not found." });
+
+    const sends = await PromotionSend.find({ promotionId: id })
+      .populate("userId", "name email")
+      .lean();
+    const redemptions = await PromotionRedemption.find({ promotionId: id })
+      .select("userId")
+      .lean();
+
+    const redeemSet = new Set(redemptions.map((r) => String(r.userId)));
+
+    const history = sends.map((send) => ({
+      userName: send.userId?.name || "Unknown",
+      userEmail: send.userId?.email || "Unknown",
+      sentAt: send.sentAt,
+      redeemedAt: redeemSet.has(String(send.userId?._id)) ? new Date() : null,
+    }));
+
+    res.json(history);
+  } catch (error) {
+    res.status(500).json({ message: error.message || "Could not load history." });
   }
 });
 

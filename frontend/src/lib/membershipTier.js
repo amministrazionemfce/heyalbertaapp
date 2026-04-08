@@ -1,3 +1,10 @@
+function promoStandardActive(user) {
+  const exp = user?.promoStandardExpiresAt;
+  if (!exp) return false;
+  const t = new Date(exp);
+  return Number.isFinite(t.getTime()) && t > new Date();
+}
+
 function bestTierFromTierString(rawIn) {
   const raw = String(rawIn || '')
     .trim()
@@ -35,14 +42,20 @@ export function membershipPlanTierFromListings(listings) {
 }
 
 /**
- * Effective plan for UI: max of account billing tier (Stripe) and any listing tiers.
- * Fixes “subscribed but still Free” when the user has zero listings yet.
+ * Effective plan for vendor UI and membership cards.
+ * When Stripe billing says standard or premium, that wins — listing `tier` can lag or drift
+ * (e.g. still `premium` after subscribing to Standard), which wrongly showed “Gold”.
+ * If billing is free/unset, use the best tier from listings (e.g. legacy or comped listings).
  */
 export function membershipPlanTierFromUserAndListings(user, listings) {
-  const fromListings = membershipPlanTierFromListings(listings);
   const { rank: rankUser, normalized: userTier } = bestTierFromTierString(user?.billingTier);
-  const { rank: rankList } = bestTierFromTierString(fromListings);
-  return rankUser > rankList ? userTier : fromListings;
+  if (rankUser > 0) {
+    return userTier;
+  }
+  if (promoStandardActive(user)) {
+    return 'standard';
+  }
+  return membershipPlanTierFromListings(listings);
 }
 
 /** @deprecated Use membershipPlanTierFromListings */

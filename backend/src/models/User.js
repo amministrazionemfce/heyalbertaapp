@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema({
   createdAt: String,
   /** Updated on login and when the client loads /auth/me */
   lastActiveAt: { type: Date },
+  /** Admin promotion: Standard-equivalent access until this instant (UTC). */
+  promoStandardExpiresAt: { type: Date },
 });
 
 userSchema.virtual("id").get(function () {

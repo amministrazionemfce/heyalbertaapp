@@ -550,7 +550,7 @@ export default function DirectoryPage() {
                       data-testid="filter-my-likings"
                     />
                     <span className="flex items-center gap-2 text-sm text-slate-700">
-                      <ThumbsUp className="w-4 h-4 text-yellow-600" aria-hidden />
+                      <ThumbsUp className="w-4 h-4 text-yellow-400" aria-hidden />
                       My likings
                     </span>
                   </label>

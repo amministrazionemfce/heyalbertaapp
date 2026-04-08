@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../lib/auth';
-import { uploadAvatar, listingAPI } from '../lib/api';
+import { uploadAvatar, listingAPI, authAPI, billingAPI } from '../lib/api';
 import { ROUTES } from '../constants';
 import { getApiErrorLines } from '../lib/formatApiError';
 import AuthFormError from '../components/AuthFormError';
@@ -35,7 +35,7 @@ function RoleIcon({ role, className }) {
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, updateProfile } = useAuth();
+  const { user, loading: authLoading, updateProfile, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,11 +47,47 @@ export default function ProfilePage() {
   const [validationError, setValidationError] = useState({});
   const [myListings, setMyListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoBusy, setPromoBusy] = useState(false);
   const previewRef = useRef(null);
+  const didSyncBillingRef = useRef(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate(ROUTES.LOGIN, { replace: true });
   }, [user, authLoading, navigate]);
+
+  useEffect(() => {
+    if (!user?.id || didSyncBillingRef.current) return;
+    didSyncBillingRef.current = true;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const syncRes = await billingAPI.syncSubscription();
+        if (!cancelled && syncRes?.data?.ok) {
+          try {
+            await refreshUser();
+          } catch {
+            /* ignore */
+          }
+          if (user?.role === 'vendor') {
+            try {
+              const res = await listingAPI.myListings();
+              if (!cancelled) setMyListings(Array.isArray(res.data) ? res.data : []);
+            } catch {
+              /* ignore */
+            }
+          }
+        }
+      } catch {
+        // Stripe may be unconfigured; Profile should still render.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, user?.role, refreshUser]);
 
   useEffect(() => {
     if (!user || user.role !== 'vendor') {
@@ -179,6 +215,39 @@ export default function ProfilePage() {
   const tierLabel = TIER_LABELS[planTier] || 'Free';
   const tierHint = TIER_HINTS[planTier] || TIER_HINTS.free;
 
+  const billingTierRaw = String(user.billingTier || 'free').toLowerCase();
+  const billingIsFree = billingTierRaw === 'free';
+  const billingIsStandardPaid = billingTierRaw === 'standard';
+  const billingIsPremiumPaid = billingTierRaw === 'premium';
+  const promoUntil = user.promoStandardExpiresAt ? new Date(user.promoStandardExpiresAt) : null;
+  const promoActive =
+    promoUntil && Number.isFinite(promoUntil.getTime()) && promoUntil > new Date();
+  const canApplyPromoCode = billingIsFree && !promoActive;
+
+  const applyPromotion = async (e) => {
+    e.preventDefault();
+    const c = String(promoCode || '').trim();
+    if (!c) {
+      toast.error('Enter a promotion code.');
+      return;
+    }
+    setPromoBusy(true);
+    try {
+      const { data } = await authAPI.redeemPromotion({ code: c });
+      toast.success(data?.message || 'Promotion applied.');
+      setPromoCode('');
+      await refreshUser();
+      if (user?.role === 'vendor') {
+        const res = await listingAPI.myListings();
+        setMyListings(Array.isArray(res.data) ? res.data : []);
+      }
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Could not apply code.');
+    } finally {
+      setPromoBusy(false);
+    }
+  };
+
   const totalListings = myListings.length;
   const publishedCount = myListings.filter((l) => l.status === 'published').length;
   const draftCount = myListings.filter((l) => l.status === 'draft').length;
@@ -188,7 +257,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen py-10 px-4" data-testid="profile-page">
-      <div className="mx-auto max-w-lg md:max-w-xl">
+      <div className="mx-auto max-w-6xl">
         <Link
           to={ROUTES.HOME}
           className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-spruce-700"
@@ -196,7 +265,8 @@ export default function ProfilePage() {
           <ArrowLeft className="h-4 w-4" /> Back to home
         </Link>
 
-        <div className="mb-6 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-900/5 md:p-6">
+        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm shadow-slate-900/5 md:p-6">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <h2 className="font-heading text-lg font-semibold text-slate-900">Account</h2>
@@ -251,15 +321,15 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                    <div className="rounded-xl border border-slate-100 px-3 py-3 text-center">
                       <p className="text-2xl font-semibold tabular-nums text-slate-900">{totalListings}</p>
                       <p className="mt-0.5 text-[11px] font-medium text-slate-500">Total</p>
                     </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                    <div className="rounded-xl border border-slate-100 px-3 py-3 text-center">
                       <p className="text-2xl font-semibold tabular-nums text-spruce-800">{publishedCount}</p>
                       <p className="mt-0.5 text-[11px] font-medium text-slate-500">Published</p>
                     </div>
-                    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-3 py-3 text-center">
+                    <div className="rounded-xl border border-slate-100 px-3 py-3 text-center">
                       <p className="text-2xl font-semibold tabular-nums text-slate-700">{draftCount}</p>
                       <p className="mt-0.5 text-[11px] font-medium text-slate-500">Drafts</p>
                     </div>
@@ -345,6 +415,68 @@ export default function ProfilePage() {
               Save changes
             </Button>
           </form>
+
+          <div className="mt-8 border-t border-slate-100 pt-6" data-testid="profile-promotion-section">
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Promotion code</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Apply an admin-issued code for temporary Standard access (starts when you redeem).
+            </p>
+            {billingIsPremiumPaid ? (
+              <p className="mt-3 text-sm text-slate-600">
+                Promotion codes are not used while you have an active <strong className="font-medium text-slate-800">Gold</strong> subscription.
+              </p>
+            ) : billingIsStandardPaid ? (
+              <p className="mt-3 text-sm text-slate-600">
+                You already have <strong className="font-medium text-slate-800">Standard</strong> through your paid
+                subscription. Promotion codes only apply when you do not have a paid Standard or Gold plan.
+              </p>
+            ) : promoActive ? (
+              <>
+                <p className="mt-3 text-sm text-slate-600">
+                  Promotional <strong className="font-medium text-slate-800">Standard</strong> access is active until{' '}
+                  <time dateTime={promoUntil.toISOString()}>
+                    {promoUntil.toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                  .
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  You cannot stack another code until this period ends and you are on a free plan.
+                </p>
+              </>
+            ) : canApplyPromoCode ? (
+              <>
+                <form onSubmit={applyPromotion} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="profile-promo-code">Code</Label>
+                    <Input
+                      id="profile-promo-code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="Enter code"
+                      autoComplete="off"
+                      className="mt-1.5 uppercase"
+                      data-testid="profile-promo-code"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={promoBusy}
+                    variant="outline"
+                    className="border-spruce-200 text-spruce-900 shrink-0 sm:mb-0.5"
+                    data-testid="profile-promo-apply"
+                  >
+                    {promoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-slate-600">You cannot apply a promotion code on this account right now.</p>
+            )}
+          </div>
+        </div>
         </div>
       </div>
     </div>

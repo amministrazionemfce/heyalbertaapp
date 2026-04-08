@@ -119,6 +119,7 @@ export const authAPI = {
   verifyEmail: (token) =>
     API.get('/auth/verify-email', { params: { token } }),
   resendVerification: (body) => API.post('/auth/resend-verification', body),
+  redeemPromotion: (body) => API.post('/auth/redeem-promotion', body),
 };
 
 /** Stripe: backend creates Checkout / Customer Portal sessions (requires auth). */
@@ -127,8 +128,11 @@ export const billingAPI = {
   getCheckoutSessionStatus: (sessionId) =>
     API.get('/billing/checkout-session-status', { params: { session_id: sessionId } }),
   createPortalSession: () => API.post('/billing/portal-session', {}),
+  cancelSubscription: () => API.post('/billing/cancel-subscription', {}),
   /** Refresh listing tiers from Stripe (after checkout or if webhook missed). */
   syncSubscription: () => API.post('/billing/sync-subscription', {}),
+  /** Standard ↔ Gold or cadence change on existing subscription (no new Checkout). */
+  changeSubscriptionPlan: (body) => API.post('/billing/change-subscription-plan', body),
 };
 
 /** Upload a promotional video (auth required). Returns `{ url }` for storing on listing.videoUrl. */
@@ -215,6 +219,7 @@ export const resourceAPI = {
 /** Public site copy (News hero text, etc.) */
 export const siteAPI = {
   settings: () => API.get('/site-settings'),
+  systemNotification: () => API.get('/site-settings/system-notification'),
 };
 
 /** Public contact form — no auth */
@@ -254,6 +259,10 @@ export const adminAPI = {
   contactMessages: (params) => API.get('/admin/contact-messages', { params }),
   markContactMessageRead: (id) => API.patch(`/admin/contact-messages/${id}/read`),
   replyContactMessage: (id, body) => API.post(`/admin/contact-messages/${id}/reply`, body),
+  systemNotifications: () => API.get('/admin/system-notifications'),
+  createSystemNotification: (body) => API.post('/admin/system-notifications', body),
+  updateSystemNotification: (id, body) => API.put(`/admin/system-notifications/${id}`, body),
+  deleteSystemNotification: (id) => API.delete(`/admin/system-notifications/${id}`),
   /** Notifications */
   notificationUsers: (params) => API.get('/admin/notifications/users', { params: params || {} }),
   /** Listing reviews (admin) */
@@ -263,6 +272,12 @@ export const adminAPI = {
   marketingRecipientPools: () => API.get('/admin/marketing/recipient-pools'),
   sendMarketingEmail: (data) => API.post('/admin/marketing/send', data),
   newsSubscribers: () => API.get('/admin/news-subscribers'),
+  promotions: () => API.get('/admin/promotions'),
+  createPromotion: (data) => API.post('/admin/promotions', data),
+  updatePromotion: (id, data) => API.patch(`/admin/promotions/${id}`, data),
+  deletePromotion: (id) => API.delete(`/admin/promotions/${id}`),
+  sendPromotionEmail: (id, data) => API.post(`/admin/promotions/${id}/send-email`, data),
+  promotionHistory: (id) => API.get(`/admin/promotions/${id}/history`),
 };
 
 export default API;

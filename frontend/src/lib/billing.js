@@ -33,26 +33,104 @@ function envFallbackResult(planId, cadence) {
   return { ok: false, message: 'Unknown plan.' };
 }
 
+const TIER_RANK = { free: 0, standard: 1, premium: 2 };
+
 export function getPlanActionLabel(planId, currentTier = 'free') {
   if (planId === currentTier) return 'Current plan';
   if (planId === 'free') return 'Downgrade to Free';
-  if (planId === 'standard') return 'Upgrade to Standard';
-  if (planId === 'premium') return 'Upgrade to Gold';
+  const cur = TIER_RANK[currentTier] ?? 0;
+  const target = TIER_RANK[planId] ?? 0;
+  if (planId === 'standard') {
+    return target < cur ? 'Downgrade to Standard' : 'Upgrade to Standard';
+  }
+  if (planId === 'premium') {
+    return target > cur ? 'Upgrade to Gold' : 'Downgrade to Gold';
+  }
   return 'Select plan';
 }
 
-export async function redirectToPlanCheckout(planId, cadence = 'monthly') {
+/**
+ * @param {string} planId
+ * @param {string} [cadence]
+ * @param {{ billingTier?: string, refreshUser?: () => Promise<unknown> }} [options] — billingTier from DB (Stripe); used to update subscription instead of new Checkout when already paid.
+ */
+export async function redirectToPlanCheckout(planId, cadence = 'monthly', options = {}) {
   const normalizedCadence = cadence === 'yearly' ? 'yearly' : 'monthly';
   const token = typeof window !== 'undefined' ? getStoredAuthToken() : null;
+  const { billingTier, refreshUser } = options;
+  const bt = String(billingTier || 'free').toLowerCase();
 
   const tryBackend = async () => {
     if (!token) return null;
     try {
       if (planId === 'free') {
-        const res = await billingAPI.createPortalSession();
-        const url = res.data?.url;
+        // If user is already paid, cancel immediately so the app reflects Free right away.
+        if (bt === 'standard' || bt === 'premium') {
+          const res = await billingAPI.cancelSubscription();
+          if (res.data?.ok) {
+            if (typeof refreshUser === 'function') {
+              try {
+                await refreshUser();
+              } catch {
+                /* ignore */
+              }
+            }
+            return {
+              ok: true,
+              mode: 'updated',
+              tier: res.data.tier,
+              effectiveTier: res.data.effectiveTier,
+              unchanged: false,
+            };
+          }
+        }
+
+        // Otherwise fall back to customer portal (manage billing / subscribe later).
+        const portalRes = await billingAPI.createPortalSession();
+        const url = portalRes.data?.url;
         if (url) return { ok: true, url, mode: 'portal' };
       } else if (planId === 'standard' || planId === 'premium') {
+        if (bt === 'standard' || bt === 'premium') {
+          try {
+            const res = await billingAPI.changeSubscriptionPlan({
+              planId,
+              cadence: normalizedCadence,
+            });
+            if (res.data?.ok) {
+              if (typeof refreshUser === 'function') {
+                try {
+                  await refreshUser();
+                } catch {
+                  /* ignore */
+                }
+              }
+              return {
+                ok: true,
+                mode: 'updated',
+                tier: res.data.tier,
+                effectiveTier: res.data.effectiveTier,
+                unchanged: res.data.unchanged,
+              };
+            }
+          } catch (changeErr) {
+            const code = changeErr?.response?.data?.code;
+            const status = changeErr?.response?.status;
+            if (status === 400 && code === 'NO_ACTIVE_SUBSCRIPTION') {
+              /* fall through to new Checkout */
+            } else if (changeErr?.response) {
+              const msg = changeErr.response.data?.message || changeErr.message;
+              if (status === 401) return { needAuth: true, message: msg };
+              if (status === 503 || status === 500) return { backendError: true, message: msg };
+              return { fatal: true, message: msg };
+            } else {
+              return {
+                backendError: true,
+                message:
+                  'Cannot reach the billing server. Check that the API is running and REACT_APP_BACKEND_URL matches your backend URL.',
+              };
+            }
+          }
+        }
         const res = await billingAPI.createCheckoutSession({
           planId,
           cadence: normalizedCadence,

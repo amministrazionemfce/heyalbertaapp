@@ -2,7 +2,10 @@ import express from "express";
 import mongoose from "mongoose";
 import Review from "../models/Review.js";
 import Listing from "../models/Listing.js";
+import User from "../models/User.js";
+import SiteSettings from "../models/SiteSettings.js";
 import { requireAuth } from "../middleware/auth.js";
+import { sendTransactionalMail } from "../utils/mail.js";
 import {
   findReviewsForListingSorted,
   serializeReviewForApi,
@@ -14,6 +17,45 @@ const router = express.Router();
 
 function isValidObjectId(id) {
   return id && typeof id === "string" && id !== "undefined" && mongoose.Types.ObjectId.isValid(id);
+}
+
+async function sendReviewNotificationEmail(vendorUser, listing, review, reviewerName) {
+  try {
+    if (!vendorUser?.email) return;
+
+    const settings = await SiteSettings.findById("default").lean();
+    const subject = String(settings?.reviewNotificationEmailSubject || "").trim();
+    const bodyTemplate = String(settings?.reviewNotificationEmailBody || "").trim();
+
+    if (!subject || !bodyTemplate) return;
+
+    const listingUrl = `${process.env.FRONTEND_URL || "http://localhost:3000"}/listing/${listing._id}`;
+    const vendorName = vendorUser.name || "Vendor";
+    const listingTitle = listing.title || "Listing";
+    const reviewText = review.comment || "";
+    const reviewRating = review.rating || 0;
+
+    const body = bodyTemplate
+      .replace(/{vendorName}/g, vendorName)
+      .replace(/{listingTitle}/g, listingTitle)
+      .replace(/{reviewerName}/g, reviewerName)
+      .replace(/{reviewText}/g, reviewText)
+      .replace(/{reviewRating}/g, String(reviewRating))
+      .replace(/{listingUrl}/g, listingUrl);
+
+    const emailSubject = subject
+      .replace(/{vendorName}/g, vendorName)
+      .replace(/{listingTitle}/g, listingTitle)
+      .replace(/{reviewerName}/g, reviewerName);
+
+    await sendTransactionalMail({
+      to: vendorUser.email,
+      subject: emailSubject,
+      text: body,
+    });
+  } catch (err) {
+    console.error("Failed to send review notification email:", err?.message || err);
+  }
 }
 
 router.get("/listings/:listingId", async (req, res) => {
@@ -64,6 +106,12 @@ router.post("/listings/:listingId", requireAuth, async (req, res) => {
       comment: commentTrim,
       createdAt: new Date().toISOString(),
     });
+
+    if (ownerId) {
+      const vendorUser = await User.findById(ownerId).lean();
+      await sendReviewNotificationEmail(vendorUser, listingDoc, review, req.user.name);
+    }
+
     res.json(serializeReviewForApi(review));
   } catch (err) {
     if (err && err.code === 11000) {

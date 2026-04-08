@@ -85,7 +85,7 @@ export default function FeaturedListingCard({ listing }) {
       />
 
       <div className="relative z-10 flex flex-1 flex-col pointer-events-none">
-        <div className="relative aspect-[4/3] overflow-hidden rounded-t-2xl bg-slate-100">
+        <div className="relative aspect-video overflow-hidden rounded-t-2xl bg-slate-100">
           <img
             src={img}
             alt=""
@@ -99,11 +99,11 @@ export default function FeaturedListingCard({ listing }) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <ListingCategoryLabel categoryId={listing.categoryId} showTitle={false} />
             {priceStr ? (
-              <span className="truncate text-base font-bold tabular-nums leading-tight">
+              <span className="truncate text-sm font-bold tabular-nums leading-tight">
                 {priceStr}
               </span>
             ) : null}
@@ -112,7 +112,7 @@ export default function FeaturedListingCard({ listing }) {
             type="button"
             onClick={toggleFavorite}
             className={`pointer-events-auto z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-              favorited ? 'text-yellow-600' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-600'
+              favorited ? 'text-yellow-400 border-yellow-400' : 'text-slate-600 hover:border-yellow-400/40 hover:text-yellow-400'
             }`}
             aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
           >
@@ -120,23 +120,23 @@ export default function FeaturedListingCard({ listing }) {
           </button>
         </div>
 
-        <div className="flex flex-1 flex-col p-4 pt-3.5">
-          <h3 className="font-heading line-clamp-2 min-h-[2.5rem] text-base font-bold leading-snug text-slate-900 group-hover:text-spruce-800">
+        <div className="flex flex-1 flex-col p-3 pt-2">
+          <h3 className="font-heading line-clamp-2 min-h-[2rem] text-sm font-semibold leading-snug text-slate-900 group-hover:text-spruce-800">
             {listing.title}
           </h3>
 
           {descriptionPlain ? (
-            <p className="mt-2 line-clamp-1 text-sm leading-relaxed text-slate-600">{descriptionPlain}</p>
+            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-600">{descriptionPlain}</p>
           ) : null}
 
           {locationLine ? (
-            <div className="mt-2 flex min-w-0 items-center gap-1.5 text-sm text-slate-500">
+            <div className="mt-1 flex min-w-0 items-center gap-1 text-xs text-slate-500">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
               <span className="truncate">{locationLine}</span>
             </div>
           ) : null}
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-1 flex flex-wrap items-center gap-2">
             <StarRatingRow rating={ratingForStars} />
             <span className="text-xs tabular-nums text-slate-500">({reviewCount})</span>
           </div>

@@ -4,8 +4,14 @@ import Stripe from "stripe";
 import { requireAuth } from "../middleware/auth.js";
 import Listing from "../models/Listing.js";
 import User from "../models/User.js";
-import { planIdFromPriceId } from "../utils/stripePlan.js";
-import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
+import { bestPaidPlanFromSubscriptions } from "../utils/stripePlan.js";
+import {
+  listActiveAndTrialingSubscriptions,
+  pruneCustomerDuplicateSubscriptions,
+  reconcileUserBillingFromStripeCustomer,
+} from "../utils/stripeUserBilling.js";
+import { setFeaturedForPaidUser, applyFreeStripeTierToUser } from "../utils/membershipFeatured.js";
+import { effectiveMembershipTier } from "../utils/promotionTier.js";
 
 const router = express.Router();
 
@@ -67,9 +73,7 @@ async function setVendorsTier(userId, tier) {
     await User.updateOne({ _id: oid }, { $set: { billingTier: tier } });
     await setFeaturedForPaidUser(uid);
   } else {
-    await Listing.updateMany({ userId: uid }, { $set: { tier: "free" } });
-    await User.updateOne({ _id: oid }, { $set: { billingTier: "free" } });
-    await clearFeaturedForFreeUser(uid);
+    await applyFreeStripeTierToUser(uid);
   }
 }
 
@@ -208,6 +212,157 @@ router.post("/portal-session", requireAuth, async (req, res) => {
   }
 });
 
+/**
+ * Swap Standard ↔ Gold (or billing period) on the existing subscription — no new Checkout session.
+ */
+router.post("/change-subscription-plan", requireAuth, async (req, res) => {
+  try {
+    const planId = String(req.body?.planId || "").trim();
+    const cadence = String(req.body?.cadence || "monthly").trim() === "yearly" ? "yearly" : "monthly";
+
+    if (planId !== "standard" && planId !== "premium") {
+      return res.status(400).json({ message: "Invalid plan.", code: "INVALID_PLAN" });
+    }
+
+    const targetPriceId = priceIdFor(planId, cadence);
+    if (!targetPriceId) {
+      return res.status(503).json({
+        message: `Missing Stripe price ID for ${planId} (${cadence}). Set STRIPE_* env vars.`,
+      });
+    }
+
+    const { stripe, configError } = getStripeClient();
+    if (!stripe) return billingNotReadyResponse(res, configError);
+
+    const uid = req.user._id.toString();
+    const email = String(req.user.email || "").trim().toLowerCase();
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    const customer = customers.data[0];
+    if (!customer) {
+      return res.status(400).json({
+        message: "No Stripe customer for this account. Complete checkout once to start a subscription.",
+        code: "NO_ACTIVE_SUBSCRIPTION",
+      });
+    }
+
+    let subs = await listActiveAndTrialingSubscriptions(stripe, customer.id);
+    if (subs.length === 0) {
+      return res.status(400).json({
+        message: "No active subscription to change. Use checkout to subscribe.",
+        code: "NO_ACTIVE_SUBSCRIPTION",
+      });
+    }
+
+    subs.sort((a, b) => (b.created || 0) - (a.created || 0));
+    const primaryId = subs[0].id;
+    for (let i = 1; i < subs.length; i++) {
+      try {
+        await stripe.subscriptions.cancel(subs[i].id);
+      } catch (e) {
+        console.error("change-plan cancel extra sub:", e?.message || e);
+      }
+    }
+
+    const sub = await stripe.subscriptions.retrieve(primaryId, { expand: ["items.data.price"] });
+    const item0 = sub.items?.data?.[0];
+    const itemId = item0?.id;
+    if (!itemId) {
+      return res.status(500).json({ message: "Subscription has no updatable line item." });
+    }
+
+    let currentPriceId = item0.price;
+    if (currentPriceId && typeof currentPriceId === "object") {
+      currentPriceId = currentPriceId.id;
+    }
+
+    if (String(currentPriceId || "") === String(targetPriceId)) {
+      await reconcileUserBillingFromStripeCustomer(stripe, customer.id, uid);
+      const uSame = await User.findById(uid).select("promoStandardExpiresAt billingTier").lean();
+      const effSame = effectiveMembershipTier(uSame?.billingTier || "free", uSame?.promoStandardExpiresAt);
+      return res.json({
+        ok: true,
+        unchanged: true,
+        tier: uSame?.billingTier || "free",
+        effectiveTier: effSame,
+        promoStandardExpiresAt: uSame?.promoStandardExpiresAt || null,
+      });
+    }
+
+    await stripe.subscriptions.update(primaryId, {
+      items: [{ id: itemId, price: targetPriceId }],
+      proration_behavior: "create_prorations",
+      metadata: {
+        userId: uid,
+        planId,
+        cadence,
+      },
+    });
+
+    await reconcileUserBillingFromStripeCustomer(stripe, customer.id, uid);
+    const uAfter = await User.findById(uid).select("promoStandardExpiresAt billingTier").lean();
+    const effectiveTier = effectiveMembershipTier(uAfter?.billingTier || "free", uAfter?.promoStandardExpiresAt);
+    res.json({
+      ok: true,
+      tier: uAfter?.billingTier || "free",
+      effectiveTier,
+      promoStandardExpiresAt: uAfter?.promoStandardExpiresAt || null,
+      subscriptionId: primaryId,
+    });
+  } catch (err) {
+    console.error("change-subscription-plan:", err?.message || err);
+    res.status(500).json({ message: err.message || "Could not update subscription." });
+  }
+});
+
+/**
+ * Cancel the active subscription immediately (downgrade to Free) — avoids portal “cancel at period end” confusion.
+ */
+router.post("/cancel-subscription", requireAuth, async (req, res) => {
+  try {
+    const { stripe, configError } = getStripeClient();
+    if (!stripe) return billingNotReadyResponse(res, configError);
+
+    const uid = req.user._id.toString();
+    const email = String(req.user.email || "").trim().toLowerCase();
+    const customers = await stripe.customers.list({ email, limit: 1 });
+    const customer = customers.data[0];
+
+    if (!customer) {
+      await setVendorsTier(uid, "free");
+      const uNo = await User.findById(uid).select("promoStandardExpiresAt").lean();
+      const effNo = effectiveMembershipTier("free", uNo?.promoStandardExpiresAt);
+      return res.json({
+        ok: true,
+        tier: "free",
+        effectiveTier: effNo,
+        promoStandardExpiresAt: uNo?.promoStandardExpiresAt || null,
+      });
+    }
+
+    const subs = await listActiveAndTrialingSubscriptions(stripe, customer.id);
+    for (const sub of subs) {
+      try {
+        await stripe.subscriptions.cancel(sub.id);
+      } catch (e) {
+        console.error("cancel-subscription cancel:", e?.message || e);
+      }
+    }
+
+    await reconcileUserBillingFromStripeCustomer(stripe, customer.id, uid);
+    const uAfter = await User.findById(uid).select("promoStandardExpiresAt billingTier").lean();
+    const effectiveTier = effectiveMembershipTier(uAfter?.billingTier || "free", uAfter?.promoStandardExpiresAt);
+    res.json({
+      ok: true,
+      tier: uAfter?.billingTier || "free",
+      effectiveTier,
+      promoStandardExpiresAt: uAfter?.promoStandardExpiresAt || null,
+    });
+  } catch (err) {
+    console.error("cancel-subscription:", err?.message || err);
+    res.status(500).json({ message: err.message || "Could not cancel subscription." });
+  }
+});
+
 router.post("/sync-subscription", requireAuth, async (req, res) => {
   try {
     const { stripe, configError } = getStripeClient();
@@ -219,26 +374,33 @@ router.post("/sync-subscription", requireAuth, async (req, res) => {
 
     if (!customer) {
       await setVendorsTier(uid, "free");
-      return res.json({ ok: true, tier: "free" });
+      const uNo = await User.findById(uid).select("promoStandardExpiresAt").lean();
+      const effNo = effectiveMembershipTier("free", uNo?.promoStandardExpiresAt);
+      return res.json({
+        ok: true,
+        tier: "free",
+        effectiveTier: effNo,
+        promoStandardExpiresAt: uNo?.promoStandardExpiresAt || null,
+      });
     }
 
-    const subs = await stripe.subscriptions.list({ customer: customer.id, limit: 20 });
-    let best = "free";
-
-    for (const sub of subs.data) {
-      const st = sub.status;
-      if (st !== "active" && st !== "trialing") continue;
-      let planId = sub.metadata?.planId;
-      if (planId !== "standard" && planId !== "premium") {
-        const priceId = sub.items?.data?.[0]?.price?.id;
-        planId = planIdFromPriceId(priceId);
-      }
-      if (planId === "premium") best = "premium";
-      else if (planId === "standard" && best !== "premium") best = "standard";
+    const allSubs = await listActiveAndTrialingSubscriptions(stripe, customer.id);
+    let best = bestPaidPlanFromSubscriptions(allSubs);
+    if (best !== "free") {
+      await pruneCustomerDuplicateSubscriptions(stripe, customer.id);
     }
+    const finalSubs = await listActiveAndTrialingSubscriptions(stripe, customer.id);
+    best = bestPaidPlanFromSubscriptions(finalSubs);
 
     await setVendorsTier(uid, best);
-    res.json({ ok: true, tier: best });
+    const uAfter = await User.findById(uid).select("promoStandardExpiresAt").lean();
+    const effectiveTier = effectiveMembershipTier(best, uAfter?.promoStandardExpiresAt);
+    res.json({
+      ok: true,
+      tier: best,
+      effectiveTier,
+      promoStandardExpiresAt: uAfter?.promoStandardExpiresAt || null,
+    });
   } catch (err) {
     console.error("sync-subscription:", err?.message || err);
     res.status(500).json({ message: err.message || "Failed to sync subscription." });

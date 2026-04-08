@@ -3,11 +3,14 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 
 import User from "../models/User.js";
+import Listing from "../models/Listing.js";
 import SiteSettings from "../models/SiteSettings.js";
 import { createToken } from "../utils/jwt.js";
 import { requireAuth } from "../middleware/auth.js";
 import { verificationEmailEnabled, sendTransactionalMail } from "../utils/mail.js";
-import { syncUserListingTiersFromBilling } from "../utils/membershipFeatured.js";
+import Promotion from "../models/Promotion.js";
+import PromotionRedemption from "../models/PromotionRedemption.js";
+import { syncUserListingTiersFromBilling, expirePromoIfNeeded } from "../utils/membershipFeatured.js";
 
 const router = express.Router();
 
@@ -129,6 +132,7 @@ router.get("/verify-email", async (req, res) => {
     user.emailVerificationTokenExpires = undefined;
     await user.save();
 
+    await expirePromoIfNeeded(user._id);
     await syncUserListingTiersFromBilling(user._id);
 
     const jwt = createToken(user._id.toString(), user.role);
@@ -196,6 +200,7 @@ router.post("/login", async (req, res) => {
   const token = createToken(user._id.toString(), user.role);
 
   await User.findByIdAndUpdate(user._id, { lastActiveAt: new Date() });
+  await expirePromoIfNeeded(user._id);
   await syncUserListingTiersFromBilling(user._id);
 
   res.json({ token, user: user.toJSON() });
@@ -205,11 +210,78 @@ router.get("/me", requireAuth, async (req, res) => {
   const user = await User.findByIdAndUpdate(
     req.user._id,
     { lastActiveAt: new Date() },
-    { new: true }
+    { returnDocument: "after" }
   );
   if (!user) return res.status(401).json({ message: "User not found" });
+  await expirePromoIfNeeded(user._id);
   await syncUserListingTiersFromBilling(user._id);
   res.json(user);
+});
+
+router.post("/redeem-promotion", requireAuth, async (req, res) => {
+  try {
+    const code = String(req.body?.code || "").trim().toUpperCase();
+    if (!code) {
+      return res.status(400).json({ message: "Promotion code is required." });
+    }
+
+    const fresh = await User.findById(req.user._id).select("billingTier").lean();
+    if (!fresh) {
+      return res.status(401).json({ message: "User not found." });
+    }
+
+    const b = String(fresh.billingTier || "free").toLowerCase();
+    if (b === "premium") {
+      return res.status(400).json({ message: "Your account already has Gold membership." });
+    }
+    if (b === "standard") {
+      return res.status(400).json({ message: "You already have Standard membership from your subscription." });
+    }
+
+    const promo = await Promotion.findOne({ code, active: true });
+    if (!promo) {
+      return res.status(400).json({ message: "Invalid or inactive promotion code." });
+    }
+    if (promo.redeemBy && new Date(promo.redeemBy) < new Date()) {
+      return res.status(400).json({ message: "This promotion code is no longer valid." });
+    }
+
+    const uid = req.user._id;
+    const existing = await PromotionRedemption.findOne({ promotionId: promo._id, userId: uid });
+    if (existing) {
+      return res.status(400).json({ message: "You have already used this promotion code." });
+    }
+
+    const ms = Number(promo.durationDays) * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + ms);
+
+    await PromotionRedemption.create({
+      promotionId: promo._id,
+      userId: uid,
+      redeemedAt: new Date(),
+      expiresAt,
+    });
+
+    await User.updateOne({ _id: uid }, { $set: { promoStandardExpiresAt: expiresAt } });
+    await Listing.updateMany({ userId: uid.toString() }, { $set: { tier: "standard", featured: true } });
+
+    const user = await User.findById(uid);
+    if (!user) {
+      return res.status(500).json({ message: "Could not reload user." });
+    }
+
+    res.json({
+      user: user.toJSON(),
+      message: `Standard membership is active until ${expiresAt.toISOString().slice(0, 10)} (UTC date).`,
+      expiresAt,
+    });
+  } catch (err) {
+    if (err?.code === 11000) {
+      return res.status(400).json({ message: "You have already used this promotion code." });
+    }
+    console.error("redeem-promotion:", err?.message || err);
+    res.status(500).json({ message: err.message || "Could not apply promotion." });
+  }
 });
 
 router.patch("/me", requireAuth, async (req, res) => {
@@ -256,7 +328,7 @@ router.patch("/me", requireAuth, async (req, res) => {
       return res.json(u);
     }
 
-    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { returnDocument: "after" });
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (updates.email && verificationEmailEnabled() && user.emailVerificationToken) {

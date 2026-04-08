@@ -1,9 +1,10 @@
-import mongoose from "mongoose";
 import Stripe from "stripe";
-import Listing from "../models/Listing.js";
+import {
+  reconcileUserBillingFromStripeCustomer,
+  cancelOtherSubscriptionsForCustomer,
+  applyPaidPlanToUser,
+} from "../utils/stripeUserBilling.js";
 import User from "../models/User.js";
-import { planIdFromPriceId } from "../utils/stripePlan.js";
-import { setFeaturedForPaidUser, clearFeaturedForFreeUser } from "../utils/membershipFeatured.js";
 
 function getStripe() {
   const key = String(process.env.STRIPE_SECRET_KEY || "").trim();
@@ -15,22 +16,11 @@ function getStripe() {
   }
 }
 
-async function applyPaidTier(userId, planId) {
-  if (!userId || (planId !== "standard" && planId !== "premium")) return;
-  const uid = String(userId);
-  const oid = mongoose.Types.ObjectId.isValid(uid) ? new mongoose.Types.ObjectId(uid) : uid;
-  await Listing.updateMany({ userId: uid }, { $set: { tier: planId } });
-  await User.updateOne({ _id: oid }, { $set: { billingTier: planId } });
-  await setFeaturedForPaidUser(uid);
-}
-
-async function applyFreeTier(userId) {
-  if (!userId) return;
-  const uid = String(userId);
-  const oid = mongoose.Types.ObjectId.isValid(uid) ? new mongoose.Types.ObjectId(uid) : uid;
-  await Listing.updateMany({ userId: uid }, { $set: { tier: "free" } });
-  await User.updateOne({ _id: oid }, { $set: { billingTier: "free" } });
-  await clearFeaturedForFreeUser(uid);
+function sessionSubscriptionId(session) {
+  const s = session?.subscription;
+  if (typeof s === "string" && s.startsWith("sub_")) return s;
+  if (s && typeof s === "object" && typeof s.id === "string") return s.id;
+  return null;
 }
 
 /**
@@ -58,40 +48,65 @@ export async function stripeWebhookHandler(req, res) {
         const session = event.data.object;
         if (session.mode !== "subscription") break;
         const userId = session.metadata?.userId || session.client_reference_id;
-        const planId = session.metadata?.planId;
-        if (planId === "standard" || planId === "premium") {
-          await applyPaidTier(userId, planId);
+        const customerId = session.customer;
+        const newSubId = sessionSubscriptionId(session);
+        if (userId && customerId && newSubId) {
+          await cancelOtherSubscriptionsForCustomer(stripe, customerId, newSubId);
+          await reconcileUserBillingFromStripeCustomer(stripe, customerId, userId);
+        } else if (userId) {
+          const planId = session.metadata?.planId;
+          if (planId === "standard" || planId === "premium") {
+            await applyPaidPlanToUser(userId, planId);
+          }
         }
         break;
       }
       case "customer.subscription.updated": {
         const sub = event.data.object;
+        const customerId = sub.customer;
         const userId = sub.metadata?.userId;
-        const status = sub.status;
-        if (!userId) break;
-        if (status === "active" || status === "trialing") {
-          let planId = sub.metadata?.planId;
-          if (planId !== "standard" && planId !== "premium") {
-            const priceId = sub.items?.data?.[0]?.price?.id;
-            planId = planIdFromPriceId(priceId);
+        if (userId && customerId) {
+          await reconcileUserBillingFromStripeCustomer(stripe, customerId, userId);
+          break;
+        }
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(String(customerId));
+            const email = String(customer?.email || "").trim().toLowerCase();
+            if (email) {
+              const u = await User.findOne({ email }).select("_id").lean();
+              if (u?._id) {
+                await reconcileUserBillingFromStripeCustomer(stripe, customerId, String(u._id));
+              }
+            }
+          } catch (e) {
+            console.error("stripe webhook reconcile fallback (updated):", e?.message || e);
           }
-          if (planId === "standard" || planId === "premium") {
-            await applyPaidTier(userId, planId);
-          }
-        } else if (
-          status === "canceled" ||
-          status === "unpaid" ||
-          status === "incomplete_expired" ||
-          status === "paused"
-        ) {
-          await applyFreeTier(userId);
         }
         break;
       }
       case "customer.subscription.deleted": {
         const sub = event.data.object;
+        const customerId = sub.customer;
         const userId = sub.metadata?.userId;
-        await applyFreeTier(userId);
+        if (userId && customerId) {
+          await reconcileUserBillingFromStripeCustomer(stripe, customerId, userId);
+          break;
+        }
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(String(customerId));
+            const email = String(customer?.email || "").trim().toLowerCase();
+            if (email) {
+              const u = await User.findOne({ email }).select("_id").lean();
+              if (u?._id) {
+                await reconcileUserBillingFromStripeCustomer(stripe, customerId, String(u._id));
+              }
+            }
+          } catch (e) {
+            console.error("stripe webhook reconcile fallback (deleted):", e?.message || e);
+          }
+        }
         break;
       }
       default:

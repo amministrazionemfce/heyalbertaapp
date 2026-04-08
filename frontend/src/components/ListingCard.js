@@ -99,7 +99,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
       )}
 
       <div className="relative z-10 flex flex-1 flex-col pointer-events-none">
-        <div className="relative h-44 overflow-hidden rounded-t-2xl bg-slate-100">
+        <div className="relative h-32 overflow-hidden rounded-t-2xl bg-slate-100">
           {imageOk && (thumb || 'services/1.jpg') ? (
             <img
               src={thumb || 'services/1.jpg'}
@@ -129,7 +129,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
         </div>
 
         <div
-          className={`flex items-center gap-2 border-b border-slate-100 px-4 py-2.5 ${
+          className={`flex items-center gap-2 border-b border-slate-100 px-4 py-2 ${
             adminMode ? '' : 'justify-between'
           }`}
         >
@@ -139,7 +139,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
               showTitle={adminMode}
             />
             {!adminMode && priceStr ? (
-              <span className="truncate text-base font-bold tabular-nums leading-tight">
+              <span className="truncate text-sm font-bold tabular-nums leading-tight">
                 {priceStr}
               </span>
             ) : null}
@@ -149,7 +149,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
               type="button"
               onClick={toggleFavorite}
               className={`pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-                favorited ? 'text-yellow-500' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-500'
+                favorited ? 'text-yellow-400 border-yellow-400' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-500'
               }`}
               aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
               data-testid={`listing-favorite-${listing.id}`}
@@ -159,17 +159,21 @@ export default function ListingCard({ listing, onAdminOpen }) {
           ) : null}
         </div>
 
-        <div className="flex flex-1 flex-col p-4 pt-3.5">
-          <h3 className="min-h-0 font-heading text-base font-semibold leading-snug text-slate-900 line-clamp-2 transition-colors group-hover:text-spruce-800">
+        <div className="flex flex-1 flex-col p-3 pt-2">
+          <h3 className="min-h-0 font-heading text-sm font-semibold leading-snug text-slate-900 line-clamp-2 transition-colors group-hover:text-spruce-800">
             {listing.title}
           </h3>
 
+          {seller.businessName ? (
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-600">{seller.businessName}</p>
+          ) : null}
+
           {descriptionPlain ? (
-            <p className="mt-2 line-clamp-1 text-sm leading-relaxed text-slate-600">{descriptionPlain}</p>
+            <p className="mt-1 line-clamp-1 text-xs leading-relaxed text-slate-600">{descriptionPlain}</p>
           ) : null}
 
           {(seller.city || seller.neighborhood) ? (
-            <div className="mt-2 flex min-w-0 items-center gap-1 text-xs text-slate-500">
+            <div className="mt-1 flex min-w-0 items-center gap-1 text-xs text-slate-500">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-spruce-600" aria-hidden />
               <span className="truncate">
                 {[seller.city, seller.neighborhood].filter(Boolean).join(', ')}
@@ -178,7 +182,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
           ) : null}
 
           <div
-            className="mt-2 flex flex-wrap items-center gap-2"
+            className="mt-1 flex flex-wrap items-center gap-2"
             title={
               avgRating != null && !Number.isNaN(Number(avgRating))
                 ? `${Number(avgRating).toFixed(1)} avg · ${reviewCount} reviews`
@@ -190,7 +194,7 @@ export default function ListingCard({ listing, onAdminOpen }) {
           </div>
 
           {adminMode && priceStr ? (
-            <p className="mt-2 text-lg font-bold leading-tight">{priceStr}</p>
+            <p className="mt-1 text-base font-bold leading-tight">{priceStr}</p>
           ) : null}
         </div>
       </div>
