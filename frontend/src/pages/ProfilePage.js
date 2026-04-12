@@ -11,7 +11,7 @@ import { getApiErrorLines } from '../lib/formatApiError';
 import AuthFormError from '../components/AuthFormError';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { membershipPlanTierFromUserAndListings } from '../lib/membershipTier';
-import { Loader2, ArrowLeft, User, Shield, Store, LayoutDashboard, Sparkles } from 'lucide-react';
+import { Loader2, ArrowLeft, User, Shield, Store, LayoutDashboard, Sparkles, Lock, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const TIER_LABELS = { free: 'Free', standard: 'Standard', premium: 'Gold' };
@@ -35,7 +35,7 @@ function RoleIcon({ role, className }) {
 }
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, updateProfile, refreshUser } = useAuth();
+  const { user, loading: authLoading, updateProfile, refreshUser, logout } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -49,6 +49,17 @@ export default function ProfilePage() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [promoBusy, setPromoBusy] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordError, setChangePasswordError] = useState([]);
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('');
+  const [deleteAcctPassword, setDeleteAcctPassword] = useState('');
+  const [deleteAcctLoading, setDeleteAcctLoading] = useState(false);
+  const [deleteAcctError, setDeleteAcctError] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [emailNotifications, setEmailNotifications] = useState(true);
   const previewRef = useRef(null);
   const didSyncBillingRef = useRef(false);
 
@@ -248,6 +259,67 @@ export default function ProfilePage() {
     }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setChangePasswordError([]);
+    setChangePasswordSuccess('');
+
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmNewPassword.trim()) {
+      setChangePasswordError(['All fields are required.']);
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setChangePasswordError(['New passwords do not match.']);
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setChangePasswordError(['Password must be at least 6 characters.']);
+      return;
+    }
+
+    setChangePasswordLoading(true);
+    try {
+      await authAPI.changePassword({
+        currentPassword: currentPassword.trim(),
+        newPassword: newPassword.trim(),
+      });
+      setChangePasswordSuccess('Password changed successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+      setTimeout(() => setChangePasswordSuccess(''), 5000);
+    } catch (err) {
+      setChangePasswordError(getApiErrorLines(err));
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async (e) => {
+    e.preventDefault();
+    setDeleteAcctError([]);
+
+    if (!deleteAcctPassword.trim()) {
+      setDeleteAcctError(['Password is required to delete your account.']);
+      return;
+    }
+
+    setDeleteAcctLoading(true);
+    try {
+      await authAPI.deleteAccount({ password: deleteAcctPassword.trim() });
+      toast.success('Account deleted successfully.');
+      // Logout and redirect
+      logout();
+      setTimeout(() => navigate(ROUTES.LOGIN, { replace: true }), 1500);
+    } catch (err) {
+      setDeleteAcctError(getApiErrorLines(err));
+    } finally {
+      setDeleteAcctLoading(false);
+    }
+  };
+
   const totalListings = myListings.length;
   const publishedCount = myListings.filter((l) => l.status === 'published').length;
   const draftCount = myListings.filter((l) => l.status === 'draft').length;
@@ -301,6 +373,67 @@ export default function ProfilePage() {
               </dd>
             </div>
           </dl>
+
+          <div className="mt-8 border-t border-slate-100 pt-6" data-testid="profile-promotion-section">
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Promotion code</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Apply an admin-issued code for temporary Standard access (starts when you redeem).
+            </p>
+            {billingIsPremiumPaid ? (
+              <p className="mt-3 text-sm text-slate-600">
+                Promotion codes are not used while you have an active <strong className="font-medium text-slate-800">Gold</strong> subscription.
+              </p>
+            ) : billingIsStandardPaid ? (
+              <p className="mt-3 text-sm text-slate-600">
+                You already have <strong className="font-medium text-slate-800">Standard</strong> through your paid
+                subscription. Promotion codes only apply when you do not have a paid Standard or Gold plan.
+              </p>
+            ) : promoActive ? (
+              <>
+                <p className="mt-3 text-sm text-slate-600">
+                  Promotional <strong className="font-medium text-slate-800">Standard</strong> access is active until{' '}
+                  <time dateTime={promoUntil.toISOString()}>
+                    {promoUntil.toLocaleString(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    })}
+                  </time>
+                  .
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  You cannot stack another code until this period ends and you are on a free plan.
+                </p>
+              </>
+            ) : canApplyPromoCode ? (
+              <>
+                <form onSubmit={applyPromotion} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="profile-promo-code">Code</Label>
+                    <Input
+                      id="profile-promo-code"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="Enter code"
+                      autoComplete="off"
+                      className="mt-1.5 uppercase"
+                      data-testid="profile-promo-code"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    disabled={promoBusy}
+                    variant="outline"
+                    className="border-spruce-200 text-spruce-900 shrink-0 sm:mb-0.5"
+                    data-testid="profile-promo-apply"
+                  >
+                    {promoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-slate-600">You cannot apply a promotion code on this account right now.</p>
+            )}
+          </div>
 
           {user.role === 'vendor' && (
             <div className="mt-5 border-t border-slate-100 pt-5">
@@ -416,64 +549,169 @@ export default function ProfilePage() {
             </Button>
           </form>
 
-          <div className="mt-8 border-t border-slate-100 pt-6" data-testid="profile-promotion-section">
-            <h2 className="font-heading text-lg font-semibold text-slate-900">Promotion code</h2>
-            <p className="mt-1 text-xs text-slate-500">
-              Apply an admin-issued code for temporary Standard access (starts when you redeem).
+
+          <div className="mt-8 border-t border-slate-100 pt-6">
+            <h2 className="font-heading text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Lock className="h-5 w-5 text-spruce-700" aria-hidden />
+              Change Password
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Update your password to keep your account secure.</p>
+            <form onSubmit={handleChangePassword} className="mt-4 space-y-4">
+              {changePasswordError.length > 0 && (
+                <AuthFormError lines={changePasswordError} />
+              )}
+              {changePasswordSuccess && (
+                <div className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-900">
+                  {changePasswordSuccess}
+                </div>
+              )}
+              <div>
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => {
+                    setCurrentPassword(e.target.value);
+                    setChangePasswordError([]);
+                  }}
+                  placeholder="Enter current password"
+                  className="mt-1.5"
+                  data-testid="profile-current-password"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => {
+                    setNewPassword(e.target.value);
+                    setChangePasswordError([]);
+                  }}
+                  placeholder="Enter new password"
+                  className="mt-1.5"
+                  data-testid="profile-new-password"
+                />
+              </div>
+              <div>
+                <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-new-password"
+                  type="password"
+                  value={confirmNewPassword}
+                  onChange={(e) => {
+                    setConfirmNewPassword(e.target.value);
+                    setChangePasswordError([]);
+                  }}
+                  placeholder="Confirm new password"
+                  className="mt-1.5"
+                  data-testid="profile-confirm-new-password"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={changePasswordLoading}
+                className="w-full bg-spruce-700 hover:bg-spruce-800 text-white"
+                data-testid="profile-change-password-btn"
+              >
+                {changePasswordLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                Change Password
+              </Button>
+            </form>
+          </div>
+
+          <div className="mt-8 border-t border-slate-100 pt-6">
+            <h2 className="font-heading text-lg font-semibold text-slate-900">Notification Preferences</h2>
+            <p className="mt-1 text-xs text-slate-500">Manage how you receive updates about your account and listings.</p>
+            <div className="mt-4 space-y-4">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={emailNotifications}
+                  onChange={(e) => setEmailNotifications(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-spruce-700 cursor-pointer"
+                  data-testid="profile-email-notifications"
+                />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">Email Notifications</p>
+                </div>
+              </label>
+            </div>
+            <p className="mt-4 text-xs text-slate-500">
+              Note: Critical security notifications (password changes, account deletion attempts) are always sent regardless of these settings.
             </p>
-            {billingIsPremiumPaid ? (
-              <p className="mt-3 text-sm text-slate-600">
-                Promotion codes are not used while you have an active <strong className="font-medium text-slate-800">Gold</strong> subscription.
-              </p>
-            ) : billingIsStandardPaid ? (
-              <p className="mt-3 text-sm text-slate-600">
-                You already have <strong className="font-medium text-slate-800">Standard</strong> through your paid
-                subscription. Promotion codes only apply when you do not have a paid Standard or Gold plan.
-              </p>
-            ) : promoActive ? (
-              <>
-                <p className="mt-3 text-sm text-slate-600">
-                  Promotional <strong className="font-medium text-slate-800">Standard</strong> access is active until{' '}
-                  <time dateTime={promoUntil.toISOString()}>
-                    {promoUntil.toLocaleString(undefined, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}
-                  </time>
-                  .
+          </div>
+
+          <div className="mt-8 border-t border-slate-100 pt-6">
+            <h2 className="font-heading text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" aria-hidden />
+              Danger Zone
+            </h2>
+            <p className="mt-1 text-xs text-slate-500">Permanent actions that cannot be undone.</p>
+
+            {!showDeleteConfirm ? (
+              <Button
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                variant="outline"
+                className="mt-4 border-red-200 text-red-900 hover:bg-red-50"
+                data-testid="profile-delete-account-btn"
+              >
+                Delete Account
+              </Button>
+            ) : (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-4">
+                <h3 className="font-semibold text-red-900 mb-3">Delete Your Account?</h3>
+                <p className="text-sm text-red-800 mb-4">
+                  This action is permanent and cannot be undone. Your account and all associated data will be deleted.
                 </p>
-                <p className="mt-2 text-xs text-slate-500">
-                  You cannot stack another code until this period ends and you are on a free plan.
-                </p>
-              </>
-            ) : canApplyPromoCode ? (
-              <>
-                <form onSubmit={applyPromotion} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
-                  <div className="min-w-0 flex-1">
-                    <Label htmlFor="profile-promo-code">Code</Label>
+                <form onSubmit={handleDeleteAccount} className="space-y-4">
+                  {deleteAcctError.length > 0 && (
+                    <AuthFormError lines={deleteAcctError} />
+                  )}
+                  <div>
+                    <Label htmlFor="delete-password">Confirm Your Password</Label>
                     <Input
-                      id="profile-promo-code"
-                      value={promoCode}
-                      onChange={(e) => setPromoCode(e.target.value)}
-                      placeholder="Enter code"
-                      autoComplete="off"
-                      className="mt-1.5 uppercase"
-                      data-testid="profile-promo-code"
+                      id="delete-password"
+                      type="password"
+                      value={deleteAcctPassword}
+                      onChange={(e) => {
+                        setDeleteAcctPassword(e.target.value);
+                        setDeleteAcctError([]);
+                      }}
+                      placeholder="Enter your password"
+                      className="mt-1.5"
+                      data-testid="profile-delete-password"
                     />
                   </div>
-                  <Button
-                    type="submit"
-                    disabled={promoBusy}
-                    variant="outline"
-                    className="border-spruce-200 text-spruce-900 shrink-0 sm:mb-0.5"
-                    data-testid="profile-promo-apply"
-                  >
-                    {promoBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="submit"
+                      disabled={deleteAcctLoading}
+                      className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                      data-testid="profile-delete-confirm-btn"
+                    >
+                      {deleteAcctLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                      Yes, Delete My Account
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowDeleteConfirm(false);
+                        setDeleteAcctPassword('');
+                        setDeleteAcctError([]);
+                      }}
+                      variant="outline"
+                      className="flex-1"
+                      data-testid="profile-delete-cancel-btn"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </form>
-              </>
-            ) : (
-              <p className="mt-3 text-sm text-slate-600">You cannot apply a promotion code on this account right now.</p>
+              </div>
             )}
           </div>
         </div>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Homepage - highest priority -->
+  <url>
+    <loc>https://heyalberta.com/</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+
+  <!-- Main information pages -->
+  <url>
+    <loc>https://heyalberta.com/about</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://heyalberta.com/contact</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://heyalberta.com/news</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <!-- Authentication pages - no follow but included for crawlability -->
+  <url>
+    <loc>https://heyalberta.com/register</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://heyalberta.com/login</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Legal pages -->
+  <url>
+    <loc>https://heyalberta.com/privacy-policy</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <url>
+    <loc>https://heyalberta.com/terms-of-service</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+
+  <!-- Directory/Search pages - updated when listings change -->
+  <url>
+    <loc>https://heyalberta.com/directory</loc>
+    <lastmod>2025-04-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <!-- Note: Dynamic listing pages (individual businesses) should be generated server-side 
+       and updated regularly based on listing data. Consider implementing a backend endpoint
+       that generates or updates this sitemap with actual listing URLs. -->
+</urlset>

@@ -156,7 +156,7 @@ export function AdminNotificationsSection({ onUpdate }) {
               onClick={() => setTab(id)}
               className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-spruce-800 text-white shadow-sm'
+                  ? 'bg-spruce-700 text-white shadow-sm'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
               }`}
               data-testid={`admin-notifications-tab-${id}`}

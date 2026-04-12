@@ -12,8 +12,11 @@ import {
 } from './components/VendorBrowseRedirects';
 import ListingDetailPage from './pages/ListingDetailPage';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import RegisterPage from './pages/RegisterPage';
 import VerifyEmailPage from './pages/VerifyEmailPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsOfServicePage from './pages/TermsOfServicePage';
 import VendorDashboard from './pages/VendorDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import NewsPage from './pages/NewsPage';
@@ -70,6 +73,7 @@ function App() {
         <Routes>
           {/* Auth pages without nav */}
           <Route path={ROUTES.LOGIN} element={<Layout hideNav><LoginPage /></Layout>} />
+          <Route path={ROUTES.FORGOT_PASSWORD} element={<Layout hideNav><ForgotPasswordPage /></Layout>} />
           <Route path={ROUTES.REGISTER} element={<Layout hideNav><RegisterPage /></Layout>} />
           <Route path={ROUTES.VERIFY_EMAIL} element={<Layout hideNav><VerifyEmailPage /></Layout>} />
           <Route path={ROUTES.CHECKOUT} element={<Layout hideNav><CheckoutContinuePage /></Layout>} />
@@ -77,6 +81,8 @@ function App() {
 
           {/* Pages with nav */}
           <Route path={ROUTES.HOME} element={<Layout><HomePage /></Layout>} />
+          <Route path={ROUTES.PRIVACY_POLICY} element={<Layout><PrivacyPolicyPage /></Layout>} />
+          <Route path={ROUTES.TERMS_OF_SERVICE} element={<Layout><TermsOfServicePage /></Layout>} />
           <Route
             path={ROUTES.VENDORS}
             element={<Layout><RedirectVendorsIndexToListings /></Layout>}

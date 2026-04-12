@@ -101,7 +101,7 @@ export function CookieConsentProvider({ children }) {
               <Button
                 type="button"
                 onClick={acceptAll}
-                className="h-10 shrink-0 rounded-sm bg-spruce-800 px-4 text-sm font-semibold text-white hover:bg-spruce-900"
+                className="h-10 shrink-0 rounded-sm bg-spruce-700 px-4 text-sm font-semibold text-white hover:bg-spruce-900"
                 data-testid="cookie-accept-all-btn"
               >
                 Accept all
@@ -109,7 +109,7 @@ export function CookieConsentProvider({ children }) {
               <Button
                 type="button"
                 onClick={rejectAll}
-                className="h-10 shrink-0 rounded-sm bg-spruce-800 px-4 text-sm font-semibold text-white hover:bg-spruce-900"
+                className="h-10 shrink-0 rounded-sm bg-spruce-700 px-4 text-sm font-semibold text-white hover:bg-spruce-900"
                 data-testid="cookie-reject-all-btn"
               >
                 Reject all
@@ -171,7 +171,7 @@ export function CookieConsentProvider({ children }) {
             </Button>
             <Button
               type="button"
-              className="rounded-sm bg-spruce-800 text-white hover:bg-spruce-900"
+              className="rounded-sm bg-spruce-700 text-white hover:bg-spruce-900"
               onClick={saveManage}
               data-testid="cookie-save-preferences-btn"
             >

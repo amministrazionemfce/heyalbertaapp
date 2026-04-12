@@ -2,6 +2,8 @@
  * Site-wide copy and contact — footer, meta, etc.
  * Adjust branding and legal placeholders in one place.
  */
+import { ROUTES } from './routes';
+
 export const SITE_CONTACT = Object.freeze({
   email: 'hello@heyalberta.ca',
   phoneDisplay: '(403) 555-0100',
@@ -16,7 +18,7 @@ export const SITE_TAGLINE = Object.freeze({
 export const SITE_LEGAL = Object.freeze({
   COPYRIGHT_LINE: '2026 Hey Alberta. All rights reserved.',
   PRIVACY_LABEL: 'Privacy Policy',
-  PRIVACY_HREF: '#',
+  PRIVACY_HREF: ROUTES.PRIVACY_POLICY,
   TERMS_LABEL: 'Terms of Service',
-  TERMS_HREF: '#',
+  TERMS_HREF: ROUTES.TERMS_OF_SERVICE,
 });

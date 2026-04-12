@@ -124,6 +124,7 @@ router.post("/checkout-session", requireAuth, async (req, res) => {
       client_reference_id: req.user._id.toString(),
       /** Restrict to cards (Link is a separate method in Dashboard; card-only reduces Link prompts). */
       payment_method_types: ["card"],
+      billing_address_collection: "required",
       consent_collection: {
         payment_method_reuse_agreement: {
           position: "hidden",

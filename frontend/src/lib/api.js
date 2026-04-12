@@ -120,6 +120,10 @@ export const authAPI = {
     API.get('/auth/verify-email', { params: { token } }),
   resendVerification: (body) => API.post('/auth/resend-verification', body),
   redeemPromotion: (body) => API.post('/auth/redeem-promotion', body),
+  requestPasswordReset: (body) => API.post('/auth/request-password-reset', body),
+  resetPassword: (body) => API.post('/auth/reset-password', body),
+  changePassword: (body) => API.post('/auth/change-password', body),
+  deleteAccount: (body) => API.post('/auth/delete-account', body),
 };
 
 /** Stripe: backend creates Checkout / Customer Portal sessions (requires auth). */
@@ -236,6 +240,8 @@ export const newsSubscribeAPI = {
 export const adminAPI = {
   listings: (params) => API.get('/admin/listings', { params }),
   moderateListing: (listingId, body) => API.put(`/admin/listings/${listingId}/moderation`, body),
+  /** @param {string} adminPassword */
+  deleteAllListings: (adminPassword) => API.post('/admin/listings/delete-all', { adminPassword }),
   stats: () => API.get('/admin/stats'),
   /** @param {Record<string, string|number>} [params] — page, limit, q, roleFilter, membershipFilter, sort, order */
   users: (params) => API.get('/admin/users', { params: params || {} }),

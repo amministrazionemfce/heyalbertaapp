@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import MembershipTiersSection from '../components/MembershipTiersSection';
 import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
 import { useAddListingClick } from '../hooks/useAddListingClick';
+import { useSEO } from '../hooks/useSEO';
 import { siteAPI } from '../lib/api';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { useAuth } from '../lib/auth';
@@ -92,6 +93,11 @@ export default function AboutPage() {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
 
+  useSEO({
+    title: 'About Hey Alberta',
+    description: 'Learn about Hey Alberta\'s mission to connect newcomers with trusted local businesses across Alberta.',
+  });
+
   const missionImageUrls = useMemo(() => {
     const raw = settings?.aboutMissionImages;
     if (!Array.isArray(raw)) return ['/background.jpeg'];
@@ -113,7 +119,7 @@ export default function AboutPage() {
   }, []);
 
   const heroRaw = settings?.aboutHeroImage?.trim();
-  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : '/about.jpeg';
+  const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : '/lake.png';
 
   const handleListBusiness = () => {
     if (!user) {

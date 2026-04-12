@@ -23,6 +23,7 @@ import {
   ChevronRight,
   ChevronDown,
   ArrowDownUp,
+  MapPin,
 } from 'lucide-react';
 import { DirectoryListingsGridSkeleton } from '../components/ListingPageSkeletons';
 import { Skeleton } from '../components/ui/skeleton';
@@ -207,6 +208,7 @@ export default function DirectoryPage() {
   const [sellerName, setSellerName] = useState(searchParams.get('vendorName') || searchParams.get('sellerName') || '');
   const [featured, setFeatured] = useState(searchParams.get('featured') === 'true');
   const [myLikings, setMyLikings] = useState(searchParams.get('myLikings') === 'true');
+  const [viewMode, setViewMode] = useState(searchParams.get('viewMode') || 'region'); // 'general' or 'region'
   /** When URL has userId but no display name, resolve label from first listing title. */
   const [sellerResolvedName, setSellerResolvedName] = useState('');
 
@@ -430,6 +432,25 @@ export default function DirectoryPage() {
   const displayCategoryLabel = categoryName || 'All Categories';
   const displayCityLabel = city || 'All Cities';
 
+  // Group listings by city for display with headers
+  const listingsByCity = useMemo(() => {
+    const grouped = {};
+    listings.forEach((listing) => {
+      const listingCity = listing.city || 'Other';
+      if (!grouped[listingCity]) {
+        grouped[listingCity] = [];
+      }
+      grouped[listingCity].push(listing);
+    });
+    // Sort cities alphabetically, with user's selected city first if applicable
+    const sortedCities = Object.keys(grouped).sort((a, b) => {
+      if (city && a === city) return -1;
+      if (city && b === city) return 1;
+      return a.localeCompare(b);
+    });
+    return Object.fromEntries(sortedCities.map((c) => [c, grouped[c]]));
+  }, [listings, city]);
+
   return (
     <div className="min-h-screen" data-testid="directory-page">
       <div className="w-full px-4 py-1 sm:px-5 md:px-6 md:py-5 lg:px-8 xl:px-10">
@@ -550,8 +571,8 @@ export default function DirectoryPage() {
                       data-testid="filter-my-likings"
                     />
                     <span className="flex items-center gap-2 text-sm text-slate-700">
-                      <ThumbsUp className="w-4 h-4 text-yellow-400" aria-hidden />
-                      My likings
+                      <ThumbsUp className="w-4 h-4 text-yellow-500" aria-hidden />
+                      My favourites
                     </span>
                   </label>
                 </div>
@@ -570,113 +591,155 @@ export default function DirectoryPage() {
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 flex w-full flex-col gap-3 sm:flex-row sm:items-stretch">
-                  <div className="w-full min-w-0 sm:w-1/2 flex flex-col justify-center sm:max-w-[50%]">
-                    {activeFilters > 0 ? (
-                      <div
-                        className="w-full rounded-xl border border-slate-200/90 bg-white p-2 shadow-sm"
-                        data-testid="directory-active-filters"
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-                            {search && (
-                              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">{search}</span>
-                            )}
-                            {categoryName && (
-                              <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-800">
-                                {categoryName}
-                              </span>
-                            )}
-                            {city && (
-                              <span className="rounded-md bg-secondary-50 px-2 py-1 text-xs text-secondary-800">
-                                {city}
-                              </span>
-                            )}
-                            {sellerUserId && (
-                              <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                                {sellerName || sellerResolvedName || `Seller #${sellerUserId}`}
-                              </span>
-                            )}
-                            {featured && (
-                              <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">Featured</span>
-                            )}
-                            {myLikings && (
-                              <span className="rounded-md bg-spruce-50 px-2 py-1 text-xs text-spruce-900">My likings</span>
-                            )}
-                          </div>
-                          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
-                         
-                            <button
-                              type="button"
-                              onClick={clearFilters}
-                              className="font-ui inline-flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:underline"
-                              data-testid="clear-filters-btn"
-                            >
-                              <X className="h-3.5 w-3.5" aria-hidden /> Clear all
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <header className="pr-2" data-testid="directory-results-bar">
-                        <h2 className="font-heading text-sm text-slate-900 md:text-lg">
-                          {total > 0
-                            ? `${total} result${total === 1 ? '' : 's'}`
-                            : 'No results match your filters'}
-                        </h2>
-                      </header>
-                    )}
-                  </div>
-                  <div className="flex w-full items-center justify-start sm:w-1/2 sm:justify-end sm:pl-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10 min-w-[10.5rem] justify-between gap-2 border-slate-200 bg-white px-3 hover:bg-white sm:min-w-[11.5rem]"
-                          data-testid="directory-review-sort-btn"
-                          aria-label="Sort listings by review count"
-                          aria-haspopup="menu"
-                        >
-                          <span className="flex min-w-0 flex-1 items-center gap-2">
-                            <ArrowDownUp className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
-                            <span className="truncate text-sm font-medium text-slate-900">
-                              {reviewSort === 'most'
-                                ? 'Most reviews'
-                                : reviewSort === 'least'
-                                  ? 'Least reviews'
-                                  : 'No sort'}
-                            </span>
-                          </span>
-                          <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="min-w-[12rem] py-1" role="menu">
-                        <DropdownMenuItem
-                          variant={reviewSort == null ? 'highlight' : 'default'}
-                          onClick={() => applyReviewSort(null)}
-                          data-testid="directory-review-sort-none"
-                        >
-                          No sort
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant={reviewSort === 'most' ? 'highlight' : 'default'}
-                          onClick={() => applyReviewSort('most')}
-                          data-testid="directory-review-sort-most"
-                        >
-                          Most reviews
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          variant={reviewSort === 'least' ? 'highlight' : 'default'}
-                          onClick={() => applyReviewSort('least')}
-                          data-testid="directory-review-sort-least"
-                        >
-                          Least reviews
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
+               <div className="mb-4 flex w-full flex-col gap-3 lg:flex-row lg:items-center">
+  <div className="w-full min-w-0 lg:flex-1">
+    {activeFilters > 0 ? (
+      <div
+        className="w-full rounded-xl border border-slate-200/90 bg-white p-2 shadow-sm"
+        data-testid="directory-active-filters"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            {search && (
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-700">{search}</span>
+            )}
+            {categoryName && (
+              <span className="rounded-md bg-slate-50 px-2 py-1 text-xs text-slate-800">
+                {categoryName}
+              </span>
+            )}
+            {city && (
+              <span className="rounded-md bg-secondary-50 px-2 py-1 text-xs text-secondary-800">
+                {city}
+              </span>
+            )}
+            {sellerUserId && (
+              <span className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                {sellerName || sellerResolvedName || `Seller #${sellerUserId}`}
+              </span>
+            )}
+            {featured && (
+              <span className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-900">Featured</span>
+            )}
+            {myLikings && (
+              <span className="rounded-md bg-spruce-50 px-2 py-1 text-xs text-spruce-900">My likings</span>
+            )}
+          </div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-2 sm:gap-3">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="font-ui inline-flex shrink-0 items-center gap-1 text-xs font-medium text-red-600 hover:underline"
+              data-testid="clear-filters-btn"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden /> Clear all
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <header className="pr-2" data-testid="directory-results-bar">
+        <h2 className="font-heading text-sm text-slate-900 md:text-lg">
+          {total > 0
+            ? `${total} result${total === 1 ? '' : 's'}`
+            : 'No results match your filters'}
+        </h2>
+      </header>
+    )}
+  </div>
+
+  <div className="flex w-full flex-col gap-3 sm:flex-col lg:w-auto lg:flex-row lg:items-center lg:justify-end">
+    <div className="w-full lg:w-auto">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="h-10 w-full justify-between gap-2 border-slate-200 bg-white px-3 hover:bg-white lg:min-w-[11.5rem] lg:w-auto"
+            data-testid="directory-review-sort-btn"
+            aria-label="Sort listings by review count"
+            aria-haspopup="menu"
+          >
+            <span className="flex min-w-0 flex-1 items-center gap-2">
+              <ArrowDownUp className="h-4 w-4 shrink-0 text-slate-600" aria-hidden />
+              <span className="truncate text-sm font-medium text-slate-900">
+                {reviewSort === 'most'
+                  ? 'Most reviews'
+                  : reviewSort === 'least'
+                    ? 'Least reviews'
+                    : 'Sort By Review'}
+              </span>
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+
+        <DropdownMenuContent
+          align="end"
+          className="min-w-[12rem] py-1"
+          role="menu"
+        >
+          <DropdownMenuItem
+            variant={reviewSort == null ? 'highlight' : 'default'}
+            onClick={() => applyReviewSort(null)}
+            data-testid="directory-review-sort-none"
+          >
+            Sort By Review
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant={reviewSort === 'most' ? 'highlight' : 'default'}
+            onClick={() => applyReviewSort('most')}
+            data-testid="directory-review-sort-most"
+          >
+            Most reviews
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            variant={reviewSort === 'least' ? 'highlight' : 'default'}
+            onClick={() => applyReviewSort('least')}
+            data-testid="directory-review-sort-least"
+          >
+            Least reviews
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+
+    <div className="flex w-full items-center justify-between gap-2 lg:w-auto lg:justify-end lg:gap-3">
+      <span className="whitespace-nowrap text-xs font-medium text-slate-600">View:</span>
+
+      <div className="flex w-full gap-1 rounded-lg border border-slate-200 bg-white p-1 lg:w-auto">
+        <button
+          type="button"
+          onClick={() => setViewMode('general')}
+          className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors lg:flex-none ${
+            viewMode === 'general'
+              ? 'bg-spruce-700 text-white'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+          data-testid="view-mode-general"
+          aria-label="General view"
+        >
+          General
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setViewMode('region')}
+          className={`flex-1 rounded px-3 py-1.5 text-sm font-medium transition-colors lg:flex-none ${
+            viewMode === 'region'
+              ? 'bg-spruce-700 text-white'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+          data-testid="view-mode-region"
+          aria-label="Region view"
+        >
+          By Region
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
                 <div className="flex min-h-0 flex-1 flex-col">
                   {listings.length === 0 ? (
@@ -694,13 +757,34 @@ export default function DirectoryPage() {
                         </Button>
                       </div>
                     </div>
-                  ) : (
+                  ) : viewMode === 'general' ? (
                     <div
                       className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 md:gap-6 lg:gap-7"
                       data-testid="listings-grid"
                     >
                       {listings.map((listing) => (
                         <ListingCard key={listing.id} listing={listing} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-8">
+                      {Object.entries(listingsByCity).map(([cityName, cityListings]) => (
+                        <div key={cityName} className="space-y-3">
+                          <div className="flex items-center gap-2 border-slate-200/60 pb-2">
+                            <MapPin className="h-4 w-4 text-spruce-600" />
+                            <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+                              {cityName}
+                            </h3>
+                            <span className="ml-auto text-xs font-medium text-slate-500">
+                              {cityListings.length} result{cityListings.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 md:gap-6 lg:gap-7">
+                            {cityListings.map((listing) => (
+                              <ListingCard key={listing.id} listing={listing} />
+                            ))}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   )}

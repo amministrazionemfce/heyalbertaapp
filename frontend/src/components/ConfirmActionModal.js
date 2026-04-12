@@ -5,7 +5,7 @@ import { AlertTriangle, Trash2 } from 'lucide-react';
 const VARIANTS = {
   danger: {
     headerClass:
-      'bg-spruce-800 text-white',
+      'bg-spruce-700 text-white',
     iconWrap: 'bg-white/20 text-white ring-white/30',
     confirmClass:
       'bg-red-600 hover:from-adminDanger-700 hover:via-red-700 hover:to-adminDanger-900 text-white shadow-md shadow-adminDanger-900/25',
@@ -13,14 +13,14 @@ const VARIANTS = {
   },
   warning: {
     headerClass:
-      'bg-spruce-800 text-white',
+      'bg-spruce-700 text-white',
     iconWrap: 'bg-white/20 text-white ring-white/30',
     confirmClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-md',
   },
   neutral: {
-    headerClass: 'bg-spruce-800 text-white',
+    headerClass: 'bg-spruce-700 text-white',
     iconWrap: 'bg-white/15 text-white ring-white/20',
-    confirmClass: 'bg-spruce-800 hover:bg-slate-900 text-white',
+    confirmClass: 'bg-spruce-700 hover:bg-slate-900 text-white',
   },
 };
 

@@ -12,8 +12,13 @@ export const ROUTES = Object.freeze({
   CONTACT: '/contact',
   REGISTER: '/register',
   LOGIN: '/login',
+  /** Password reset request landing (query: token for verification) */
+  FORGOT_PASSWORD: '/forgot-password',
   /** Email verification landing (query: token) */
   VERIFY_EMAIL: '/verify-email',
+  /** Legal documents */
+  PRIVACY_POLICY: '/privacy-policy',
+  TERMS_OF_SERVICE: '/terms-of-service',
   /** Pre-Stripe subscription review (split layout like login) */
   CHECKOUT: '/checkout',
   CHECKOUT_RETURN: '/checkout/return',

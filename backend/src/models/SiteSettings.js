@@ -3,8 +3,8 @@ import mongoose from "mongoose";
 const siteSettingsSchema = new mongoose.Schema(
   {
     _id: { type: String, default: "default" },
-    newsHeroImage: { type: String, default: "" },
-    aboutHeroImage: { type: String, default: "/about.jpeg" },
+    newsHeroImage: { type: String, default: "news.png" },
+    aboutHeroImage: { type: String, default: "/lake.png" },
     contactHeroImage: { type: String, default: "/support.jpeg" },
     /** About page — images shown in the Mission section (between copy and checkmarks) */
     aboutMissionImages: {
@@ -60,6 +60,15 @@ const siteSettingsSchema = new mongoose.Schema(
     /** Review notification email templates (sent to vendors) */
     reviewNotificationEmailSubject: { type: String, default: "" },
     reviewNotificationEmailBody: { type: String, default: "" },
+    /** Privacy Policy and Terms of Service documents */
+    privacyPolicyContent: { 
+      type: String, 
+      default: "# Privacy Policy\n\nYour privacy is important to us. This Privacy Policy explains how Hey Alberta collects, uses, and protects your personal information.\n\n## Information We Collect\n\nWe collect information that you provide directly to us, such as when you create an account, post a listing, or contact us. This may include your name, email address, phone number, and business information.\n\n## How We Use Your Information\n\nWe use the information we collect to provide, maintain, and improve our services, process payments, and communicate with you.\n\n## Data Protection\n\nWe implement appropriate technical and organizational measures to protect your personal information from unauthorized access, alteration, disclosure, or destruction.\n\n## Third-Party Services\n\nWe use third-party service providers such as Stripe for payment processing. These providers are bound by confidentiality agreements and are not permitted to use your information for any purpose other than to provide services to us.\n\n## Your Rights\n\nYou have the right to access, update, or delete your personal information at any time by logging into your account or contacting us.\n\n## Contact Us\n\nIf you have any questions about this Privacy Policy, please contact us at hello@heyalberta.ca.\n"
+    },
+    termsOfServiceContent: {
+      type: String,
+      default: "# Terms of Service\n\nThese Terms of Service govern your use of the Hey Alberta website and services.\n\n## Acceptance of Terms\n\nBy accessing and using Hey Alberta, you accept and agree to be bound by these Terms of Service.\n\n## User Responsibilities\n\nYou are responsible for maintaining the confidentiality of your account and password. You agree to be responsible for all activity that occurs under your account.\n\n## Content Ownership\n\nYou retain ownership of all content you post on Hey Alberta. By posting content, you grant Hey Alberta a non-exclusive, royalty-free license to display your content.\n\n## Prohibited Content\n\nYou may not post content that is illegal, harassing, threatening, abusive, or defamatory. You may not post duplicate listings or engage in spam.\n\n## Payment Terms\n\nSome services on Hey Alberta require payment. Prices are subject to change with notice. All charges are processed through Stripe and are subject to their terms.\n\n## Limitation of Liability\n\nHey Alberta is provided \"as is\" without warranties. Hey Alberta shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of the service.\n\n## Termination\n\nWe reserve the right to suspend or terminate your account if you violate these Terms of Service.\n\n## Changes to Terms\n\nWe may modify these Terms of Service at any time. Your continued use of Hey Alberta following the posting of revised Terms of Service means that you accept and agree to the changes.\n\n## Contact Us\n\nIf you have questions about these Terms of Service, please contact us at hello@heyalberta.ca.\n"
+    },
     /** Public site maintenance (non-admins see maintenance UI; admins bypass). */
     maintenanceMode: { type: Boolean, default: false },
     maintenanceMessage: { type: String, default: "" },

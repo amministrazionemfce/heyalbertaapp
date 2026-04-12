@@ -49,9 +49,11 @@ export default function CityBrowseCard({ cityName, listingCount = 0, imageSrc })
           <h3 className="font-heading text-lg font-bold leading-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.65)] sm:text-xl">
             {cityName}
           </h3>
-          <p className="mt-2 text-sm font-normal text-white/95 [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">
-            {count} Listing
-          </p>
+          {count > 0 && (
+            <p className="mt-2 text-sm font-normal text-white/95 [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">
+              {count} Listing
+            </p>
+          )}
         </div>
       </div>
     </Link>

@@ -1,11 +1,13 @@
 import { useSearchParams } from 'react-router-dom';
-import { Settings, Quote } from 'lucide-react';
+import { Settings, Quote, FileText } from 'lucide-react';
 import { AdminPlatformReviewsSection } from './AdminPlatformReviewsSection';
 import { AdminListingReviewsSection } from './AdminListingReviewsSection';
+import { AdminLegalDocumentsSection } from './AdminLegalDocumentsSection';
 
 const SETTINGS_TABS = [
   { id: 'overview', label: 'Listings reviews', icon: Settings },
   { id: 'reviews', label: 'Platform reviews', icon: Quote },
+  { id: 'legal', label: 'Legal Documents', icon: FileText },
 ];
 
 export function AdminSettingsSection({ onUpdate }) {
@@ -31,7 +33,7 @@ export function AdminSettingsSection({ onUpdate }) {
               onClick={() => setTab(id)}
               className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? 'bg-spruce-800 text-white shadow-sm'
+                  ? 'bg-spruce-700 text-white shadow-sm'
                   : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
               }`}
               data-testid={`admin-settings-tab-${id}`}
@@ -47,6 +49,7 @@ export function AdminSettingsSection({ onUpdate }) {
         <AdminListingReviewsSection onUpdate={onUpdate} />
       )}
       {activeTab === 'reviews' && <AdminPlatformReviewsSection onUpdate={onUpdate} />}
+      {activeTab === 'legal' && <AdminLegalDocumentsSection onUpdate={onUpdate} />}
     </div>
   );
 }

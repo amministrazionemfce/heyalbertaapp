@@ -128,6 +128,9 @@ export default function LoginPage() {
                 className="mt-1.5"
                 data-testid="login-password"
               />
+              <Link to={ROUTES.FORGOT_PASSWORD} className="text-xs text-spruce-700 hover:underline mt-2 inline-block">
+                Forgot password?
+              </Link>
             </div>
             <Button type="submit" disabled={loading} className="w-full h-11 bg-spruce-700 hover:bg-spruce-800 text-white" data-testid="login-submit-btn">
               {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
@@ -167,9 +170,6 @@ export default function LoginPage() {
             <Link to={ROUTES.REGISTER} className="text-spruce-700 hover:underline font-medium">Sign up</Link>
           </p>
 
-          <p className="text-xs text-muted-foreground text-center mt-6">
-            Admin demo: admin@heyalberta.ca / admin123
-          </p>
         </div>
       </div>
     </div>

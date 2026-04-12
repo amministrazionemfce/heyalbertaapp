@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { ROUTES, DASHBOARD_ADD_LISTING } from '../constants';
 import { useAuth } from '../lib/auth';
 import { contactAPI, siteAPI } from '../lib/api';
+import { useSEO } from '../hooks/useSEO';
 import { getApiErrorLines } from '../lib/formatApiError';
 import { resolveMediaUrl } from '../lib/mediaUrl';
 import { Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
@@ -33,6 +34,11 @@ export default function ContactPage() {
   const [sending, setSending] = useState(false);
   const [settings, setSettings] = useState(null);
 
+  useSEO({
+    title: 'Contact Us',
+    description: 'Get in touch with Hey Alberta. Whether you\'re a newcomer looking for services or a business interested in partnering with us, we\'d love to hear from you.',
+  });
+
   useEffect(() => {
     let cancelled = false;
     siteAPI
@@ -46,7 +52,7 @@ export default function ContactPage() {
     };
   }, []);
 
-  const DEFAULT_CONTACT_HERO = '/team.jpg';
+  const DEFAULT_CONTACT_HERO = '/support.png';
   const heroRaw = settings?.contactHeroImage?.trim();
   const heroSrc = heroRaw ? resolveMediaUrl(heroRaw) || heroRaw : DEFAULT_CONTACT_HERO;
 

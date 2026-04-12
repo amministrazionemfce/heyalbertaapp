@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { MapPin, Star, ThumbsUp } from 'lucide-react';
+import { MapPin, Star, ThumbsUp, Award } from 'lucide-react';
 import ListingCategoryLabel from './ListingCategoryLabel';
 import { listingPath } from '../constants';
 import { getListingCoverImageUrl } from '../lib/listingCover';
@@ -92,11 +92,6 @@ export default function FeaturedListingCard({ listing }) {
             className="h-full w-full object-cover transition-transform duration-500 [transform:translateZ(0)] will-change-transform group-hover:scale-[1.03]"
             loading="lazy"
           />
-          <div className="pointer-events-none absolute left-3 top-3 z-10">
-            <span className="rounded-md bg-green-600 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
-              Featured
-            </span>
-          </div>
         </div>
 
         <div className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-2">
@@ -108,16 +103,21 @@ export default function FeaturedListingCard({ listing }) {
               </span>
             ) : null}
           </div>
-          <button
-            type="button"
-            onClick={toggleFavorite}
-            className={`pointer-events-auto z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-              favorited ? 'text-yellow-400 border-yellow-400' : 'text-slate-600 hover:border-yellow-400/40 hover:text-yellow-400'
-            }`}
-            aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
-          >
-            <ThumbsUp className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-spruce-700 p-2.5 text-white shadow-sm flex items-center justify-center">
+              <Award className="h-4 w-4" />
+            </div>
+            <button
+              type="button"
+              onClick={toggleFavorite}
+              className={`pointer-events-auto z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
+                favorited ? 'text-yellow-500 border-yellow-500' : 'text-slate-600 hover:border-yellow-400/40 hover:text-yellow-400'
+              }`}
+              aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
+            >
+              <ThumbsUp className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-1 flex-col p-3 pt-2">
@@ -136,10 +136,12 @@ export default function FeaturedListingCard({ listing }) {
             </div>
           ) : null}
 
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <StarRatingRow rating={ratingForStars} />
-            <span className="text-xs tabular-nums text-slate-500">({reviewCount})</span>
-          </div>
+          {reviewCount > 0 && (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <StarRatingRow rating={ratingForStars} />
+              <span className="text-xs tabular-nums text-slate-500">({reviewCount})</span>
+            </div>
+          )}
         </div>
       </div>
     </div>

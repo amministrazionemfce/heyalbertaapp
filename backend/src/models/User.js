@@ -28,6 +28,8 @@ const userSchema = new mongoose.Schema({
   emailVerified: { type: Boolean, default: false },
   emailVerificationToken: { type: String },
   emailVerificationTokenExpires: { type: Date },
+  passwordResetToken: { type: String },
+  passwordResetExpires: { type: Date },
   createdAt: String,
   /** Updated on login and when the client loads /auth/me */
   lastActiveAt: { type: Date },

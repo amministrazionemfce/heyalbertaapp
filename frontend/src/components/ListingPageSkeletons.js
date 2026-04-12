@@ -2,7 +2,7 @@ import { Skeleton } from './ui/skeleton';
 
 function DirectoryListingCardSkeleton() {
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white">
+    <div className="flex h-full flex-col overflow-hidden rounded-2x bg-white">
       <Skeleton className="h-44 w-full rounded-none rounded-t-2xl" />
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-2.5">
         <Skeleton className="h-6 w-24 rounded-md" />

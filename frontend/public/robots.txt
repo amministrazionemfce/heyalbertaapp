@@ -1,0 +1,19 @@
+# Hey Alberta - SEO Robots Configuration
+# See robots.txt specification: https://www.robotstxt.org/
+
+User-agent: *
+Allow: /
+
+# Disallow private/account pages
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /profile/
+Disallow: /login/
+Disallow: /register/
+Disallow: /checkout/
+
+# Allow search engine crawlers to see sitemap
+Sitemap: https://heyalberta.com/sitemap.xml
+
+# Crawl delay (optional) - be respectful to server resources
+Crawl-delay: 1

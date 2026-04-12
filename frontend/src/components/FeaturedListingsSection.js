@@ -118,7 +118,7 @@ export default function FeaturedListingsSection() {
         <div className="mt-12 flex justify-center">
           <Link
             to={viewMoreHref}
-            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-spruce-800 hover:bg-spruce-900 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-800 hover:via-spruce-700 hover:to-spruce-600 hover:shadow-lg active:scale-[0.98]"
+            className="inline-flex min-w-[200px] cursor-pointer items-center justify-center rounded-full bg-spruce-700 hover:bg-spruce-900 px-10 py-3 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:from-spruce-700 hover:via-spruce-600 hover:to-spruce-500 hover:shadow-lg active:scale-[0.98]"
             data-testid="featured-listings-view-more"
           >
             View more

@@ -50,7 +50,7 @@ export default function NewsPageHero({ settings }) {
   const bg =
     raw && (resolveMediaUrl(raw) || raw)
       ? resolveMediaUrl(raw) || raw
-      : '/background.jpeg';
+      : '/news.png';
   const headline = settings?.newsHeadline || 'Life, Business, and Community in Alberta.';
   const sub = settings?.newsSubhead || '';
   const cta1 = settings?.newsCtaPrimaryText || 'Subscribe for news';
@@ -134,7 +134,7 @@ export default function NewsPageHero({ settings }) {
             )}
             <CtaLink
               href={cta2Href || ROUTES.LISTINGS}
-              className="inline-flex min-h-[48px] min-w-[200px] items-center justify-center rounded-md bg-spruce-800 px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-lg transition-colors hover:bg-spruce-700"
+              className="inline-flex min-h-[48px] min-w-[200px] items-center justify-center rounded-md bg-spruce-700 px-6 py-3 text-xs font-bold uppercase tracking-wide text-white shadow-lg transition-colors hover:bg-spruce-700"
             >
               {cta2}
             </CtaLink>

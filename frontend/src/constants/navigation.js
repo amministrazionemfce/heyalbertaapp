@@ -1,4 +1,4 @@
-import { ROUTES } from './routes';
+import { ROUTES, MEMBERSHIP_PLANS_URL } from './routes';
 
 /**
  * Primary header navigation (desktop + mobile sheet).
@@ -24,7 +24,7 @@ export const FOOTER_QUICK_LINKS = Object.freeze([
 /** Footer — “For Vendors” column */
 export const FOOTER_VENDOR_LINKS = Object.freeze([
   { to: ROUTES.REGISTER, label: 'Create Free Listing' },
-  { to: ROUTES.ABOUT, label: 'Membership Tiers' },
+  { to: MEMBERSHIP_PLANS_URL, label: 'Membership Tiers' },
   { to: ROUTES.LOGIN, label: 'Vendor Login' },
   { to: ROUTES.CONTACT, label: 'Partner With Us' },
 ]);

@@ -12,6 +12,7 @@ import {
   SITE_LEGAL,
 } from '../constants';
 import { useCookieConsent } from './CookieConsentBanner';
+import { useAuth } from '../lib/auth';
 
 function FooterCookiePreferences() {
   const cookie = useCookieConsent();
@@ -28,8 +29,13 @@ function FooterCookiePreferences() {
   );
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 export default function Footer() {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const isHome = pathname === ROUTES.HOME;
   const topCategories = CATEGORIES.slice(0, 6);
   const footerBg = 'bg-spruce-700';
@@ -68,7 +74,7 @@ export default function Footer() {
             <ul className="space-y-3 text-sm flex flex-col items-center md:items-start">
               {FOOTER_QUICK_LINKS.map((item) => (
                 <li key={item.to + item.label}>
-                  <Link to={item.to} className="hover:text-white transition-colors">
+                  <Link to={item.to} onClick={scrollToTop} className="hover:text-white transition-colors">
                     {item.label}
                   </Link>
                 </li>
@@ -82,7 +88,7 @@ export default function Footer() {
             <ul className="space-y-3 text-sm flex flex-col items-center md:items-start">
               {topCategories.map(cat => (
                 <li key={cat.id}>
-                  <Link to={directoryCategoryQuery(cat.id)} className="hover:text-white transition-colors">
+                  <Link to={directoryCategoryQuery(cat.id)} onClick={scrollToTop} className="hover:text-white transition-colors">
                     {cat.name}
                   </Link>
                 </li>
@@ -91,18 +97,20 @@ export default function Footer() {
           </div>
 
           {/* For Vendors */}
-          <div>
-            <h4 className="font-heading font-semibold text-white mb-4">{FOOTER_HEADINGS.FOR_VENDORS}</h4>
-            <ul className="space-y-3 text-sm flex flex-col items-center md:items-start">
-              {FOOTER_VENDOR_LINKS.map((item) => (
-                <li key={item.to + item.label}>
-                  <Link to={item.to} className="hover:text-white transition-colors">
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {user?.role !== 'user' && (
+            <div>
+              <h4 className="font-heading font-semibold text-white mb-4">{FOOTER_HEADINGS.FOR_VENDORS}</h4>
+              <ul className="space-y-3 text-sm flex flex-col items-center md:items-start">
+                {FOOTER_VENDOR_LINKS.map((item) => (
+                  <li key={item.to + item.label}>
+                    <Link to={item.to} onClick={scrollToTop} className="hover:text-white transition-colors">
+                      {item.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         <div className="border-t border-white/10 text-white/90 mt-12 pt-8 flex flex-col md:flex-row items-center justify-center md:justify-between gap-4 text-center">

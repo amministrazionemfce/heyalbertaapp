@@ -769,6 +769,38 @@ router.post("/users/bulk-delete", requireAdmin, async (req, res) => {
 
 /*
 ------------------------------------------------
+DELETE all listings (Admin only, password required)
+------------------------------------------------
+*/
+router.post("/listings/delete-all", requireAdmin, async (req, res) => {
+  try {
+    const adminCheck = await assertAdminPassword(req.user, req.body?.adminPassword);
+    if (!adminCheck.ok) {
+      return res.status(adminCheck.status).json({ message: adminCheck.message });
+    }
+
+    // Get all listings for count
+    const allListings = await Listing.find({});
+    const listingCount = allListings.length;
+
+    // Delete all reviews associated with listings
+    await Review.deleteMany({});
+
+    // Delete all listings
+    const result = await Listing.deleteMany({});
+
+    res.json({
+      message: `Successfully deleted all ${result.deletedCount} listings and their associated reviews`,
+      deletedListings: result.deletedCount,
+      originalCount: listingCount,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+/*
+------------------------------------------------
 GET city images (Admin panel)
 ------------------------------------------------
 */
@@ -926,6 +958,8 @@ router.put("/site-settings", requireAdmin, async (req, res) => {
       "emailVerificationEmailBody",
       "reviewNotificationEmailSubject",
       "reviewNotificationEmailBody",
+      "privacyPolicyContent",
+      "termsOfServiceContent",
     ];
     for (const k of allowed) {
       if (req.body[k] !== undefined) s[k] = req.body[k];

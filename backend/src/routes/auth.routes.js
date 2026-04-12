@@ -184,11 +184,11 @@ router.post("/login", async (req, res) => {
 
   const user = await User.findOne({ email: String(email || "").trim().toLowerCase() });
 
-  if (!user) return res.status(404).json({ message: "No account found for that email." });
+  if (!user) return res.status(401).json({ message: "Invalid email or password." });
 
   const valid = await bcrypt.compare(password, user.passwordHash);
 
-  if (!valid) return res.status(401).json({ message: "Incorrect password." });
+  if (!valid) return res.status(401).json({ message: "Invalid email or password." });
 
   if (verificationEmailEnabled() && !user.emailVerified) {
     return res.status(403).json({
@@ -349,6 +349,151 @@ router.patch("/me", requireAuth, async (req, res) => {
     return res.json(user);
   } catch (err) {
     return res.status(500).json({ message: err.message || "Update failed" });
+  }
+});
+
+router.post("/request-password-reset", async (req, res) => {
+  try {
+    const email = String(req.body?.email || "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Valid email required." });
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal whether the email exists
+      return res.json({ message: "If an account exists for that email, we sent a password reset link." });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetExpires = new Date(Date.now() + 1 * 3600000); // 1 hour
+
+    await User.findByIdAndUpdate(user._id, {
+      passwordResetToken: resetToken,
+      passwordResetExpires: resetExpires,
+    });
+
+    const base = getFrontendBase();
+    const resetUrl = `${base}/forgot-password?token=${encodeURIComponent(resetToken)}`;
+    const subject = "Reset Your Hey Alberta Password";
+    const text = `Hi ${user.name},\n\nClick this link to reset your password:\n${resetUrl}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, ignore this email.`;
+
+    try {
+      await sendTransactionalMail({
+        to: user.email,
+        subject,
+        text,
+      });
+    } catch (e) {
+      console.error("send password reset email:", e?.message || e);
+      return res.json({ message: "If an account exists for that email, we sent a password reset link." });
+    }
+
+    return res.json({ message: "If an account exists for that email, we sent a password reset link." });
+  } catch (err) {
+    console.error("request-password-reset:", err?.message || err);
+    return res.status(500).json({ message: err.message || "Could not process request." });
+  }
+});
+
+router.post("/reset-password", async (req, res) => {
+  try {
+    const token = String(req.body?.token || "").trim();
+    const password = String(req.body?.password || "").trim();
+
+    if (!token || token.length < 20) {
+      return res.status(400).json({ message: "Invalid or missing reset token." });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters." });
+    }
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "This reset link is invalid or has expired. Request a new one." });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await User.findByIdAndUpdate(user._id, {
+      passwordHash,
+      passwordResetToken: undefined,
+      passwordResetExpires: undefined,
+    });
+
+    return res.json({ message: "Password reset successfully. You can now log in." });
+  } catch (err) {
+    console.error("reset-password:", err?.message || err);
+    return res.status(500).json({ message: err.message || "Could not reset password." });
+  }
+});
+
+router.post("/change-password", requireAuth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Both current and new passwords are required." });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters." });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(401).json({ message: "User not found." });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ message: "Current password is incorrect." });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await User.findByIdAndUpdate(req.user._id, { passwordHash });
+
+    return res.json({ message: "Password changed successfully." });
+  } catch (err) {
+    console.error("change-password:", err?.message || err);
+    return res.status(500).json({ message: err.message || "Could not change password." });
+  }
+});
+
+router.post("/delete-account", requireAuth, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ message: "Password is required to delete your account." });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(401).json({ message: "User not found." });
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ message: "Password is incorrect." });
+    }
+
+    // Delete user's listings first (if vendor)
+    if (user.role === "vendor") {
+      await Listing.deleteMany({ userId: user._id.toString() });
+    }
+
+    // Delete user account
+    await User.findByIdAndDelete(req.user._id);
+
+    return res.json({ message: "Your account has been deleted successfully." });
+  } catch (err) {
+    console.error("delete-account:", err?.message || err);
+    return res.status(500).json({ message: err.message || "Could not delete account." });
   }
 });
 

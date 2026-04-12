@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Star, ThumbsUp } from 'lucide-react';
+import { MapPin, Star, ThumbsUp, Award } from 'lucide-react';
 import ListingCategoryLabel from './ListingCategoryLabel';
 import { listingPath } from '../constants';
 import { getListingCoverImageUrl } from '../lib/listingCover';
@@ -121,11 +121,6 @@ export default function ListingCard({ listing, onAdminOpen }) {
             </div>
           )}
 
-          {featured && (
-            <div className="pointer-events-auto absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white shadow-md">
-              Featured
-            </div>
-          )}
         </div>
 
         <div
@@ -145,17 +140,24 @@ export default function ListingCard({ listing, onAdminOpen }) {
             ) : null}
           </div>
           {!adminMode ? (
-            <button
-              type="button"
-              onClick={toggleFavorite}
-              className={`pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
-                favorited ? 'text-yellow-400 border-yellow-400' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-500'
-              }`}
-              aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
-              data-testid={`listing-favorite-${listing.id}`}
-            >
-              <ThumbsUp className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />
-            </button>
+            <div className="flex items-center gap-2">
+              {featured && (
+                <div className="rounded-full bg-spruce-700 p-2.5 text-white shadow-sm flex items-center justify-center">
+                  <Award className="h-4 w-4" />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={toggleFavorite}
+                className={`pointer-events-auto flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors ${
+                  favorited ? 'text-yellow-500 border-yellow-500' : 'text-slate-600 hover:border-yellow-500/40 hover:text-yellow-500'
+                }`}
+                aria-label={favorited ? 'Remove thumbs up' : 'Thumbs up this listing'}
+                data-testid={`listing-favorite-${listing.id}`}
+              >
+                <ThumbsUp className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />
+              </button>
+            </div>
           ) : null}
         </div>
 
@@ -181,17 +183,19 @@ export default function ListingCard({ listing, onAdminOpen }) {
             </div>
           ) : null}
 
-          <div
-            className="mt-1 flex flex-wrap items-center gap-2"
-            title={
-              avgRating != null && !Number.isNaN(Number(avgRating))
-                ? `${Number(avgRating).toFixed(1)} avg · ${reviewCount} reviews`
-                : `${reviewCount} reviews`
-            }
-          >
-            <StarRatingRow rating={ratingForStars} />
-            <span className="text-xs tabular-nums text-slate-600">({reviewCount})</span>
-          </div>
+          {reviewCount > 0 && (
+            <div
+              className="mt-1 flex flex-wrap items-center gap-2"
+              title={
+                avgRating != null && !Number.isNaN(Number(avgRating))
+                  ? `${Number(avgRating).toFixed(1)} avg · ${reviewCount} reviews`
+                  : `${reviewCount} reviews`
+              }
+            >
+              <StarRatingRow rating={ratingForStars} />
+              <span className="text-xs tabular-nums text-slate-600">({reviewCount})</span>
+            </div>
+          )}
 
           {adminMode && priceStr ? (
             <p className="mt-1 text-base font-bold leading-tight">{priceStr}</p>

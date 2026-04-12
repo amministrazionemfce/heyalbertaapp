@@ -51,9 +51,11 @@ export default function CategoryBrowseCard({ category, listingCount = 0, imageSr
           <h3 className="font-heading text-lg font-bold leading-tight text-white [text-shadow:0_2px_12px_rgba(0,0,0,0.65)] sm:text-xl">
             {category.name}
           </h3>
-          <p className="mt-2 text-sm font-normal text-white text-bold">
-            {count} Listing
-          </p>
+          {count > 0 && (
+            <p className="mt-2 text-sm font-normal text-white text-bold">
+              {count} Listing
+            </p>
+          )}
         </div>
       </div>
     </Link>

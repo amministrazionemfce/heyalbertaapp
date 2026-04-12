@@ -22,7 +22,7 @@ export function AdminSidebar({ stats, unreadContactMessages = null, activeSectio
                 type="button"
                 onClick={() => onSelectSection(item.id)}
                 className={`flex items-center gap-3 px-3 py-2.5 lg:py-3 rounded-lg text-sm font-medium transition-colors lg:w-full ${
-                  active ? 'bg-spruce-800 text-white shadow-sm hover:bg-spruce-700' : 'text-slate-600 hover:bg-admin-50'
+                  active ? 'bg-spruce-700 text-white shadow-sm hover:bg-spruce-700' : 'text-slate-600 hover:bg-admin-50'
                 }`}
                 data-testid={item.testId}
               >

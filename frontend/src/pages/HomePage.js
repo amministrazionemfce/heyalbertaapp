@@ -8,6 +8,7 @@ import HomeCtaSection from '../components/HomeCtaSection';
 import MembershipTiersSection from '../components/MembershipTiersSection';
 import UpgradeToVendorModal from '../components/UpgradeToVendorModal';
 import { useAddListingClick } from '../hooks/useAddListingClick';
+import { useSEO } from '../hooks/useSEO';
 import { listingAPI, siteAPI } from '../lib/api';
 import HomePageHeroCarousel from '../components/HomePageHeroCarousel';
 import { CATEGORIES } from '../data/categories';
@@ -22,6 +23,11 @@ export default function HomePage() {
   const [categoryImageOverrides, setCategoryImageOverrides] = useState({});
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [siteSettings, setSiteSettings] = useState(null);
+
+  useSEO({
+    title: 'Discover Local Businesses',
+    description: 'Browse thousands of trusted local businesses across Alberta. Find services you need in your community from real businesses.',
+  });
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 767px)');

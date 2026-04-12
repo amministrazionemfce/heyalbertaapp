@@ -2,11 +2,20 @@ import { Link } from 'react-router-dom';
 import { ROUTES } from '../constants';
 import { ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
+import { useAuth } from '../lib/auth';
 
 /**
- * Homepage “local business” call-to-action — light card style aligned with other homepage sections.
+ * Homepage "local business" call-to-action — light card style aligned with other homepage sections.
+ * Only shown to non-logged-in users or vendors/admins.
  */
 export default function HomeCtaSection({ onListBusiness }) {
+  const { user } = useAuth();
+
+  // Hide CTA from regular users; show to non-logged-in, vendors, and admins
+  if (user?.role === 'user') {
+    return null;
+  }
+
   return (
     <section
       className="border-t border-slate-200/80 from-slate-50 via-white to-slate-50/90 py-20 md:py-28"
@@ -28,7 +37,7 @@ export default function HomeCtaSection({ onListBusiness }) {
             <Button
               type="button"
               onClick={onListBusiness}
-              className="h-12 rounded-xl px-8 text-base font-semibold shadow-md transition bg-spruce-700 hover:bg-spruce-800 text-white hover:shadow-lg"
+              className="h-12 rounded-xl px-8 text-base font-semibold shadow-md transition bg-spruce-700 hover:bg-spruce-700 text-white hover:shadow-lg"
               data-testid="cta-register-btn"
             >
               List Your Business <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
